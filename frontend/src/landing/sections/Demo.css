@@ -1,0 +1,149 @@
+.demo {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(5rem, 12vh, 8.5rem) 0;
+  background: var(--night);
+}
+.demo__glow {
+  position: absolute; inset: -20% -10% auto 40%;
+  z-index: -1;
+  height: 90%;
+  background:
+    radial-gradient(40% 50% at 60% 40%, rgba(255, 110, 66, 0.2), transparent 70%),
+    radial-gradient(30% 40% at 20% 70%, rgba(27, 63, 208, 0.16), transparent 70%);
+  pointer-events: none;
+}
+
+.demo__inner { display: grid; gap: 3rem; align-items: start; }
+.demo__copy { display: grid; gap: 1.1rem; align-content: start; }
+.demo__title { font-size: clamp(2.6rem, 1rem + 5vw, 5.6rem); }
+.demo__lede { max-width: 28rem; font-size: 1.1rem; color: var(--ivory-2); }
+
+/* bitntech.in's "Get in touch" rows. */
+.demo__reach { margin-top: 1.25rem; border-top: 1px solid var(--line-d); }
+.demo__reach a {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 0.95rem 0.2rem;
+  border-bottom: 1px solid var(--line-d);
+  color: var(--ivory);
+  text-decoration: none;
+  transition: padding 0.35s var(--out), color 0.25s var(--ease);
+}
+.demo__reach small { grid-column: 1; font: 500 0.64rem var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--ivory-3); }
+.demo__reach span { grid-column: 1; font-size: 1.15rem; font-weight: 500; }
+.demo__reach i { grid-column: 2; grid-row: 1 / span 2; font-style: normal; color: var(--ivory-3); transition: transform 0.35s var(--out), color 0.25s var(--ease); }
+.demo__reach a:hover { padding-left: 0.6rem; }
+.demo__reach a:hover i { color: var(--orange); transform: translate(3px, -3px); }
+
+/* ---- the form ---- */
+
+.form {
+  position: relative;
+  display: grid;
+  gap: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  border: 1px solid var(--line-d);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(247, 243, 237, 0.045), rgba(247, 243, 237, 0.015));
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.form__group { display: grid; gap: 1rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.form__legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  padding: 0;
+  font: 500 0.68rem var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ivory-3);
+}
+.form__legend b { font-weight: 500; color: var(--orange); }
+.form__legend::after { content: ''; flex: 1; height: 1px; background: var(--line-d); }
+
+.form__grid { display: grid; gap: 0.9rem; }
+@media (min-width: 560px) {
+  .form__grid { grid-template-columns: 1fr 1fr; }
+  .field--full { grid-column: 1 / -1; }
+}
+
+.field { display: grid; gap: 0.45rem; }
+.field > span, .choice__label { font: 500 0.66rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ivory-3); }
+.field input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--line-d2);
+  border-radius: 12px;
+  background: rgba(5, 6, 10, 0.55);
+  color: var(--ivory);
+  font-size: 1.0625rem; /* over 16px: iOS does not zoom into the field */
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.field input::placeholder { color: rgba(247, 243, 237, 0.3); }
+.field input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(255, 110, 66, 0.2); }
+.field input[aria-invalid='true'] { border-color: var(--miss); }
+
+.choice { display: grid; gap: 0.6rem; border-radius: 12px; }
+.choice[aria-invalid='true'] .chip { border-color: rgba(255, 77, 94, 0.55); }
+.choice__opts { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.choice__opts--row { display: grid; grid-template-columns: repeat(4, 1fr); }
+.chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--line-d2);
+  border-radius: 99px;
+  color: var(--ivory-2);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.chip:hover { border-color: var(--ivory-3); color: var(--ivory); }
+.chip.is-on { border-color: var(--orange); background: var(--orange); color: var(--orange-ink); font-weight: 700; }
+.chip:has(input:focus-visible) { outline: 2px solid var(--orange); outline-offset: 3px; }
+.chip--vol { padding-inline: 0.5rem; font-family: var(--mono); font-size: 0.85rem; }
+
+.form__error { min-height: 1.4em; margin: -0.5rem 0 -0.75rem; color: #ffb4a8; font-size: 0.92rem; }
+.form__error:empty { min-height: 0; margin: 0; }
+.form__submit { width: 100%; min-height: 58px; font-size: 1.05rem; }
+.form__submit:disabled { cursor: default; opacity: 0.7; }
+.form__fine { margin-top: -0.75rem; text-align: center; font-size: 0.8rem; color: var(--ivory-3); }
+
+.form__done {
+  position: absolute; inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-radius: inherit;
+  background: radial-gradient(80% 60% at 100% 0%, rgba(255, 110, 66, 0.25), transparent 60%), #120f12;
+  animation: done-in 0.6s var(--out);
+}
+@keyframes done-in { from { opacity: 0; transform: scale(0.98); } }
+.form__tick { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: var(--orange); }
+.form__tick svg { width: 26px; height: 26px; fill: none; stroke: var(--orange-ink); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.form__done h3 { font: 800 clamp(1.6rem, 1.2rem + 1.4vw, 2.3rem)/1.1 var(--display); letter-spacing: -0.035em; color: var(--ivory); }
+.form__done p { color: var(--ivory-2); }
+
+@media (min-width: 980px) {
+  .demo__inner { grid-template-columns: 0.9fr 1.1fr; gap: 5rem; }
+  .demo__copy { position: sticky; top: 7rem; }
+}
+@media (max-width: 400px) {
+  .choice__opts--row { grid-template-columns: repeat(2, 1fr); }
+}

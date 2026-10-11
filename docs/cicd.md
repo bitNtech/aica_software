@@ -13,17 +13,21 @@ main ─► CI ──► approval (production environment) ──► Vercel prod
 |---|---|
 | `.github/workflows/pipeline.yml` | Entry point for PRs, pushes to `main` and manual runs |
 | `.github/workflows/ci.yml` | Reusable CI: frontend typecheck, tests, build; backend pytest; gitleaks, `npm audit`, `pip-audit` |
-| `.github/scripts/smoke.sh` | Post-deploy checks: `/api/health`, `/api/auth/session` (401), `/`, and the SPA fallback |
+| `.github/scripts/smoke.sh` | Post-deploy checks: `/api/health`, `/api/auth/session` (401), the landing page at `/` and its media, `/login`, and the console fallback |
 | `.github/dependabot.yml` | Weekly npm, pip and Actions updates |
-| `vercel.json` | One Vercel project, two [Services](https://vercel.com/docs/services) (beta): `console` (Vite, `frontend/`) and `api` (FastAPI, `backend/app/main.py`) |
+| `vercel.json` | One Vercel project, two [Services](https://vercel.com/docs/services) (beta): `console` (Vite, `frontend/`, which also builds the landing page) and `api` (FastAPI, `backend/app/main.py`) |
 | `.vercelignore` | Keeps `.env`, `secrets/`, virtualenvs and tests out of the upload |
 
 ## How the deployment fits together
 
 Both services are on one domain. Vercel sends `/api/*` to the FastAPI app,
 which sees the original path, so the routes are the same as in local dev.
-Everything else goes to the static console, and unknown paths fall back to
-`index.html`. The session cookie and the backend's CSRF origin check
+Everything else goes to the static `frontend/` build. It holds two pages:
+`index.html` is the prerendered landing page served at `/`, and `app.html`
+is the console's shell. Any path that isn't a real file falls back to
+`app.html`. The same fallback runs in `vite` and `vite preview`
+(`frontend/vite.config.ts`). The landing page's fixed-name media in
+`/assets/*` is cached for a day; hashed files in `/static/*` are immutable. The session cookie and the backend's CSRF origin check
 therefore work the same way as with the Vite proxy locally.
 
 On Vercel, the backend reads Vercel's system variables (see

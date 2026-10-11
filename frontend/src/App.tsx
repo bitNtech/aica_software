@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { RedirectIfSignedIn, RequireAuth, RequireStaff } from './auth/guards'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
 import ChooseOrgPage from './pages/ChooseOrgPage'
@@ -21,7 +21,7 @@ const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      {/* "/" is the landing page in web/, served by its own service (see vercel.json). */}
 
       {/* Signed out */}
       <Route path="/login" element={guest(<LoginPage />)} />

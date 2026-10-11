@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:demo": "VITE_AUTH_MODE=demo vite",
     "api": "cd ../backend && .venv/bin/uvicorn app.main:app --port 8000 --reload",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --ssr src/landing/entry-server.tsx --outDir dist-ssr && node scripts/prerender-landing.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",

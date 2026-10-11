@@ -1,0 +1,237 @@
+/* ======================================================================
+   AICA by BitNTech — base.
+   Palette is bitntech.in's: near-black ground, cream paper, plum, the
+   orange accent and the footer's pink. AICA's own blue (the orb in its film)
+   is kept for one job only: it is the colour of AICA speaking. Orange is the
+   caller, the business, and every button.
+   ====================================================================== */
+
+:root {
+  --night: #05060a;
+  --coal: #0b0a0b;
+  --coal-2: #141214;
+  --coal-3: #1b181a;
+  --ivory: #f7f3ed;
+  --ivory-2: rgba(247, 243, 237, 0.78);
+  --ivory-3: rgba(247, 243, 237, 0.56);
+  --line-d: rgba(247, 243, 237, 0.13);
+  --line-d2: rgba(247, 243, 237, 0.26);
+
+  --cream: #f5efe3;
+  --cream-2: #ece4d4;
+  --plum: #220934;
+  --paper-text: #57534e;
+  --line-p: #e2d9c8;
+
+  --orange: #ff6e42;
+  --orange-2: #ff8c66;
+  --orange-ink: #1d0c05;
+  --pink: #ed5565;
+
+  --aica: #5b84ff;
+  --aica-deep: #1b3fd0;
+  --ok: #3ccf91;
+  --miss: #ff4d5e;
+
+  --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'DM Mono', ui-monospace, Consolas, monospace;
+  --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
+
+  /* One curve for every state change, as on bitntech.in. */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --pad: clamp(1rem, 4vw, 4.5rem);
+  --max: 1240px;
+  --app-bottom-nav: env(safe-area-inset-bottom);
+
+  color-scheme: dark;
+}
+
+/* Paper sections follow the visitor's theme; the dark ones are dark by design. */
+.paper {
+  --bg: var(--cream);
+  --bg-2: var(--cream-2);
+  --ink: var(--plum);
+  --text: var(--paper-text);
+  --line: var(--line-p);
+  --card: #fbf8f2;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  .paper {
+    --bg: #12100f;
+    --bg-2: #1a1716;
+    --ink: var(--ivory);
+    --text: rgba(247, 243, 237, 0.7);
+    --line: rgba(247, 243, 237, 0.12);
+    --card: #1c1918;
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* The page edge was split by the scrollbar gutter on bitntech.in too. */
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar { display: none; }
+
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--ivory-2);
+  font: 400 1.0625rem/1.6 var(--sans);
+  letter-spacing: 0.005em;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+}
+
+[lang='ta'], .ta { font-family: var(--tamil); letter-spacing: 0; }
+
+img, video, svg { display: block; max-width: 100%; }
+h1, h2, h3, h4, p, ul, ol, figure, blockquote { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a, button, label, summary, input, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: fixed; top: 0; left: 0; z-index: 10000;
+  padding: 0.85rem 1.25rem;
+  background: var(--plum); color: #fff;
+  font: 600 0.85rem var(--sans);
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+  transform: translateY(-120%);
+  transition: transform 0.18s var(--ease);
+}
+.skip-link:focus-visible { transform: none; outline-offset: -4px; }
+
+.wrap { width: 100%; max-width: calc(var(--max) + 2 * var(--pad)); margin-inline: auto; padding-inline: var(--pad); }
+
+/* ---- labels: the site's mono kicker, "BITNTECH / PRODUCTS" ---- */
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  font: 500 0.7rem/1.4 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+.label i { font-style: normal; opacity: 0.55; color: currentColor; }
+.label--quiet { color: var(--ivory-3); }
+.paper .label--quiet { color: var(--text); }
+
+/* ---- display type ---- */
+
+.display {
+  font-family: var(--display);
+  font-weight: 800;
+  font-stretch: 100%;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--ivory);
+  text-wrap: balance;
+}
+.paper .display { color: var(--ink); }
+.display em { font-style: normal; color: var(--orange); }
+
+.h2 { font-size: clamp(2.4rem, 1.2rem + 5vw, 5.4rem); }
+
+/* An outlined word: "Our" in "Our Products". */
+.ghost {
+  color: transparent !important;
+  -webkit-text-stroke: var(--stroke-w, 1.5px) var(--stroke, var(--ivory-2));
+}
+.paper .ghost { --stroke: var(--ink); }
+
+/* ---- buttons: bitntech.in's pills ---- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 52px;
+  padding: 0.85rem 1.6rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: 700 1rem/1.1 var(--sans);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.3s var(--out), border-color 0.25s var(--ease), color 0.25s var(--ease), background-color 0.25s var(--ease);
+}
+.btn .arrow { display: inline-block; transition: transform 0.35s var(--out); }
+.btn:hover .arrow { transform: translate(2px, -2px); }
+.btn:active { transform: scale(0.98); }
+
+.btn--orange { background: var(--orange); color: var(--orange-ink); }
+/* A darker fill sweeps in from the left on hover. */
+.btn--orange::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: var(--orange-2);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--out);
+}
+.btn--orange:hover::before { transform: scaleX(1); }
+
+.btn--white { background: #fff; color: #14161a; }
+.btn--white:hover { background: var(--ivory); }
+
+.btn--line { border-color: var(--line-d2); color: var(--ivory); background: transparent; }
+.btn--line:hover { border-color: var(--ivory); }
+
+.btn--sm { min-height: 42px; padding: 0.6rem 1.15rem; font-size: 0.875rem; }
+
+/* ---- reveal ----
+   Visible by default (the prerendered page shows everything); App marks what
+   is still below the fold as waiting, and lifts it in as it arrives. */
+
+.rise { transition: opacity 0.9s var(--out), transform 0.9s var(--out); transition-delay: calc(var(--d, 0) * 90ms); }
+.rise.is-waiting { opacity: 0; transform: translateY(32px); }
+
+/* The phone bar is fixed over the foot of every screen; the last section and
+   the footer's bubbles need the room. */
+@media (max-width: 767px) {
+  main > section:last-of-type { padding-bottom: 9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .rise.is-waiting { opacity: 1; transform: none; }
+}

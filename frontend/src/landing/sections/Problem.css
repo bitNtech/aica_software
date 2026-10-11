@@ -1,0 +1,181 @@
+/* Three screens of scroll; the stage holds still for all of them. */
+.problem {
+  position: relative;
+  height: 300vh;
+  background: var(--coal);
+  transition: background-color 0.8s var(--ease);
+}
+.problem.is-beat-1 { background: #0a0708; }
+.problem.is-beat-2 { background: #12081a; }
+
+.problem__stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.problem__stage::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(40rem 26rem at 80% 50%, rgba(255, 110, 66, 0.1), transparent 70%);
+  transition: opacity 0.8s var(--ease);
+  pointer-events: none;
+}
+.is-beat-1 .problem__stage::before { background: radial-gradient(40rem 26rem at 80% 50%, rgba(255, 77, 94, 0.12), transparent 70%); }
+.is-beat-2 .problem__stage::before { background: radial-gradient(40rem 26rem at 80% 50%, rgba(140, 60, 200, 0.16), transparent 70%); }
+
+.problem__inner {
+  position: relative;
+  display: grid;
+  gap: clamp(1.25rem, 3vh, 3rem) 4rem;
+  align-items: center;
+  padding-top: 4.5rem;
+}
+
+.problem__count { color: var(--ivory); }
+.problem__title {
+  margin-top: 1rem;
+  font-size: clamp(2rem, 1rem + 3.6vw, 4.2rem);
+  max-width: 13ch;
+}
+
+/* The three beats sit on top of one another; the current one is lifted in. */
+.problem__beats { display: grid; margin-top: clamp(1rem, 3vh, 2.25rem); }
+.problem__beat {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s var(--ease), transform 0.7s var(--out);
+  pointer-events: none;
+}
+.problem__beat.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.problem__stat { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.problem__stat b {
+  font: 900 clamp(3.2rem, 2rem + 4.6vw, 6.4rem)/0.9 var(--display);
+  font-stretch: 112%;
+  letter-spacing: -0.05em;
+  color: var(--orange);
+}
+.is-beat-1 .problem__stat b { color: var(--miss); }
+.is-beat-2 .problem__stat b { color: #c792ff; }
+.problem__stat span { font: 500 0.75rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ivory-3); }
+.problem__beat h3 { margin-top: 0.85rem; font: 700 clamp(1.25rem, 1rem + 0.8vw, 1.6rem)/1.2 var(--display); letter-spacing: -0.02em; color: var(--ivory); }
+.problem__beat h3 + p { margin-top: 0.4rem; max-width: 30rem; color: var(--ivory-3); }
+
+.problem__ticks { display: flex; gap: 6px; margin-top: clamp(1rem, 3vh, 2rem); max-width: 16rem; }
+.problem__ticks li { flex: 1; height: 3px; overflow: hidden; background: var(--line-d); border-radius: 2px; }
+.problem__ticks i { display: block; height: 100%; background: var(--orange); transform-origin: left; transform: scaleX(var(--fill, 0)); }
+
+/* ---- the switchboard ---- */
+
+.board {
+  position: relative;
+  padding: clamp(0.75rem, 1.5vw, 1.1rem);
+  border: 1px solid var(--line-d);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(247, 243, 237, 0.035), rgba(247, 243, 237, 0.01));
+  transform: perspective(1400px) rotateY(-9deg) rotateX(4deg);
+  transform-origin: left center;
+  transition: transform 1s var(--out);
+}
+.is-beat-1 .board { transform: perspective(1400px) rotateY(-4deg) rotateX(2deg) scale(0.98); }
+.board__head {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.15rem 0.35rem 0.75rem;
+  font: 500 0.68rem var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ivory-3);
+}
+.board__clock { color: var(--ivory-2); }
+.is-beat-1 .board__clock { color: var(--miss); }
+
+.board__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+@media (min-width: 1200px) { .board__grid { grid-template-columns: repeat(4, 1fr); } }
+
+.line {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+  min-height: 78px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line-d);
+  border-radius: 12px;
+  background: rgba(20, 18, 20, 0.85);
+  transition: border-color 0.5s var(--ease), background-color 0.5s var(--ease), opacity 0.5s var(--ease);
+  transition-delay: calc(var(--i) * 40ms);
+}
+.line__n { font: 500 0.62rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ivory-3); }
+.line__state { display: grid; }
+.line__state > span { grid-area: 1 / 1; transition: opacity 0.45s var(--ease), transform 0.5s var(--out); transition-delay: calc(var(--i) * 40ms); }
+.line__live, .line__missed { display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.45rem; row-gap: 0.1rem; font-weight: 600; font-size: 0.95rem; color: var(--ivory); white-space: nowrap; }
+/* The time sits under the status, lined up with its text. */
+.line__live em, .line__missed em { flex-basis: 100%; padding-left: calc(7px + 0.45rem); font: 400 0.68rem var(--mono); font-style: normal; color: var(--ivory-3); }
+.line__live i, .line__missed i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.line--ringing .line__live i { background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: blink 0.9s steps(2) infinite; }
+.line--waiting .line__live i { background: #f4b740; }
+.line--hold .line__live i { background: var(--orange-2); }
+.line--ringing { border-color: rgba(255, 110, 66, 0.35); }
+.line__missed i { background: var(--miss); box-shadow: 0 0 0 3px rgba(255, 77, 94, 0.18); }
+.line__bot { display: grid; gap: 0.2rem; font-size: 0.78rem; line-height: 1.35; }
+.line__bot b { font-weight: 600; color: var(--ivory); font-size: 0.86rem; }
+.line__bot span { color: var(--ivory-3); }
+.line__bot i { font-style: normal; margin-right: 0.3rem; color: var(--miss); }
+
+.line__missed, .line__bot { opacity: 0; transform: translateY(8px); }
+.is-beat-1 .line__live, .is-beat-2 .line__live { opacity: 0; transform: translateY(-8px); }
+.is-beat-1 .line__missed { opacity: 1; transform: none; }
+.is-beat-2 .line__bot { opacity: 1; transform: none; }
+.is-beat-1 .line { border-color: rgba(255, 77, 94, 0.18); background: rgba(16, 10, 12, 0.9); }
+.is-beat-1 .line:nth-child(n + 7) { opacity: 0.55; }
+.is-beat-2 .line { border-color: rgba(199, 146, 255, 0.16); }
+
+/* A question surfacing on a line that has been ringing too long. */
+.line__ask {
+  position: absolute;
+  left: 50%; top: -0.9rem;
+  z-index: 2;
+  padding: 0.35rem 0.7rem;
+  border-radius: 10px 10px 10px 2px;
+  background: #fff;
+  color: #14161a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  transform: translateX(-30%);
+  animation: ask 2s var(--out) both;
+}
+@keyframes ask {
+  0% { opacity: 0; transform: translateX(-30%) translateY(8px) scale(0.9); }
+  15%, 80% { opacity: 1; transform: translateX(-30%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-30%) translateY(-6px); }
+}
+@keyframes blink { 50% { opacity: 0.35; } }
+
+@media (min-width: 980px) {
+  .problem__inner { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); padding-top: 3rem; }
+}
+
+/* Phones: the copy above, six lines of the board below, all inside one screen. */
+@media (max-width: 979px) {
+  .problem__inner { align-content: center; }
+  .board { transform: none !important; }
+  .problem__title { max-width: 16ch; }
+}
+@media (max-width: 640px) {
+  .board__grid { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
+  .line:nth-child(n + 7) { display: none; }
+  .line { min-height: 66px; padding: 0.55rem 0.6rem; }
+  .line__live, .line__missed { font-size: 0.85rem; }
+  .problem__beat h3 + p { font-size: 0.95rem; }
+  .problem__inner { padding-top: 4rem; gap: 1rem; }
+}
+@media (max-height: 700px) and (max-width: 640px) {
+  .problem__title { font-size: 1.8rem; }
+  .problem__stat b { font-size: 2.6rem; }
+  .line:nth-child(n + 5) { display: none; }
+}

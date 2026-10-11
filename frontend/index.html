@@ -3,24 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Sign in · AICA</title>
-    <meta name="description" content="AICA console — sign in to manage your AI front desk." />
-    <!-- The console is private; keep it out of search results. -->
-    <meta name="robots" content="noindex, nofollow" />
+    <title>AICA — AI Voice Agent for Tamil, English &amp; Tanglish Calls | BitNTech</title>
+    <meta name="description" content="AICA is an AI voice agent that handles inbound calls in Tamil, English and Tanglish — answering enquiries, completing tasks, and transferring the tricky ones to your team." />
+    <link rel="canonical" href="https://aica.bitntech.in/" />
+    <!-- Matches the hero, so the browser chrome does not flash a white strip above it. -->
     <meta name="theme-color" content="#05060a" />
+    <meta name="author" content="BitNTech" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-video-preview:-1" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="AICA by BitNTech" />
+    <meta property="og:url" content="https://aica.bitntech.in/" />
+    <meta property="og:title" content="AICA — AI Voice Agent for Tamil, English &amp; Tanglish Calls" />
+    <meta property="og:description" content="AICA answers your business calls in Tamil, English and Tanglish — handles the repetitive enquiries, runs your workflows, and hands complex calls to your team." />
+    <meta property="og:image" content="https://aica.bitntech.in/assets/img/og-aica.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Meet AICA — the AI voice agent from BitNTech" />
+    <meta property="og:locale" content="en_IN" />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
-    <!-- bitntech.in's type, same set as aica.bitntech.in: Archivo for display,
-         DM Sans for text, DM Mono for labels, Noto Sans Tamil for Tamil. -->
+    <!-- bitntech.in's type: Archivo (width + weight axes — the display face the
+         home hero animates), DM Sans for text, DM Mono for labels. Noto Sans
+         Tamil carries every Tamil line. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400..800&family=Noto+Sans+Tamil:wght@400..700&display=swap"
     />
+    <link rel="preload" as="image" href="/assets/img/aica-orb.webp" type="image/webp" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://bitntech.in/#organization",
+            "name": "BitNTech",
+            "url": "https://bitntech.in/",
+            "logo": "https://bitntech.in/logo.png",
+            "email": "support@bitntech.in",
+            "telephone": "+91 78289 14263",
+            "sameAs": ["https://linkedin.com/company/bitntech", "https://www.instagram.com/bitntech.in/"]
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "AICA",
+            "applicationCategory": "BusinessApplication",
+            "description": "AI voice agent for inbound business calls in Tamil, English and Tanglish.",
+            "url": "https://aica.bitntech.in/",
+            "publisher": { "@id": "https://bitntech.in/#organization" }
+          },
+          {
+            "@type": "VideoObject",
+            "name": "Meet AICA — the AI voice agent from BitNTech",
+            "description": "AICA answering hospital front-desk calls in Tamil, English and Tanglish: booking an appointment, answering OP timings, and handing a complex call to the team.",
+            "thumbnailUrl": "https://aica.bitntech.in/assets/media/aica-poster.jpg",
+            "contentUrl": "https://aica.bitntech.in/assets/media/aica-film.mp4",
+            "uploadDate": "2026-10-04",
+            "duration": "PT43S"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root"><!--app--></div>
+    <script type="module" src="/src/landing/main.tsx"></script>
   </body>
 </html>

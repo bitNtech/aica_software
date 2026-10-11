@@ -28,5 +28,7 @@ check() {
 
 check /api/health 200 '"ok":true'
 check /api/auth/session 401 '"unauthenticated"'
-check / 200 'id="root"'
-check /login 200 'id="root"'  # SPA fallback
+check / 200 'Every call'                    # the landing page, prerendered (frontend/index.html)
+check /assets/media/aica-film.en.vtt 200 'WEBVTT'  # its fixed-name media
+check /login 200 'Sign in · AICA'           # the console shell (frontend/app.html)
+check /o/example 200 'Sign in · AICA'       # console SPA fallback
