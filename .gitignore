@@ -1,0 +1,19 @@
+# Repo-wide safety net; backend/ and frontend/ have their own ignores too.
+.env
+.env.*
+!.env.example
+secrets/
+*.json.key
+service-account*.json
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+node_modules/
+dist/
+*.tsbuildinfo
+
+.vercel/
+.DS_Store

@@ -1,0 +1,111 @@
+/* bitNtech's console frame. Night bar, paper canvas, a permanent orange
+   hairline: you are looking at every client's data. */
+
+.ops { min-height: 100dvh; background: var(--bg); }
+
+.ops__hairline {
+  position: sticky;
+  top: 0;
+  z-index: 51;
+  height: 3px;
+  background: var(--orange);
+}
+
+.ops__bar {
+  position: sticky;
+  top: 3px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 1rem 2rem;
+  min-height: 64px;
+  padding: 0.6rem clamp(1rem, 3vw, 2.5rem);
+  background: var(--night);
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+}
+
+.ops__brand { display: inline-flex; align-items: center; gap: 0.75rem; text-decoration: none; border-radius: 8px; }
+.ops__tag {
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  color: var(--orange);
+  font: 500 0.65rem/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.ops__nav { display: flex; gap: 0.25rem; }
+.ops__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+  padding: 0 0.9rem;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+.ops__link:hover { color: var(--ink); }
+.ops__link.active { color: var(--ink); background: rgba(247, 243, 237, 0.08); }
+.ops__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: var(--r-pill);
+  background: var(--orange);
+  color: var(--orange-ink);
+  font: 700 0.72rem/1 var(--sans);
+}
+
+.ops__me { display: flex; align-items: center; gap: 1rem; margin-left: auto; }
+.ops__demo {
+  padding: 0.3rem 0.55rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  font: 500 0.62rem/1 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ops__who { display: grid; justify-items: end; line-height: 1.2; }
+.ops__name { color: var(--ink); font-weight: 600; font-size: 0.9rem; }
+.ops__role { font: 500 0.62rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.ops__role--master_admin { color: var(--orange); }
+.ops__out {
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: border-color 0.2s var(--ease);
+}
+.ops__out:hover { border-color: var(--ink); }
+.ops__out:disabled { opacity: 0.6; }
+
+.ops__main {
+  width: 100%;
+  max-width: calc(1120px + 2 * clamp(1rem, 3vw, 2.5rem));
+  margin-inline: auto;
+  padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+.ops__main:focus { outline: none; }
+.ops__head { display: grid; gap: 0.8rem; margin-bottom: 2rem; }
+.ops__title { font-size: clamp(2.1rem, 1.4rem + 2.4vw, 3.2rem); }
+.ops__lede { max-width: 40rem; color: var(--text); }
+
+@media (max-width: 860px) {
+  .ops__bar { flex-wrap: wrap; gap: 0.6rem 1rem; }
+  .ops__nav { order: 3; width: 100%; overflow-x: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
+  .ops__who, .ops__demo { display: none; }
+}

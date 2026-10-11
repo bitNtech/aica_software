@@ -1,0 +1,121 @@
+/* ======================================================================
+   AICA console — design tokens.
+   The palette, type and curves are aica.bitntech.in's (and so bitntech.in's):
+   near-black ground, cream paper, plum ink, the orange accent. AICA's blue
+   keeps the one job it has on the landing page — it is AICA itself (the
+   voice line, "AICA is listening"). Orange is every action and focus ring.
+
+   Brand tokens are fixed. Surface tokens (--bg, --ink, --text, --line, …)
+   are what components use; they flip with the theme. The `stage` surface is
+   dark by design, whatever the theme.
+   ====================================================================== */
+
+:root {
+  /* ---- brand ---- */
+  --night: #05060a;
+  --coal: #0b0a0b;
+  --coal-2: #141214;
+  --ivory: #f7f3ed;
+  --ivory-2: rgba(247, 243, 237, 0.78);
+  --ivory-3: rgba(247, 243, 237, 0.56);
+  --line-d: rgba(247, 243, 237, 0.13);
+  --line-d2: rgba(247, 243, 237, 0.26);
+
+  --cream: #f5efe3;
+  --cream-2: #ece4d4;
+  --plum: #220934;
+  --paper-text: #57534e;
+  --line-p: #e2d9c8;
+
+  --orange: #ff6e42;
+  --orange-2: #ff8c66;
+  --orange-ink: #1d0c05;
+
+  --aica: #5b84ff;
+  --aica-deep: #1b3fd0;
+  --ok: #1f9d68;
+  --danger: #c8283a;
+  --warn: #b26a00;
+
+  /* ---- type ---- */
+  --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
+  --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'DM Mono', ui-monospace, Consolas, monospace;
+  --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
+
+  /* ---- space, shape ---- */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+  --r-field: 14px;
+  --r-card: 20px;
+  --r-pill: 999px;
+  --field-h: 52px;
+
+  /* ---- motion: one curve for state changes, one for arrivals ---- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- surface: paper, light ---- */
+  --bg: var(--cream);
+  --bg-2: var(--cream-2);
+  --card: #fbf8f2;
+  --field: #fffdf9;
+  --ink: var(--plum);
+  --text: var(--paper-text);
+  --muted: #6b655e;
+  /* Orange for small text on paper: the brand orange is too light to read at 0.7rem. */
+  --orange-text: #b8400f;
+  --line: var(--line-p);
+  --line-strong: #c9bda7;
+  --danger-ink: var(--danger);
+  --danger-bg: #fbe9e7;
+  --ok-ink: var(--ok);
+  --ok-bg: #e5f4ec;
+  --warn-ink: var(--warn);
+  --warn-bg: #fbf0dc;
+  --info-bg: #e8edff;
+  --info-ink: var(--aica-deep);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12100f;
+    --bg-2: #1a1716;
+    --card: #1c1918;
+    --field: #161413;
+    --ink: var(--ivory);
+    --text: rgba(247, 243, 237, 0.72);
+    --muted: rgba(247, 243, 237, 0.56);
+    --orange-text: var(--orange);
+    --line: rgba(247, 243, 237, 0.13);
+    --line-strong: rgba(247, 243, 237, 0.28);
+    --danger-ink: #ff8a8f;
+    --danger-bg: rgba(255, 77, 94, 0.12);
+    --ok-ink: #5fe0a8;
+    --ok-bg: rgba(60, 207, 145, 0.12);
+    --warn-ink: #ffc266;
+    --warn-bg: rgba(255, 176, 50, 0.12);
+    --info-bg: rgba(91, 132, 255, 0.14);
+    --info-ink: #9db6ff;
+    color-scheme: dark;
+  }
+}
+
+/* The dark stage: the landing page's night ground, in any theme. */
+.stage {
+  --bg: var(--night);
+  --ink: var(--ivory);
+  --text: var(--ivory-2);
+  --muted: var(--ivory-3);
+  --orange-text: var(--orange);
+  --line: var(--line-d);
+  --line-strong: var(--line-d2);
+  color-scheme: dark;
+}

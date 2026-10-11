@@ -1,0 +1,11 @@
+# Secrets: never commit.
+.env
+.env.*
+!.env.example
+secrets/
+*.json.key
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,150 @@
+/* ======================================================================
+   AICA console — base. Reset, focus, and the brand's shared primitives:
+   the mono kicker label, display type and the pill buttons.
+   ====================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 1rem/1.55 var(--sans);
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+}
+
+[lang='ta'], .ta { font-family: var(--tamil); letter-spacing: 0; }
+
+img, svg { display: block; max-width: 100%; }
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: fixed; top: 0; left: 0; z-index: 1000;
+  padding: 0.85rem 1.25rem;
+  background: var(--plum); color: #fff;
+  font: 600 0.85rem var(--sans);
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+  transform: translateY(-120%);
+  transition: transform 0.18s var(--ease);
+}
+.skip-link:focus-visible { transform: none; outline-offset: -4px; }
+
+/* ---- the site's mono kicker: "AICA / SIGN IN" ---- */
+
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  font: 500 0.7rem/1.4 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--orange-text, var(--orange));
+}
+.label i { font-style: normal; opacity: 0.55; color: currentColor; }
+.label--quiet { color: var(--muted); }
+
+/* ---- display type ---- */
+
+.display {
+  font-family: var(--display);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.display em { font-style: normal; color: var(--orange); }
+
+/* ---- links ---- */
+
+.link {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--orange) 70%, transparent);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.2s var(--ease);
+}
+.link:hover { text-decoration-color: var(--orange); }
+
+/* ---- buttons: bitntech.in's pills ---- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: var(--field-h);
+  padding: 0.85rem 1.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font: 700 1rem/1.1 var(--sans);
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.3s var(--out), border-color 0.25s var(--ease), color 0.25s var(--ease), background-color 0.25s var(--ease), opacity 0.2s var(--ease);
+}
+.btn .arrow { display: inline-block; transition: transform 0.35s var(--out); }
+.btn:hover .arrow { transform: translateX(3px); }
+.btn:active { transform: scale(0.98); }
+.btn[aria-disabled='true'], .btn:disabled { cursor: not-allowed; }
+.btn:disabled:not([aria-busy='true']) { opacity: 0.5; }
+.btn--block { width: 100%; }
+
+.btn--orange { background: var(--orange); color: var(--orange-ink); }
+/* A lighter fill sweeps in from the left on hover. */
+.btn--orange::before {
+  content: '';
+  position: absolute; inset: 0; z-index: -1;
+  background: var(--orange-2);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--out);
+}
+.btn--orange:hover:not(:disabled)::before { transform: scaleX(1); }
+
+.btn--plum { background: var(--ink); color: var(--bg); }
+.btn--plum:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 88%, var(--orange)); }
+
+.btn--line { border-color: var(--line-strong); color: var(--ink); background: transparent; }
+.btn--line:hover:not(:disabled) { border-color: var(--ink); }
+
+.btn--sm { min-height: 42px; padding: 0.6rem 1.15rem; font-size: 0.875rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
