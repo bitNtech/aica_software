@@ -4,7 +4,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -37,9 +37,32 @@ class Settings(BaseSettings):
     lockout_minutes: int = 15
     invite_days: int = 7
 
+    # Vercel system variables (hostnames, no scheme), set only on Vercel.
+    vercel_env: str = ""
+    vercel_url: str = ""
+    vercel_branch_url: str = ""
+    vercel_project_production_url: str = ""
+
+    @model_validator(mode="after")
+    def _vercel_defaults(self) -> Settings:
+        """On Vercel, default APP_URL to this deployment's own address and
+        cookies to Secure. Explicitly set values always win."""
+        if not self.vercel_url:
+            return self
+        own = self.vercel_project_production_url if self.vercel_env == "production" else self.vercel_branch_url or self.vercel_url
+        if "app_url" not in self.model_fields_set and own:
+            self.app_url = f"https://{own}"
+        if "cookie_secure" not in self.model_fields_set:
+            self.cookie_secure = True
+        return self
+
     @property
     def origins(self) -> set[str]:
-        return {o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()}
+        configured = {o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()}
+        # A deployment always accepts writes from its own hostnames: preview
+        # URLs aren't known until deploy time, so they can't be configured.
+        own = {f"https://{h}" for h in (self.vercel_url, self.vercel_branch_url, self.vercel_project_production_url) if h}
+        return configured | own
 
     @property
     def firestore_database_id(self) -> str | None:

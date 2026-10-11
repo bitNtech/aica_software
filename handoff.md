@@ -7,26 +7,25 @@
   - 2026-10-11, sign-up and master admin pages
   - 2026-10-12, CI/CD: own GitHub repo for `aica_software` (workflows in `.github/workflows/`), deploy to Vercel for every environment (PR previews and production), separate Firebase project for previews, `*.vercel.app` for now, manual approval before production, Dependabot
   - 2026-10-11, the backend: FastAPI, email/password and Google, Firestore `(default)` database (asia-south1; the user first said `aica`, but no database has that ID), Resend, master admins support@ and admin@bitntech.in, local env, default session lengths
-- Last verified: 2026-10-11.
+- Last verified: 2026-10-12 (CI/CD), 2026-10-11 (app).
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
 
 ## CI/CD (2026-10-12)
-- **Done:**
-  - `.github/workflows/ci.yml` runs frontend typecheck, tests and build; backend pytest on Python 3.14 (`backend/.python-version`); gitleaks, `npm audit --omit=dev` and `pip-audit`.
-  - `.github/dependabot.yml` covers npm, pip and actions.
-  - The root `.gitignore` is a safety net.
-  - The backend accepts `FIREBASE_CREDENTIALS_JSON`, which overrides the file path (`app/services.py: firebase_certificate`, `tests/test_settings.py`).
-- **Verified locally:** pytest 32/32; typecheck, 48/48 tests and build pass; `npm audit` finds 0. Not run locally: pip-audit (no pipx here), gitleaks, actionlint (not installed). Nothing has run on GitHub yet.
-- **Blocked on a decision: Vercel topology.** The approved plan had two Vercel projects, with the console rewriting `/api` to the API project. That's circular for previews: the API's `ALLOWED_ORIGINS` and `APP_URL` need the console's preview URL, and the console's rewrite needs the API's URL. The recommendation is **one Vercel project** serving the static build plus `api/index.py`. The backend would add Vercel's system URLs (`VERCEL_URL`, `VERCEL_BRANCH_URL`, `VERCEL_PROJECT_PRODUCTION_URL`) to the allowed origins. That gives one deployment, one rollback and no version skew.
-- **Not built yet:** `deploy.yml`, `vercel.json`, the Vercel entrypoint, `.vercelignore`, `docs/cicd.md`.
-- **To do:** add `FIREBASE_CREDENTIALS_JSON=` to `backend/.env.example` (Claude can't read that file).
-- **Vercel notes:**
-  - Commercial use needs Pro.
-  - The in-process rate limiter doesn't work across serverless instances.
-  - Google sign-in on previews needs a fixed preview domain.
-  - Vercel may not run the ASGI lifespan. The post-deploy smoke test checks `/api/auth/session` returns 401, not just `/api/health`, so a missing services container is caught.
+- **Repo:** `git@github.com:bitNtech/aica_software.git`, pushed with the `github-personal` SSH alias. `backend/.env.example` is **not committed** because Claude can't read it to confirm it holds only placeholders. The user should check it, add `FIREBASE_CREDENTIALS_JSON=`, and commit it.
+- **Approved and built:** one Vercel project using Vercel Services (beta). `console` is `frontend/` (Vite) and `api` is `backend/` (FastAPI, `app/main.py` auto-detected); `/api/*` goes to the API and everything else to the console. GitHub Actions drives deploys; Vercel Git auto-deploy is off. See `docs/cicd.md` for the full setup.
+  - `pipeline.yml`: PR → CI → preview + smoke test + PR comment. `main` → CI → `production` environment approval → prod + smoke test. Deploy jobs skip until the repo variable `VERCEL_PROJECT_ID` is set. Fork and Dependabot PRs stop after CI.
+  - `ci.yml` is now reusable (`workflow_call` and manual runs). The gitleaks action was replaced with the gitleaks 8.30.1 CLI, pinned by SHA-256, because the action needs a paid license for org repos.
+  - Backend on Vercel: `FIREBASE_CREDENTIALS_JSON`. The deployment's own Vercel hostnames are added to the allowed origins (no wildcard). `APP_URL` defaults to the deployment URL, and `COOKIE_SECURE` to true. Explicit env always wins.
+- **Verified locally:**
+  - pytest 37/37; frontend typecheck, 48/48 tests and build pass; `npm audit` finds 0.
+  - gitleaks finds nothing in git history. The working-tree scan flags only the ignored `backend/.env` and `backend/secrets/`.
+  - `vercel.json` validates against Vercel's published schema.
+  - `smoke.sh` passes against the real app running on fakes, and fails as it should on an unreachable URL.
+- **Not verified:** a real Vercel build or deploy, which needs the user's Vercel project, token and env vars. `actionlint` isn't installed.
+- **First GitHub run:** frontend and backend passed. Security failed on the gitleaks license; fixed in the follow-up commit.
+- **Open Dependabot PRs:** 11 (actions v7, gitleaks-action v3, which is now unused, react-router 8 major, and Python ranges). Review them; don't bulk-merge. react-router 8 is a major upgrade.
 
 ## Goal
 Develop production-ready software in this repository. Most work is expected to involve frontend implementation and integration with externally hosted ASR, TTS, and LLM services.
@@ -93,6 +92,6 @@ Develop production-ready software in this repository. Most work is expected to i
 - **Copy that assumes a policy:** the pages say reset links last an hour and verification links 3 days, which are Firebase's defaults, and invites last 7 days (`INVITE_DAYS`). If anyone changes the expiry in Firebase, change the copy too.
 
 ## Next step
-0. CI/CD: the user picks the Vercel topology (above), then build `deploy.yml` and the Vercel config. Then the user creates the GitHub repo and the Vercel project(s), and sets the secrets.
+0. CI/CD: the user does the one-time setup in `docs/cicd.md` (Vercel Pro project, env vars per environment, preview Firebase project, GitHub secrets, variables and environments, branch protection). Then open a test PR to see the first preview deploy.
 1. The user completes "Needed from the user", then run both servers and do one real end-to-end pass: sign up, verify, approve as master admin, sign in, Google sign-in, reset.
 2. Then plan the Ops staff page or the portal shell.

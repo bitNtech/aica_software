@@ -46,6 +46,8 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `APP_URL`, `ALLOWED_ORIGINS` | `http://localhost:5173` locally |
 | `COOKIE_SECURE` | `true` behind HTTPS (required in production) |
 
+On Vercel, `APP_URL` defaults to the deployment's own URL, `COOKIE_SECURE` to `true`, and the deployment's own hostnames are always allowed origins. Explicit values win. See [`docs/cicd.md`](../docs/cicd.md).
+
 ## Firebase console setup
 
 1. **Firestore → Rules:** paste [`firestore.rules`](firestore.rules), which denies all client access. Only this API, through the Admin SDK, uses the database.

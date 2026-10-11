@@ -1,0 +1,19 @@
+# Never upload secrets or local environments.
+.env
+.env.*
+!.env.example
+**/secrets/
+**/*.json.key
+**/.venv/
+**/node_modules/
+**/dist/
+**/__pycache__/
+**/.pytest_cache/
+
+# Not needed to build or run.
+backend/tests/
+.github/
+.claude/
+docs/
+CLAUDE.md
+handoff.md
