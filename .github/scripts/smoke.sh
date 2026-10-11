@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Post-deploy smoke test: smoke.sh <deployment-url>
+# Post-deploy smoke test: smoke.sh <frontend|backend> <deployment-url>
 # Set VERCEL_AUTOMATION_BYPASS_SECRET when Vercel Deployment Protection is on.
 set -euo pipefail
 
-base="${1%/}"
+target=$1
+base="${2%/}"
 headers=()
 if [[ -n "${VERCEL_AUTOMATION_BYPASS_SECRET:-}" ]]; then
   headers=(-H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET")
@@ -26,9 +27,19 @@ check() {
   return 1
 }
 
-check /api/health 200 '"ok":true'
-check /api/auth/session 401 '"unauthenticated"'
-check / 200 'Every call'                    # the landing page, prerendered (frontend/index.html)
-check /assets/media/aica-film.en.vtt 200 'WEBVTT'  # its fixed-name media
-check /login 200 'Sign in · AICA'           # the console shell (frontend/app.html)
-check /o/example 200 'Sign in · AICA'       # console SPA fallback
+case "$target" in
+  backend)
+    check /api/health 200 '"ok":true'
+    check /api/auth/session 401 '"unauthenticated"'
+    ;;
+  frontend)
+    check / 200 'Every call'                           # the landing page, prerendered (index.html)
+    check /assets/media/aica-film.en.vtt 200 'WEBVTT'  # its fixed-name media
+    check /login 200 'Sign in · AICA'                  # the console shell (app.html)
+    check /o/example 200 'Sign in · AICA'              # console fallback
+    ;;
+  *)
+    echo "usage: smoke.sh <frontend|backend> <deployment-url>" >&2
+    exit 2
+    ;;
+esac

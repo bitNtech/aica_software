@@ -1,0 +1,15 @@
+# Never upload secrets or local environments.
+.env
+.env.*
+!.env.example
+secrets/
+*.json.key
+service-account*.json
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Not needed to run.
+tests/
+pytest.ini
+requirements-dev.txt

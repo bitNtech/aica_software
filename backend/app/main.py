@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .errors import ApiError, api_error_handler, validation_handler
@@ -24,7 +25,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.services = services or build_services(settings)
-        log.info("AICA API ready (app %s)", settings.app_url)
+        log.info("AICA API ready (app %s, api %s)", settings.app_url, settings.public_api_url)
         yield
 
     app = FastAPI(title="AICA console API", version="0.1.0", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
@@ -43,6 +44,19 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"
         return response
+
+    # The frontend is deployed on its own origin (APP_URL), so the browser
+    # calls this API cross-origin with the session cookie. Added after the
+    # check above, so it wraps it: refusals carry CORS headers too and the
+    # console can show them. Exact origins only — never "*" with credentials.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=sorted(settings.origins),
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Accept", "Content-Type"],
+        max_age=600,
+    )
 
     @app.exception_handler(Exception)
     async def unexpected(_: Request, exc: Exception):

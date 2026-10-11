@@ -7,15 +7,35 @@
   - 2026-10-11, sign-up and master admin pages
   - 2026-10-12, CI/CD: own GitHub repo for `aica_software` (workflows in `.github/workflows/`), deploy to Vercel for every environment (PR previews and production), separate Firebase project for previews, `*.vercel.app` for now, manual approval before production, Dependabot
   - 2026-10-12, landing page at `/`: copy `aica_web` into `frontend/` (the user asked for it inside `frontend/`, not as a top-level folder), add sign-in/sign-up buttons and integrations
+  - 2026-10-12, separate hosting: frontend and backend as two Vercel projects on hosts that share a site (e.g. `aica.bitntech.in` and `api.aica.bitntech.in`), configured by env
   - 2026-10-11, the backend: FastAPI, email/password and Google, Firestore `(default)` database (asia-south1; the user first said `aica`, but no database has that ID), Resend, master admins support@ and admin@bitntech.in, local env, default session lengths
 - Last verified: 2026-10-12 (CI/CD), 2026-10-11 (app).
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
 
+## Separate frontend and backend hosting (2026-10-12)
+- **Decision:** two Vercel projects. The hosts must share a site, e.g. `aica.bitntech.in` and `api.aica.bitntech.in`, so the `SameSite=Lax` cookie keeps working. Unrelated domains (which includes two `*.vercel.app` hosts) were rejected, because they'd need `SameSite=None`, which browsers that block third-party cookies drop.
+- **Backend:**
+  - New settings: `API_URL` (Google redirect URI; defaults to the deployment URL on Vercel) and `COOKIE_SAMESITE` (`lax`; `none` requires Secure).
+  - `ALLOWED_ORIGINS` now defaults to `APP_URL`'s origin and also drives CORS: exact origins, credentials, GET/POST, Accept/Content-Type.
+  - `APP_URL` is required on Vercel. The deployment's own hostnames are no longer trusted origins.
+- **Frontend:** `VITE_API_URL` (`src/lib/api.ts`). Empty means same origin, as in local dev. Set, calls go cross-origin with `credentials: 'include'`, and the Google button points at the API host. The landing page's session check uses it too. Placeholders are in `frontend/.env.example`.
+- **Deploy config:**
+  - The root `vercel.json` and `.vercelignore` are replaced by `frontend/` and `backend/` copies.
+  - `deploy.yml` deploys one target with `--cwd`. `pipeline.yml` runs both previews in parallel, plus optional fixed preview domains and a PR comment. Production goes backend first, then frontend, each with its own approval.
+  - `smoke.sh` takes `frontend|backend`.
+  - Repo variables: `VERCEL_FRONTEND_PROJECT_ID`, `VERCEL_BACKEND_PROJECT_ID`, and optionally `PREVIEW_FRONTEND_DOMAIN` and `PREVIEW_API_DOMAIN`. These replace `VERCEL_PROJECT_ID`. See `docs/cicd.md`.
+- **Verified:**
+  - pytest 45/45. Frontend typecheck, 50/50 tests, build. Both `vercel.json` files pass Vercel's schema, and the workflow YAML parses.
+  - Smoke tests pass against a local API (in-memory fakes) on `:8000` and a `vite preview` frontend on `:5173` built with `VITE_API_URL`.
+  - Headless Chrome, across the two origins: sign-in lands on `/o/arogya`. The cookie is HttpOnly, Lax, and on the API host only. The landing page shows "Open console", and `/login` redirects to the console.
+- **Not verified:** a real Vercel deploy of either project, `vercel alias set` in CI, and the Google flow against real Google. `actionlint` isn't installed.
+- **`backend/.env.example`:** Claude can't read it (settings deny). The user should add `API_URL=`, `COOKIE_SAMESITE=lax` and a note that `ALLOWED_ORIGINS` defaults to `APP_URL`.
+
 ## Landing page at `/` (2026-10-12)
 - **What:** `/` shows the AICA landing page. Its source was copied from the sibling repo `../aica_web` (in `github.com/prem-ramamoorthy/bitntech`). **`frontend/src/landing/` is now the copy to edit.** The original will drift.
-- **How:** one Vite build, two pages. `frontend/index.html` is the landing page, prerendered at build time (`scripts/prerender-landing.mjs`) and indexable. `frontend/app.html` is the console shell (`noindex`); every non-file path falls back to it, on Vercel (`vercel.json`) and in `vite`/`vite preview` (`vite.config.ts`). Each page gets its own CSS bundle and they share the React chunk. Hashed output moved from `/assets` to `/static`; `public/assets/` holds the landing page's media (about 23 MB) at fixed names.
+- **How:** one Vite build, two pages. `frontend/index.html` is the landing page, prerendered at build time (`scripts/prerender-landing.mjs`) and indexable. `frontend/app.html` is the console shell (`noindex`); every non-file path falls back to it, on Vercel (`frontend/vercel.json`) and in `vite`/`vite preview` (`vite.config.ts`). Each page gets its own CSS bundle and they share the React chunk. Hashed output moved from `/assets` to `/static`; `public/assets/` holds the landing page's media (about 23 MB) at fixed names.
 - **Added to the page:** "Sign in" in the nav, plus "Create an account" and "Already with us? Sign in" on the end card. If `GET /api/auth/session` returns 200, these become "Open console" (→ `/login`, which redirects signed-in users home). New analytics event: `console_click`.
 - **Demo form:** unchanged. It posts to `VITE_DEMO_ENDPOINT` (build time) if that's set, or falls back to WhatsApp.
 - **Verified:** typecheck, 48/48 tests, build with prerender, `vercel.json` against Vercel's schema; routing in `vite` and `vite preview` (`/` landing, `/login`, `/signup`, `/o/x`, `/ops/requests` console, media and `robots.txt`); screenshots of nav and end card at 1440 and 390 wide. **Not verified:** the signed-in "Open console" state (no backend running) and a real Vercel deploy.
@@ -23,7 +43,7 @@
 ## CI/CD (2026-10-12)
 - **Repo:** `git@github.com:bitNtech/aica_software.git`, pushed with the `github-personal` SSH alias. `backend/.env.example` is **not committed** because Claude can't read it to confirm it holds only placeholders. The user should check it, add `FIREBASE_CREDENTIALS_JSON=`, and commit it.
 - **Approved and built:** one Vercel project using Vercel Services (beta). `console` is `frontend/` (Vite) and `api` is `backend/` (FastAPI, `app/main.py` auto-detected); `/api/*` goes to the API and everything else to the console. GitHub Actions drives deploys; Vercel Git auto-deploy is off. See `docs/cicd.md` for the full setup.
-  - `pipeline.yml`: PR → CI → preview + smoke test + PR comment. `main` → CI → `production` environment approval → prod + smoke test. Deploy jobs skip until the repo variable `VERCEL_PROJECT_ID` is set. Fork and Dependabot PRs stop after CI.
+  - `pipeline.yml`: PR → CI → preview + smoke test + PR comment. `main` → CI → `production` environment approval → prod + smoke test. Fork and Dependabot PRs stop after CI. *(Superseded by the two-project split above.)*
   - `ci.yml` is now reusable (`workflow_call` and manual runs). The gitleaks action was replaced with the gitleaks 8.30.1 CLI, pinned by SHA-256, because the action needs a paid license for org repos.
   - Backend on Vercel: `FIREBASE_CREDENTIALS_JSON`. The deployment's own Vercel hostnames are added to the allowed origins (no wildcard). `APP_URL` defaults to the deployment URL, and `COOKIE_SECURE` to true. Explicit env always wins.
 - **Verified locally:**
@@ -101,6 +121,6 @@ Develop production-ready software in this repository. Most work is expected to i
 - **Copy that assumes a policy:** the pages say reset links last an hour and verification links 3 days, which are Firebase's defaults, and invites last 7 days (`INVITE_DAYS`). If anyone changes the expiry in Firebase, change the copy too.
 
 ## Next step
-0. CI/CD: the user does the one-time setup in `docs/cicd.md` (Vercel Pro project, env vars per environment, preview Firebase project, GitHub secrets, variables and environments, branch protection). Then open a test PR to see the first preview deploy.
+0. Deployment: the user does the one-time setup in `docs/cicd.md`: two Vercel projects (frontend, backend) with custom domains that share a site, env vars per environment, the preview Firebase project, GitHub secrets, variables and environments, and branch protection. Register `<API_URL>/api/auth/google/callback` on the Google client, and add the new keys to `backend/.env.example`. Then open a test PR to see the first preview deploys.
 1. The user completes "Needed from the user", then run both servers and do one real end-to-end pass: sign up, verify, approve as master admin, sign in, Google sign-in, reset.
 2. Then plan the Ops staff page or the portal shell.

@@ -1,7 +1,9 @@
 name: CI/CD
 
-# PRs: CI, then a Vercel preview deployment linked on the PR.
-# main: CI, then production after approval in the `production` environment.
+# PRs: CI, then Vercel preview deployments of the backend and the frontend,
+# linked on the PR. main: CI, then production after approval in the
+# `production` environment. The two are separate Vercel projects on separate
+# hosts (see docs/cicd.md).
 on:
   pull_request:
   push:
@@ -16,84 +18,85 @@ concurrency:
   # Supersede stale PR runs; never interrupt a production deploy.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  VERCEL_CLI: vercel@60.1.3
-  # IDs are not secret: repository variables, so deploys skip cleanly until set.
-  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  preview:
-    name: Deploy preview
+  # Fork and Dependabot PRs get no secrets, so they stop after CI. Every deploy
+  # job also skips until both Vercel project IDs are set as repository variables.
+  preview-backend:
+    name: Preview (backend)
     needs: ci
-    # Fork and Dependabot PRs get no secrets, so they stop after CI.
-    # Every deploy job also skips until the Vercel project is configured.
     if: >-
-      vars.VERCEL_PROJECT_ID != '' &&
+      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.actor != 'dependabot[bot]'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: backend
+      project-id: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      environment: preview
+      alias: ${{ vars.PREVIEW_API_DOMAIN }}
+    secrets: inherit
+
+  preview-frontend:
+    name: Preview (frontend)
+    needs: ci
+    if: >-
+      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: frontend
+      project-id: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      environment: preview
+      alias: ${{ vars.PREVIEW_FRONTEND_DOMAIN }}
+    secrets: inherit
+
+  preview-comment:
+    name: Link the previews on the PR
+    needs: [preview-backend, preview-frontend]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: preview
-      url: ${{ steps.deploy.outputs.url }}
     permissions:
-      contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-      - name: Deploy to Vercel (preview)
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          url=$(npx --yes "$VERCEL_CLI" deploy --yes --token="$VERCEL_TOKEN")
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-      - name: Smoke test
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          URL: ${{ steps.deploy.outputs.url }}
-        run: .github/scripts/smoke.sh "$URL"
-      - name: Link the preview on the PR
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
-          URL: ${{ steps.deploy.outputs.url }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          FRONTEND: ${{ vars.PREVIEW_FRONTEND_DOMAIN && format('https://{0}', vars.PREVIEW_FRONTEND_DOMAIN) || needs.preview-frontend.outputs.url }}
+          FRONTEND_DEPLOY: ${{ needs.preview-frontend.outputs.url }}
+          BACKEND_DEPLOY: ${{ needs.preview-backend.outputs.url }}
         run: |
-          body="Preview for ${GITHUB_SHA::7}: $URL (smoke test passed)"
+          body="Preview for ${GITHUB_SHA::7} (smoke tests passed): $FRONTEND
+          Deployments: frontend $FRONTEND_DEPLOY · backend $BACKEND_DEPLOY"
           gh pr comment "$PR" --edit-last --body "$body" || gh pr comment "$PR" --body "$body"
 
-  production:
-    name: Deploy production
+  # Add required reviewers to the `production` environment in the repo
+  # settings; each job waits for its own approval. The backend goes first, so
+  # the frontend never ships ahead of an API it depends on.
+  production-backend:
+    name: Production (backend)
     needs: ci
-    if: vars.VERCEL_PROJECT_ID != '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # Add required reviewers to this environment in the repo settings.
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-      - name: Deploy to Vercel (production)
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          url=$(npx --yes "$VERCEL_CLI" deploy --prod --yes --token="$VERCEL_TOKEN")
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-      - name: Smoke test
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          URL: ${{ steps.deploy.outputs.url }}
-        run: .github/scripts/smoke.sh "$URL"
+    if: >-
+      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: backend
+      project-id: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      environment: production
+    secrets: inherit
+
+  production-frontend:
+    name: Production (frontend)
+    needs: production-backend
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: frontend
+      project-id: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      environment: production
+    secrets: inherit

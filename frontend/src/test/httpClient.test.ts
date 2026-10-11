@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { homeFor } from '../auth/AuthProvider'
 import { createHttpAuthClient } from '../auth/httpClient'
 import { AuthError } from '../auth/types'
+import { apiBase } from '../lib/api'
 
 function respond(status: number, body?: unknown) {
   return vi.fn().mockResolvedValue(
@@ -59,6 +60,25 @@ describe('createHttpAuthClient', () => {
 
   it('offers Google through the backend route', () => {
     expect(createHttpAuthClient().googleSignInUrl?.()).toBe('/api/auth/google/start')
+  })
+
+  it('calls a backend on its own host with the cookie', async () => {
+    const fetchMock = respond(401, { error: { code: 'unauthenticated', message: 'Not signed in.' } })
+    vi.stubGlobal('fetch', fetchMock)
+    const c = createHttpAuthClient('https://api.aica.example')
+    await c.restore()
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.aica.example/api/auth/session')
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' })
+    expect(c.googleSignInUrl?.()).toBe('https://api.aica.example/api/auth/google/start')
+  })
+})
+
+describe('apiBase', () => {
+  it('is same-origin when VITE_API_URL is unset or blank, and drops a trailing slash', () => {
+    expect(apiBase({})).toBe('')
+    expect(apiBase({ VITE_API_URL: '  ' })).toBe('')
+    expect(apiBase({ VITE_API_URL: 'https://api.aica.example/' })).toBe('https://api.aica.example')
   })
 })
 

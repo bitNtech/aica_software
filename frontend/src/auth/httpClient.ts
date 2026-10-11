@@ -10,22 +10,24 @@ import {
   type SignUpInput,
   type SignupRequest,
 } from './types'
+import { apiBase, apiCredentials, apiUrl } from '../lib/api'
 
 /**
  * The real client: talks only to the AICA backend under /api. The session
  * lives in an HttpOnly cookie the backend sets, so nothing secret is ever
  * held in JavaScript or web storage. In dev, Vite proxies /api to the
- * FastAPI server, so requests stay same-origin.
+ * FastAPI server, so requests stay same-origin; deployed, the backend has its
+ * own host (VITE_API_URL, see lib/api.ts) and the cookie goes with every call.
  */
 
 const NETWORK = () => new AuthError('network', "We couldn't reach AICA. Check your connection and try again.")
 
-async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+async function request<T>(base: string, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(`/api${path}`, base), {
       method,
-      credentials: 'same-origin',
+      credentials: apiCredentials(base),
       headers: body === undefined ? { Accept: 'application/json' } : { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
@@ -43,7 +45,9 @@ async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Pr
   return data as T
 }
 
-export function createHttpAuthClient(): AuthClient {
+export function createHttpAuthClient(base = apiBase()): AuthClient {
+  const call = <T>(method: 'GET' | 'POST', path: string, body?: unknown) => request<T>(base, method, path, body)
+
   return {
     isDemo: false,
 
@@ -78,6 +82,7 @@ export function createHttpAuthClient(): AuthClient {
     setOrgSuspended: (slug, suspended, reason) =>
       call<void>('POST', `/ops/orgs/${encodeURIComponent(slug)}/${suspended ? 'suspend' : 'restore'}`, suspended ? { reason } : undefined),
 
-    googleSignInUrl: () => '/api/auth/google/start',
+    // A top-level navigation to the backend, which sets the cookie on its own host.
+    googleSignInUrl: () => apiUrl('/api/auth/google/start', base),
   }
 }

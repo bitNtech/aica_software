@@ -20,8 +20,8 @@ export const CONTACT = {
   site: 'https://bitntech.in',
 } as const
 
-/* The AICA console is served from the same origin as this page (see the
-   repo's vercel.json), so its pages are plain paths. /login sends a visitor
+/* The AICA console is part of the same frontend build as this page
+   (app.html; see vite.config.ts), so its pages are plain paths. /login sends a visitor
    who is already signed in straight on to their own console. */
 export const CONSOLE = {
   signIn: '/login',

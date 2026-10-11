@@ -21,7 +21,7 @@ const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
 export default function App() {
   return (
     <Routes>
-      {/* "/" is the landing page in web/, served by its own service (see vercel.json). */}
+      {/* "/" is the landing page: index.html and src/landing/, not this app (see vite.config.ts). */}
 
       {/* Signed out */}
       <Route path="/login" element={guest(<LoginPage />)} />

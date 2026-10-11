@@ -39,14 +39,14 @@ def test_missing_file_and_no_json(tmp_path):
         firebase_certificate(settings(firebase_credentials=tmp_path / "missing.json"))
 
 
-# ---------------------------------------------------------------- vercel
+# ---------------------------------------------------------------- deployment
 
-VERCEL_ENV = ("APP_URL", "ALLOWED_ORIGINS", "COOKIE_SECURE", "VERCEL_ENV", "VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL")
+DEPLOY_ENV = ("APP_URL", "API_URL", "ALLOWED_ORIGINS", "COOKIE_SECURE", "COOKIE_SAMESITE", "VERCEL_ENV", "VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL")
 
 
 @pytest.fixture()
 def clean_env(monkeypatch):
-    for k in VERCEL_ENV:
+    for k in DEPLOY_ENV:
         monkeypatch.delenv(k, raising=False)
     return monkeypatch
 
@@ -56,38 +56,68 @@ def test_local_defaults_unchanged(clean_env):
     assert s.app_url == "http://localhost:5173"
     assert s.origins == {"http://localhost:5173"}
     assert s.cookie_secure is False
+    assert s.cookie_samesite == "lax"
+    # Same origin through the Vite proxy.
+    assert s.google_redirect_uri == "http://localhost:5173/api/auth/google/callback"
 
 
-def test_vercel_preview_uses_its_own_url(clean_env):
+def test_origins_default_to_app_url_origin(clean_env):
+    assert settings(app_url="https://aica.bitntech.in/").origins == {"https://aica.bitntech.in"}
+    assert settings(app_url="https://aica.bitntech.in", allowed_origins="https://a.example, https://b.example/").origins == {"https://a.example", "https://b.example"}
+
+
+def test_separate_api_host(clean_env):
+    s = settings(app_url="https://aica.bitntech.in", api_url="https://api.aica.bitntech.in/")
+    assert s.google_redirect_uri == "https://api.aica.bitntech.in/api/auth/google/callback"
+    assert s.origins == {"https://aica.bitntech.in"}  # the frontend, not the API
+
+
+def test_vercel_requires_app_url(clean_env):
     clean_env.setenv("VERCEL_ENV", "preview")
-    clean_env.setenv("VERCEL_URL", "aica-abc123.vercel.app")
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    with pytest.raises(ValueError, match="APP_URL must be set"):
+        settings()
+
+
+def test_vercel_preview_api_url_is_its_own(clean_env):
+    clean_env.setenv("VERCEL_ENV", "preview")
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    clean_env.setenv("APP_URL", "https://preview.aica.bitntech.in")
     s = settings()
-    assert s.app_url == "https://aica-abc123.vercel.app"
-    assert "https://aica-abc123.vercel.app" in s.origins
+    assert s.api_url == "https://aica-api-abc123.vercel.app"
+    assert s.origins == {"https://preview.aica.bitntech.in"}
     assert s.cookie_secure is True
 
 
-def test_vercel_production_uses_production_url(clean_env):
+def test_vercel_production_api_url_is_production(clean_env):
     clean_env.setenv("VERCEL_ENV", "production")
-    clean_env.setenv("VERCEL_URL", "aica-abc123.vercel.app")
-    clean_env.setenv("VERCEL_PROJECT_PRODUCTION_URL", "aica.vercel.app")
-    s = settings()
-    assert s.app_url == "https://aica.vercel.app"
-    assert {"https://aica.vercel.app", "https://aica-abc123.vercel.app"} <= s.origins
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    clean_env.setenv("VERCEL_PROJECT_PRODUCTION_URL", "aica-api.vercel.app")
+    clean_env.setenv("APP_URL", "https://aica.bitntech.in")
+    assert settings().api_url == "https://aica-api.vercel.app"
 
 
 def test_explicit_settings_win_on_vercel(clean_env):
     clean_env.setenv("VERCEL_ENV", "production")
-    clean_env.setenv("VERCEL_URL", "aica-abc123.vercel.app")
-    clean_env.setenv("APP_URL", "https://console.example.com")
-    clean_env.setenv("ALLOWED_ORIGINS", "https://console.example.com")
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    clean_env.setenv("APP_URL", "https://aica.bitntech.in")
+    clean_env.setenv("API_URL", "https://api.aica.bitntech.in")
     clean_env.setenv("COOKIE_SECURE", "false")
     s = settings()
-    assert s.app_url == "https://console.example.com"
+    assert s.api_url == "https://api.aica.bitntech.in"
     assert s.cookie_secure is False
-    assert "https://console.example.com" in s.origins
 
 
-def test_other_vercel_apps_are_not_trusted(clean_env):
-    clean_env.setenv("VERCEL_URL", "aica-abc123.vercel.app")
-    assert "https://evil.vercel.app" not in settings().origins
+def test_own_vercel_hostnames_are_not_frontend_origins(clean_env):
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    clean_env.setenv("APP_URL", "https://aica.bitntech.in")
+    o = settings().origins
+    assert "https://aica-api-abc123.vercel.app" not in o and "https://evil.vercel.app" not in o
+
+
+def test_samesite_none_requires_secure(clean_env):
+    with pytest.raises(ValueError, match="COOKIE_SECURE"):
+        settings(cookie_samesite="none")
+    assert settings(cookie_samesite="none", cookie_secure=True).cookie_samesite == "none"
+    with pytest.raises(ValueError):
+        settings(cookie_samesite="sometimes")

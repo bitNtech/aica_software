@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { apiCredentials, apiUrl } from '../../lib/api'
 
 /**
  * Whether the visitor already has an AICA console session, so the page can
  * offer "Open console" instead of "Sign in". Asks the console's own backend
- * (GET /api/auth/session, same origin, HttpOnly cookie) once per page load,
+ * (GET /api/auth/session, HttpOnly cookie; see lib/api.ts) once per page load,
  * however many components want to know; nothing about the user is kept here.
  * Starts as false on the server and in the first client render, so the
  * prerendered HTML and hydration agree, and stays false if the API can't be
@@ -16,7 +17,7 @@ function hasSession(): Promise<boolean> {
     const ctrl = new AbortController()
     const timer = window.setTimeout(() => ctrl.abort(), 5000)
     try {
-      const res = await fetch('/api/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: ctrl.signal })
+      const res = await fetch(apiUrl('/api/auth/session'), { credentials: apiCredentials(), headers: { Accept: 'application/json' }, signal: ctrl.signal })
       return res.ok
     } catch {
       return false

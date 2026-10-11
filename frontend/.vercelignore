@@ -1,0 +1,7 @@
+# Never upload local environments or build output; Vercel installs and builds.
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+dist-ssr/

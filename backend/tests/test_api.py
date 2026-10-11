@@ -107,6 +107,51 @@ def test_writes_from_other_origins_are_refused(env):
     assert r.status_code == 403
 
 
+# ---------------------------------------------------------------- cross-origin (frontend on its own host)
+
+PREFLIGHT = {"Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "content-type"}
+
+
+def test_cors_allows_the_frontend_with_credentials(env):
+    client, *_ = env
+    r = client.options("/api/auth/login", headers={**ORIGIN, **PREFLIGHT})
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert r.headers["access-control-allow-credentials"] == "true"
+    r = client.get("/api/auth/session", headers=ORIGIN)
+    assert r.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_cors_refuses_other_origins(env):
+    client, *_ = env
+    evil = {"Origin": "https://evil.example"}
+    r = client.options("/api/auth/login", headers={**evil, **PREFLIGHT})
+    assert r.status_code == 400 and "access-control-allow-origin" not in r.headers
+    assert "access-control-allow-origin" not in client.get("/api/auth/session", headers=evil).headers
+    # CORS only governs what the browser lets a page read; the write itself is still refused.
+    r = client.post("/api/auth/logout", headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+
+
+def test_samesite_follows_settings():
+    ratelimit.reset()
+    svc, fb, store, _ = make_services(cookie_samesite="none", cookie_secure=True)
+    seed_org(fb, store)
+    with TestClient(create_app(svc.settings, svc), base_url="https://api.example") as client:
+        r = login(client, "owner@arogya.in")
+    assert "SameSite=none" in r.headers["set-cookie"] and "Secure" in r.headers["set-cookie"]
+
+
+def test_google_returns_to_the_frontend_from_a_separate_api():
+    ratelimit.reset()
+    svc, fb, store, _ = make_services(api_url="http://localhost:8000")
+    assert svc.settings.google_redirect_uri == "http://localhost:8000/api/auth/google/callback"
+    fb.google_users["gtok"] = {"email": "doc@gmail.com", "name": "Dr. Priya"}
+    with TestClient(create_app(svc.settings, svc), base_url="http://localhost:8000") as client:
+        r = _google_login(client)
+    assert r.status_code == 303 and r.headers["location"] == "http://localhost:5173/login"
+
+
 def test_wrong_password_is_generic_and_locks_after_five(env):
     client, fb, store, _ = env
     seed_org(fb, store)

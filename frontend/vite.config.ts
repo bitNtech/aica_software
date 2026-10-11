@@ -5,12 +5,14 @@ import { defineConfig } from 'vitest/config'
 /**
  * Two pages, one build. index.html is the landing page at "/" (prerendered,
  * indexable — src/landing/); app.html is the console's shell, served for every
- * other route. On Vercel the console service does this with a rewrite (see
- * vercel.json); this does the same for `vite` and `vite preview`.
+ * other route. On Vercel, frontend/vercel.json does this with a rewrite; this
+ * does the same for `vite` and `vite preview`. The dev server also serves
+ * module requests, so it only rewrites page loads; `vite preview` serves built
+ * files only, so there any extensionless path is a page.
  */
-const consoleFallback: Connect.NextHandleFunction = (req, _res, next) => {
+const consoleFallback = (pagesOnly: boolean): Connect.NextHandleFunction => (req, _res, next) => {
   const path = (req.url ?? '/').split('?')[0]
-  const page = (req.method === 'GET' || req.method === 'HEAD') && req.headers.accept?.includes('text/html')
+  const page = (req.method === 'GET' || req.method === 'HEAD') && (!pagesOnly || !!req.headers.accept?.includes('text/html'))
   const ownFile = path === '/' || path === '/index.html' || /\.[a-z0-9]+$/i.test(path) || /^\/(@|api\/|src\/|node_modules\/)/.test(path)
   if (page && !ownFile) req.url = '/app.html'
   next()
@@ -18,8 +20,8 @@ const consoleFallback: Connect.NextHandleFunction = (req, _res, next) => {
 
 const twoPages = (): Plugin => ({
   name: 'aica-two-pages',
-  configureServer: (server) => { server.middlewares.use(consoleFallback) },
-  configurePreviewServer: (server) => { server.middlewares.use(consoleFallback) },
+  configureServer: (server) => { server.middlewares.use(consoleFallback(true)) },
+  configurePreviewServer: (server) => { server.middlewares.use(consoleFallback(false)) },
 })
 
 export default defineConfig({
@@ -28,7 +30,7 @@ export default defineConfig({
     target: 'es2022',
     /* Hashed output goes to /static; public/ owns /assets (the landing page's
        film, poster, orb) at fixed names. The two need opposite cache rules —
-       see vercel.json. */
+       see frontend/vercel.json. */
     assetsDir: 'static',
     rollupOptions: { input: { landing: 'index.html', console: 'app.html' } },
   },

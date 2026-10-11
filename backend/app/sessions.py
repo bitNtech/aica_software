@@ -43,13 +43,13 @@ def start_session(svc: Services, response: Response, id_token: str, remember: bo
         max_age=int(lifetime.total_seconds()) if remember else None,
         httponly=True,
         secure=s.cookie_secure,
-        samesite="lax",
+        samesite=s.cookie_samesite,
         path="/",
     )
 
 
 def end_session(response: Response, svc: Services) -> None:
-    response.delete_cookie(COOKIE, path="/", secure=svc.settings.cookie_secure, httponly=True, samesite="lax")
+    response.delete_cookie(COOKIE, path="/", secure=svc.settings.cookie_secure, httponly=True, samesite=svc.settings.cookie_samesite)
 
 
 def read_session(request: Request, svc: Services) -> Caller | None:

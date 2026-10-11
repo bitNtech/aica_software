@@ -43,16 +43,19 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `FIRESTORE_DATABASE` | `(default)`, the project's only Firestore database (asia-south1) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend. `onboarding@resend.dev` only delivers to the Resend account owner |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The OAuth web client Firebase created for Google sign-in. Leave both empty to switch Google sign-in off: the button then returns to the login page with a "not set up yet" message |
-| `APP_URL`, `ALLOWED_ORIGINS` | `http://localhost:5173` locally |
-| `COOKIE_SECURE` | `true` behind HTTPS (required in production) |
+| `APP_URL` | The frontend's public URL, for email links and the redirect after Google. `http://localhost:5173` locally. **Required on Vercel** |
+| `API_URL` | This API's public URL when it has its own host, e.g. `https://api.aica.bitntech.in`; the Google redirect URI is built from it. Empty locally (same origin through the Vite proxy). On Vercel it defaults to the deployment's own URL |
+| `ALLOWED_ORIGINS` | Frontend origins allowed to call the API with cookies (CORS) and to make writes, comma-separated. Defaults to `APP_URL`'s origin |
+| `COOKIE_SECURE` | `true` behind HTTPS (required in production). Defaults to `true` on Vercel |
+| `COOKIE_SAMESITE` | `lax` (default). Works when the frontend and API share a site, e.g. `aica.bitntech.in` and `api.aica.bitntech.in`. `none` needs `COOKIE_SECURE=true` and breaks in browsers that block third-party cookies |
 
-On Vercel, `APP_URL` defaults to the deployment's own URL, `COOKIE_SECURE` to `true`, and the deployment's own hostnames are always allowed origins. Explicit values win. See [`docs/cicd.md`](../docs/cicd.md).
+The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/cicd.md) for hosts and per-environment values. Explicit values always win.
 
 ## Firebase console setup
 
 1. **Firestore → Rules:** paste [`firestore.rules`](firestore.rules), which denies all client access. Only this API, through the Admin SDK, uses the database.
 2. **Authentication → Settings → User account linking:** keep "Link accounts that use the same email" (the default).
-3. **Google sign-in:** any Google OAuth web client works. The backend verifies Google's ID token itself (signature, issuer, expiry, audience = `GOOGLE_CLIENT_ID`, verified email). It then signs the matching Firebase user in with a custom token, so Firebase's own Google provider settings aren't involved. On the client (Google Cloud console → APIs & Services → Credentials), add the authorised redirect URI `http://localhost:5173/api/auth/google/callback`. The app name Google shows comes from that project's OAuth consent screen (Branding).
+3. **Google sign-in:** any Google OAuth web client works. The backend verifies Google's ID token itself (signature, issuer, expiry, audience = `GOOGLE_CLIENT_ID`, verified email). It then signs the matching Firebase user in with a custom token, so Firebase's own Google provider settings aren't involved. On the client (Google Cloud console → APIs & Services → Credentials), add the authorised redirect URI `http://localhost:5173/api/auth/google/callback`, plus `<API_URL>/api/auth/google/callback` for each deployed environment. The app name Google shows comes from that project's OAuth consent screen (Branding).
 
 ## Routes
 
@@ -73,6 +76,7 @@ On Vercel, `APP_URL` defaults to the deployment's own URL, `COOKIE_SECURE` to `t
 Errors are always `{"error": {"code", "message", "retryAfter"?}}`, with codes matching the frontend's `AuthErrorCode`.
 
 Protections:
+- CORS allows only the exact origins in `ALLOWED_ORIGINS`, with credentials, `GET`/`POST` and the `Accept`/`Content-Type` headers.
 - Writes whose `Origin` isn't in `ALLOWED_ORIGINS` get 403, as CSRF protection.
 - Login pauses for 15 minutes after 5 failures per email; this is stored in Firestore.
 - There's a per-IP limit on sign-up, reset and resend. It's in-process, so add a shared limiter before running more than one worker.

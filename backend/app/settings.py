@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,9 +29,20 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # The frontend's public URL: email links and redirects after Google go here.
     app_url: str = "http://localhost:5173"
-    allowed_origins: str = "http://localhost:5173"
+    # This API's public URL, when it isn't served from the frontend's origin
+    # (e.g. https://api.aica.bitntech.in). Empty: same origin as APP_URL, as in
+    # local dev through the Vite proxy.
+    api_url: str = ""
+    # Frontend origins allowed to call the API with cookies (CORS) and to make
+    # writes (CSRF check). Comma-separated. Defaults to APP_URL's origin.
+    allowed_origins: str = ""
     cookie_secure: bool = False
+    # "lax" works whenever the frontend and API share a site (aica.bitntech.in
+    # and api.aica.bitntech.in). "none" requires COOKIE_SECURE and is dropped by
+    # browsers that block third-party cookies.
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     session_hours: int = Field(8, ge=1, le=24 * 14)
     remember_days: int = Field(14, ge=1, le=14)  # Firebase caps session cookies at 14 days.
@@ -44,25 +57,30 @@ class Settings(BaseSettings):
     vercel_project_production_url: str = ""
 
     @model_validator(mode="after")
-    def _vercel_defaults(self) -> Settings:
-        """On Vercel, default APP_URL to this deployment's own address and
-        cookies to Secure. Explicitly set values always win."""
-        if not self.vercel_url:
-            return self
-        own = self.vercel_project_production_url if self.vercel_env == "production" else self.vercel_branch_url or self.vercel_url
-        if "app_url" not in self.model_fields_set and own:
-            self.app_url = f"https://{own}"
-        if "cookie_secure" not in self.model_fields_set:
-            self.cookie_secure = True
+    def _defaults(self) -> Settings:
+        """The frontend and this API are deployed separately, so on Vercel
+        APP_URL must be set: this deployment's own address is the API's, not
+        the frontend's. API_URL defaults to that address, and cookies to
+        Secure. Explicitly set values always win."""
+        if self.vercel_url:
+            if "app_url" not in self.model_fields_set:
+                raise ValueError("APP_URL must be set on Vercel: the frontend's public URL, e.g. https://aica.bitntech.in")
+            own = self.vercel_project_production_url if self.vercel_env == "production" else self.vercel_branch_url or self.vercel_url
+            if "api_url" not in self.model_fields_set and own:
+                self.api_url = f"https://{own}"
+            if "cookie_secure" not in self.model_fields_set:
+                self.cookie_secure = True
+        if self.cookie_samesite == "none" and not self.cookie_secure:
+            raise ValueError("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
         return self
 
     @property
     def origins(self) -> set[str]:
         configured = {o.strip().rstrip("/") for o in self.allowed_origins.split(",") if o.strip()}
-        # A deployment always accepts writes from its own hostnames: preview
-        # URLs aren't known until deploy time, so they can't be configured.
-        own = {f"https://{h}" for h in (self.vercel_url, self.vercel_branch_url, self.vercel_project_production_url) if h}
-        return configured | own
+        if configured:
+            return configured
+        u = urlsplit(self.app_url)
+        return {f"{u.scheme}://{u.netloc}"}
 
     @property
     def firestore_database_id(self) -> str | None:
@@ -76,9 +94,14 @@ class Settings(BaseSettings):
         return p if p.is_absolute() else BACKEND_DIR / p
 
     @property
+    def public_api_url(self) -> str:
+        return (self.api_url or self.app_url).rstrip("/")
+
+    @property
     def google_redirect_uri(self) -> str:
-        # Through the Vite proxy in dev, so the cookie lands on the console's origin.
-        return f"{self.app_url.rstrip('/')}/api/auth/google/callback"
+        # Back to this API, so the session cookie lands on the API's host. In
+        # dev that is the Vite proxy, i.e. the frontend's origin.
+        return f"{self.public_api_url}/api/auth/google/callback"
 
     @property
     def google_enabled(self) -> bool:
