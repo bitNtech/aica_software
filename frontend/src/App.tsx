@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
+import { Analytics } from '@vercel/analytics/react'
 import { RedirectIfSignedIn, RequireAuth, RequireStaff } from './auth/guards'
 import { ActingAsBanner } from './components/ops/ActingAsBanner'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
@@ -57,6 +58,7 @@ export default function App() {
       <Route path="/403" element={<ForbiddenPage />} />
       <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
     </>
   )
 }
