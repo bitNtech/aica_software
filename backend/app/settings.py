@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     resend_api_key: str = ""
     email_from: str = "AICA <onboarding@resend.dev>"
+    # Who gets the landing page's demo requests. Comma-separated.
+    demo_request_to: str = "support@bitntech.in"
 
     google_client_id: str = ""
     google_client_secret: str = ""
@@ -81,6 +83,10 @@ class Settings(BaseSettings):
             return configured
         u = urlsplit(self.app_url)
         return {f"{u.scheme}://{u.netloc}"}
+
+    @property
+    def demo_recipients(self) -> list[str]:
+        return [a.strip() for a in self.demo_request_to.split(",") if a.strip()]
 
     @property
     def firestore_database_id(self) -> str | None:

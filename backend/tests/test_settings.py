@@ -121,3 +121,8 @@ def test_samesite_none_requires_secure(clean_env):
     assert settings(cookie_samesite="none", cookie_secure=True).cookie_samesite == "none"
     with pytest.raises(ValueError):
         settings(cookie_samesite="sometimes")
+
+
+def test_demo_recipients():
+    assert settings().demo_recipients == ["support@bitntech.in"]
+    assert settings(demo_request_to=" a@x.in, ,b@x.in ").demo_recipients == ["a@x.in", "b@x.in"]

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { apiUrl } from '../../lib/api'
 import { CONTACT, INDUSTRIES, VOLUMES, WA_DEMO, whatsappHref } from '../content'
 import { track } from '../lib/analytics'
 import { ATTR_KEYS, attribution } from '../lib/attribution'
@@ -8,12 +9,11 @@ import './Demo.css'
  * The page's one goal. Five fields, the last two as tap targets rather than
  * dropdowns — faster on a phone, which is where the ads send people.
  *
- * Where requests go: set VITE_DEMO_ENDPOINT to any URL that accepts a JSON
- * POST (a Sheets Apps Script, a CRM webhook, Formspree…). Until it is set,
- * the request is handed to WhatsApp with the details filled in — the channel
- * bitntech.in already uses for AICA demo requests.
+ * Where requests go: the AICA backend (POST /api/leads/demo), which emails
+ * them to the team through Resend. If that fails, the visitor is pointed at
+ * WhatsApp, the channel bitntech.in already uses for AICA demo requests.
  */
-const ENDPOINT = (import.meta.env.VITE_DEMO_ENDPOINT as string | undefined) ?? ''
+const ENDPOINT = apiUrl('/api/leads/demo')
 
 type Field = 'name' | 'company' | 'phone' | 'industry' | 'calls_per_day'
 type Values = Record<Field, string>
@@ -36,7 +36,10 @@ export default function Demo() {
   const formRef = useRef<HTMLFormElement>(null)
   const [v, setV] = useState<Values>(EMPTY)
   const [error, setError] = useState<{ field: Field; message: string } | null>(null)
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'handed'>('idle')
+  const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  /* Honeypot: hidden from people and assistive tech; bots that fill every
+     field give themselves away, and the backend quietly drops them. */
+  const [website, setWebsite] = useState('')
 
   const set = (field: Field, value: string) => {
     setV((old) => ({ ...old, [field]: value }))
@@ -57,7 +60,8 @@ export default function Demo() {
     }
     setError(null)
     const phone = normalisePhone(v.phone)
-    const attr = attribution()
+    /* Only the known tags: the backend refuses anything it doesn't expect. */
+    const attr = Object.fromEntries(Object.entries(attribution()).filter(([k]) => (ATTR_KEYS as readonly string[]).includes(k)))
     const lead = {
       name: v.name.trim(),
       company: v.company.trim(),
@@ -69,32 +73,18 @@ export default function Demo() {
       submitted_at: new Date().toISOString(),
     }
 
-    if (!ENDPOINT) {
-      /* Opened synchronously inside the submit, so no popup blocker stops it. */
-      const tags = ATTR_KEYS.filter((k) => attr[k]).map((k) => `${k}=${attr[k]}`).join(', ')
-      const text = [
-        'Hi BitNTech, I would like to book a demo of AICA.',
-        '',
-        `Name: ${lead.name}`,
-        `Company: ${lead.company}`,
-        `Phone: ${phone}`,
-        `Industry: ${lead.industry}`,
-        `Calls per day: ${lead.calls_per_day}`,
-        tags ? `\n(${tags})` : '',
-      ].join('\n').trim()
-      window.open(whatsappHref(text), '_blank', 'noopener')
-      track('form_submit', { industry: lead.industry, calls_per_day: lead.calls_per_day, channel: 'whatsapp' })
-      setState('handed')
-      return
-    }
-
     setState('sending')
     try {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(lead),
+        body: JSON.stringify({ ...lead, website }),
       })
+      if (res.status === 429) {
+        setState('idle')
+        setError({ field: 'name', message: 'Too many tries from here. Wait a minute and try again, or message us on WhatsApp.' })
+        return
+      }
       if (!res.ok) throw new Error(String(res.status))
       track('form_submit', { industry: lead.industry, calls_per_day: lead.calls_per_day, channel: 'endpoint' })
       setState('sent')
@@ -105,7 +95,7 @@ export default function Demo() {
   }
 
   const invalid = (f: Field) => (error?.field === f ? { 'aria-invalid': true, 'aria-describedby': 'demo-error' } : {})
-  const done = state === 'sent' || state === 'handed'
+  const done = state === 'sent'
 
   return (
     <section className="demo" id="demo" aria-labelledby="demo-title">
@@ -188,6 +178,13 @@ export default function Demo() {
             </div>
           </fieldset>
 
+          <div className="form__hp" aria-hidden="true">
+            <label>
+              Website
+              <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            </label>
+          </div>
+
           <p className="form__error" id="demo-error" role="alert">{error?.message ?? ''}</p>
 
           <button className="btn btn--orange form__submit" type="submit" disabled={state === 'sending' || done}>
@@ -200,17 +197,8 @@ export default function Demo() {
               <span className="form__tick" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4 8-9" /></svg>
               </span>
-              {state === 'sent' ? (
-                <>
-                  <h3>Thanks, {v.name.trim().split(' ')[0]}. We’ll call you to fix a time.</h3>
-                  <p>Our team will reach you on {normalisePhone(v.phone).replace(/(\d{5})(\d{5})/, '$1 $2')}.</p>
-                </>
-              ) : (
-                <>
-                  <h3>Almost there — press Send in WhatsApp.</h3>
-                  <p>Your details are filled in. If WhatsApp didn’t open, call us on {CONTACT.phone}.</p>
-                </>
-              )}
+              <h3>Thanks, {v.name.trim().split(' ')[0]}. We’ll call you to fix a time.</h3>
+              <p>Our team will reach you on {normalisePhone(v.phone).replace(/(\d{5})(\d{5})/, '$1 $2')}.</p>
             </div>
           )}
         </form>

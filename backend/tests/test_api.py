@@ -402,3 +402,79 @@ def test_google_blocks_disabled_account(env):
 def test_google_rejected_token(env):
     client, *_ = env
     assert _google_login(client, "unknown").headers["location"].endswith("/login?error=google_failed")
+
+
+# ---------------------------------------------------------------- demo requests (landing page)
+
+
+def demo_body(**over):
+    body = {
+        "name": "Dr. Priya",
+        "company": "Priya Dental <b>",
+        "phone": "+91 98765 43210",
+        "industry": "Hospital / clinic",
+        "calls_per_day": "50–200",
+        "utm_source": "google",
+        "page": "http://localhost:5173/",
+        "submitted_at": "2026-10-12T10:00:00.000Z",
+    }
+    body.update(over)
+    return body
+
+
+def test_demo_request_is_emailed_to_the_team(env):
+    client, _, store, mailer = env
+    r = post(client, "/api/leads/demo", demo_body())
+    assert r.status_code == 204, r.text
+    [(to, lead)] = mailer.leads
+    assert to == ["support@bitntech.in"]
+    assert lead["phone"] == "9876543210" and lead["company"] == "Priya Dental <b>" and lead["utm_source"] == "google"
+    assert "submitted_at" not in lead and "website" not in lead and "received_at" in lead
+    assert store.audits == []  # nothing stored
+
+
+def test_demo_request_recipients_come_from_settings():
+    ratelimit.reset()
+    svc, _, _, mailer = make_services(demo_request_to="sales@bitntech.in, support@bitntech.in")
+    with TestClient(create_app(svc.settings, svc), base_url="http://localhost:5173") as client:
+        assert post(client, "/api/leads/demo", demo_body()).status_code == 204
+    assert mailer.leads[0][0] == ["sales@bitntech.in", "support@bitntech.in"]
+
+
+@pytest.mark.parametrize("over", [
+    {"phone": "12345"},
+    {"name": ""},
+    {"company": "x" * 121},
+    {"industry": "Mining"},
+    {"calls_per_day": "lots"},
+    {"utm_source": "x" * 201},
+    {"admin": True},  # unknown fields are refused
+])
+def test_demo_request_validation(env, over):
+    client, _, _, mailer = env
+    r = post(client, "/api/leads/demo", demo_body(**over))
+    assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_input"
+    assert mailer.leads == []
+
+
+def test_demo_request_honeypot_looks_fine_but_sends_nothing(env):
+    client, _, _, mailer = env
+    assert post(client, "/api/leads/demo", demo_body(website="http://spam.example")).status_code == 204
+    assert mailer.leads == []
+
+
+def test_demo_request_mail_failure_is_reported(env):
+    client, _, _, mailer = env
+    mailer.fail_leads = True
+    r = post(client, "/api/leads/demo", demo_body())
+    assert r.status_code == 503 and "WhatsApp" in r.json()["error"]["message"]
+
+
+def test_demo_request_needs_the_sites_origin_and_is_rate_limited(env):
+    client, _, _, mailer = env
+    assert client.post("/api/leads/demo", json=demo_body(), headers={"Origin": "https://evil.example"}).status_code == 403
+    for _ in range(5):
+        assert post(client, "/api/leads/demo", demo_body()).status_code == 204
+    r = post(client, "/api/leads/demo", demo_body())
+    assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
+    assert len(mailer.leads) == 5

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .errors import ApiError, api_error_handler, validation_handler
-from .routes import auth, google, invites, ops
+from .routes import auth, google, invites, leads, ops
 from .services import Services, build_services
 from .settings import Settings, get_settings
 
@@ -73,6 +73,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.include_router(auth.router)
     app.include_router(google.router)
     app.include_router(invites.router)
+    app.include_router(leads.router)
     app.include_router(ops.router)
     return app
 

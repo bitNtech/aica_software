@@ -42,6 +42,7 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `FIREBASE_WEB_API_KEY` | Project settings → General → Web API key. Server-side only |
 | `FIRESTORE_DATABASE` | `(default)`, the project's only Firestore database (asia-south1) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend. `onboarding@resend.dev` only delivers to the Resend account owner |
+| `DEMO_REQUEST_TO` | Who receives the landing page's "Book a demo" requests, comma-separated. Default `support@bitntech.in` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The OAuth web client Firebase created for Google sign-in. Leave both empty to switch Google sign-in off: the button then returns to the login page with a "not set up yet" message |
 | `APP_URL` | The frontend's public URL, for email links and the redirect after Google. `http://localhost:5173` locally. **Required on Vercel** |
 | `API_URL` | This API's public URL when it has its own host, e.g. `https://api.aica.bitntech.in`; the Google redirect URI is built from it. Empty locally (same origin through the Vite proxy). On Vercel it defaults to the deployment's own URL |
@@ -69,6 +70,7 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | POST | `/api/auth/business` | signed in with no organisation (Google sign-ups) |
 | GET | `/api/auth/google/start`, `/api/auth/google/callback` | anyone. OAuth code flow with PKCE and a state cookie; the Google ID token is verified server-side, then a Firebase custom-token sign-in follows |
 | GET/POST | `/api/invites/{token}`, `/api/invites/{token}/accept` | anyone holding the link |
+| POST | `/api/leads/demo` | anyone, from an allowed origin. The landing page's demo form: validated, emailed to `DEMO_REQUEST_TO` through Resend, not stored. 204 when sent, 503 when Resend fails, 5 per minute per IP. A filled-in `website` honeypot gets 204 and is dropped |
 | GET | `/api/ops/orgs`, `/api/ops/signup-requests` | bitNtech staff and master admin |
 | POST | `/api/ops/signup-requests/{slug}/approve`, `/decline` | bitNtech staff and master admin |
 | POST | `/api/ops/orgs/{slug}/suspend`, `/restore`, `/api/ops/staff-invites` | master admin only |

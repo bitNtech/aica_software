@@ -44,7 +44,6 @@ Example hosts (use your own; they must **share a site**, i.e. sit under the same
 | Key | Production | Preview |
 |---|---|---|
 | `VITE_API_URL` | `https://api.aica.bitntech.in` | `https://api-preview.aica.bitntech.in` |
-| `VITE_DEMO_ENDPOINT` | Optional: where the landing page's demo form POSTs. Empty: WhatsApp | same |
 
 **Backend project** (runtime; see `backend/README.md`). Use the **preview Firebase project** for Preview, so PR previews never touch real users or send real emails.
 
@@ -59,6 +58,7 @@ Example hosts (use your own; they must **share a site**, i.e. sit under the same
 | `FIREBASE_WEB_API_KEY` | That Firebase project's Web API key |
 | `FIRESTORE_DATABASE` | `(default)` unless the project uses another ID |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend |
+| `DEMO_REQUEST_TO` | Who receives the landing page's demo requests, comma-separated. Defaults to `support@bitntech.in`. On Preview, point it at a test inbox |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional on Preview. Leave both empty to switch Google sign-in off |
 
 Anything you set explicitly overrides the defaults. A change to a frontend variable needs a redeploy, because it's built in.

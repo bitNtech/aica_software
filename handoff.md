@@ -7,12 +7,29 @@
   - 2026-10-11, sign-up and master admin pages
   - 2026-10-12, CI/CD: own GitHub repo for `aica_software` (workflows in `.github/workflows/`), deploy to Vercel for every environment (PR previews and production), separate Firebase project for previews, `*.vercel.app` for now, manual approval before production, Dependabot
   - 2026-10-12, landing page at `/`: copy `aica_web` into `frontend/` (the user asked for it inside `frontend/`, not as a top-level folder), add sign-in/sign-up buttons and integrations
+  - 2026-10-12, demo form via the backend: `POST /api/leads/demo` emails requests through Resend to `DEMO_REQUEST_TO` (default support@bitntech.in), no Firestore copy
   - 2026-10-12, separate hosting: frontend and backend as two Vercel projects on hosts that share a site (e.g. `aica.bitntech.in` and `api.aica.bitntech.in`), configured by env
   - 2026-10-11, the backend: FastAPI, email/password and Google, Firestore `(default)` database (asia-south1; the user first said `aica`, but no database has that ID), Resend, master admins support@ and admin@bitntech.in, local env, default session lengths
 - Last verified: 2026-10-12 (CI/CD), 2026-10-11 (app).
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
+
+## Demo requests through the backend (2026-10-12)
+- **Backend:** `POST /api/leads/demo` (`app/routes/leads.py`) is public but behind the origin check, with 5 per minute per IP.
+  - It validates `DemoRequestIn`, rejects unknown fields, and has a `website` honeypot.
+  - It emails the request with `Mailer.demo_request` to `DEMO_REQUEST_TO`.
+  - Responses: 204 when sent, 503 when Resend fails. Nothing is stored, and no names or phone numbers reach the logs.
+- **Frontend:** the demo form always posts to `${VITE_API_URL}/api/leads/demo`. `VITE_DEMO_ENDPOINT` and the "open WhatsApp when there's no endpoint" path are gone. WhatsApp stays as the fallback in the error message.
+- **Verified:**
+  - pytest 61/61, including mailer tests against a mocked Resend: HTML escaping, single-line subject, several recipients.
+  - Frontend 55/55 tests (5 new form tests), typecheck, build.
+  - Headless Chrome against the local API: the form succeeds, and the mailer receives the fields including the UTM tags.
+- **Not verified:** a real email through Resend.
+- **The user must:**
+  - Delete the `VITE_DEMO_ENDPOINT` lines from `frontend/.env.example`, and add `DEMO_REQUEST_TO=` to `backend/.env.example`. Both files are blocked to Claude.
+  - Make sure `EMAIL_FROM` is on a verified Resend domain.
+- **Known issues:** the in-process rate limit doesn't hold across serverless instances (add a CAPTCHA if spam appears). The thank-you line greets "Dr. Priya" as "Dr.." (existing behaviour).
 
 ## Separate frontend and backend hosting (2026-10-12)
 - **Decision:** two Vercel projects. The hosts must share a site, e.g. `aica.bitntech.in` and `api.aica.bitntech.in`, so the `SameSite=Lax` cookie keeps working. Unrelated domains (which includes two `*.vercel.app` hosts) were rejected, because they'd need `SameSite=None`, which browsers that block third-party cookies drop.
@@ -37,7 +54,7 @@
 - **What:** `/` shows the AICA landing page. Its source was copied from the sibling repo `../aica_web` (in `github.com/prem-ramamoorthy/bitntech`). **`frontend/src/landing/` is now the copy to edit.** The original will drift.
 - **How:** one Vite build, two pages. `frontend/index.html` is the landing page, prerendered at build time (`scripts/prerender-landing.mjs`) and indexable. `frontend/app.html` is the console shell (`noindex`); every non-file path falls back to it, on Vercel (`frontend/vercel.json`) and in `vite`/`vite preview` (`vite.config.ts`). Each page gets its own CSS bundle and they share the React chunk. Hashed output moved from `/assets` to `/static`; `public/assets/` holds the landing page's media (about 23 MB) at fixed names.
 - **Added to the page:** "Sign in" in the nav, plus "Create an account" and "Already with us? Sign in" on the end card. If `GET /api/auth/session` returns 200, these become "Open console" (→ `/login`, which redirects signed-in users home). New analytics event: `console_click`.
-- **Demo form:** unchanged. It posts to `VITE_DEMO_ENDPOINT` (build time) if that's set, or falls back to WhatsApp.
+- **Demo form:** superseded. It now posts to the backend; see "Demo requests through the backend".
 - **Verified:** typecheck, 48/48 tests, build with prerender, `vercel.json` against Vercel's schema; routing in `vite` and `vite preview` (`/` landing, `/login`, `/signup`, `/o/x`, `/ops/requests` console, media and `robots.txt`); screenshots of nav and end card at 1440 and 390 wide. **Not verified:** the signed-in "Open console" state (no backend running) and a real Vercel deploy.
 
 ## CI/CD (2026-10-12)
@@ -116,7 +133,7 @@ Develop production-ready software in this repository. Most work is expected to i
   - team invites from a client organisation
   - impersonation
   - the portal (`/o/:slug` is a placeholder)
-- Landing page: no backend endpoint for demo requests yet (it uses `VITE_DEMO_ENDPOINT` or WhatsApp). The media sits in git, about 23 MB. `canonical`, OG URLs and the sitemap point to `https://aica.bitntech.in/`, so update them if the site launches on another host.
+- Landing page: the media sits in git, about 23 MB. `canonical`, OG URLs and the sitemap point to `https://aica.bitntech.in/`, so update them if the site launches on another host.
 - Terms and privacy pages don't exist yet; the sign-up checkbox names them without links.
 - **Copy that assumes a policy:** the pages say reset links last an hour and verification links 3 days, which are Firebase's defaults, and invites last 7 days (`INVITE_DAYS`). If anyone changes the expiry in Firebase, change the copy too.
 

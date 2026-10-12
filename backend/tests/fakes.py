@@ -213,6 +213,15 @@ class FakeMailer:
     def signup_decided(self, to, org_name, approved, reason, url):
         return self._rec("approved" if approved else "declined", to, url)
 
+    leads: list[tuple[list[str], dict]] = field(default_factory=list)
+    fail_leads: bool = False
+
+    def demo_request(self, to, lead):
+        if self.fail_leads:
+            return False
+        self.leads.append((to, lead))
+        return True
+
     def last(self, kind):
         return next(u for k, _, u in reversed(self.sent) if k == kind)
 

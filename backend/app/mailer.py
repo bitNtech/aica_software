@@ -28,12 +28,35 @@ def _page(title: str, intro: str, button: str, url: str, outro: str) -> str:
 </td></tr></table></body></html>"""
 
 
+def _details(title: str, rows: list[tuple[str, str]]) -> str:
+    """An internal notification: a heading and a table of fields, no button."""
+    e = html.escape
+    cells = "".join(
+        f'<tr><td style="padding:8px 0;border-top:1px solid #e2d9c8;font:500 12px monospace;letter-spacing:1px;text-transform:uppercase;color:#7a746d;width:38%;vertical-align:top">{e(k)}</td>'
+        f'<td style="padding:8px 0;border-top:1px solid #e2d9c8;font-size:15px;color:#220934;word-break:break-word">{e(v)}</td></tr>'
+        for k, v in rows
+    )
+    return f"""<!doctype html><html><body style="margin:0;background:#f5efe3;font-family:'DM Sans',Segoe UI,Arial,sans-serif;color:#57534e">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px">
+<table role="presentation" width="100%" style="max-width:560px;background:#fbf8f2;border:1px solid #e2d9c8;border-radius:20px" cellpadding="0" cellspacing="0">
+<tr><td style="padding:28px 32px 0;font:800 22px Arial,sans-serif;letter-spacing:-1px;color:#220934">AICA<span style="color:#ff6e42">.</span></td></tr>
+<tr><td style="padding:20px 32px 8px;font:800 26px/1.15 Arial,sans-serif;letter-spacing:-1px;color:#220934">{e(title)}</td></tr>
+<tr><td style="padding:8px 32px 28px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{cells}</table></td></tr>
+</table>
+<p style="font:500 11px monospace;letter-spacing:2px;text-transform:uppercase;color:#7a746d">AICA by BitNTech · sent from the landing page</p>
+</td></tr></table></body></html>"""
+
+
+def _one_line(v: str) -> str:
+    return " ".join(v.split())
+
+
 class Mailer:
     def __init__(self, api_key: str, sender: str, client: httpx.Client | None = None):
         self._key, self._from = api_key, sender
         self._http = client or httpx.Client(timeout=10.0)
 
-    def send(self, to: str, subject: str, html_body: str, kind: str) -> bool:
+    def send(self, to: str | list[str], subject: str, html_body: str, kind: str) -> bool:
         if not self._key:
             log.warning("RESEND_API_KEY not set; %s email not sent", kind)
             return False
@@ -41,7 +64,7 @@ class Mailer:
             r = self._http.post(
                 RESEND_URL,
                 headers={"Authorization": f"Bearer {self._key}"},
-                json={"from": self._from, "to": [to], "subject": subject, "html": html_body},
+                json={"from": self._from, "to": [to] if isinstance(to, str) else to, "subject": subject, "html": html_body},
             )
         except httpx.HTTPError as e:
             log.error("resend unreachable sending %s email: %s", kind, type(e).__name__)
@@ -101,3 +124,18 @@ class Mailer:
             _page("We couldn't approve this request.", f"Reason: {reason}", "See details", url, "If something has changed, write to support@bitntech.in and we'll look again."),
             "declined",
         )
+
+    def demo_request(self, to: list[str], lead: dict[str, str]) -> bool:
+        """The landing page's "Book a demo" form, to the team. Unlike the
+        emails above, this one is the whole point of the request: the caller
+        reports a failed send to the visitor."""
+        phone = lead["phone"]
+        rows = [
+            ("Name", lead["name"]),
+            ("Company", lead["company"]),
+            ("Phone", f"+91 {phone[:5]} {phone[5:]}"),
+            ("Industry", lead["industry"]),
+            ("Calls per day", lead["calls_per_day"]),
+        ]
+        rows += [(k, v) for k, v in lead.items() if k not in {"name", "company", "phone", "industry", "calls_per_day"} and v]
+        return self.send(to, _one_line(f"Demo request: {lead['company']}")[:150], _details(f"Demo request from {lead['name']}", rows), "demo-request")
