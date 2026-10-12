@@ -1,8 +1,8 @@
 name: Deploy
 
-# One Vercel project, one deployment. Called by pipeline.yml once for the
-# frontend and once for the backend: they are separate Vercel projects on
-# separate hosts, configured by environment variables in each project.
+# One production deployment of one Vercel project. Called by pipeline.yml
+# once for the backend and once for the frontend: they are separate Vercel
+# projects on separate hosts, configured by environment variables in each.
 on:
   workflow_call:
     inputs:
@@ -14,14 +14,6 @@ on:
         description: The Vercel project ID for this target
         type: string
         required: true
-      environment:
-        description: GitHub environment (preview or production)
-        type: string
-        required: true
-      alias:
-        description: Optional fixed domain to point at this deployment (previews)
-        type: string
-        default: ''
     outputs:
       url:
         description: The deployment URL
@@ -41,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: ${{ inputs.environment }}
+      name: production
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -57,19 +49,9 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           TARGET: ${{ inputs.target }}
-          PROD: ${{ inputs.environment == 'production' && '--prod' || '' }}
         run: |
-          url=$(npx --yes "$VERCEL_CLI" deploy --cwd "$TARGET" $PROD --yes --token="$VERCEL_TOKEN")
+          url=$(npx --yes "$VERCEL_CLI" deploy --cwd "$TARGET" --prod --yes --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
-      # A fixed preview domain (e.g. api-preview.aica.bitntech.in) lets the
-      # other project's Preview env vars point at it. The latest PR wins.
-      - name: Point the preview domain at it
-        if: inputs.alias != ''
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          URL: ${{ steps.deploy.outputs.url }}
-          ALIAS: ${{ inputs.alias }}
-        run: npx --yes "$VERCEL_CLI" alias set "$URL" "$ALIAS" --token="$VERCEL_TOKEN"
       - name: Smoke test
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
