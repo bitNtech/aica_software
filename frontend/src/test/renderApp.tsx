@@ -4,14 +4,22 @@ import { MemoryRouter } from 'react-router'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
 import { createMockAuthClient, DEMO_PASSWORD } from '../auth/mockClient'
+import { ConsoleProvider } from '../console/ConsoleProvider'
+import { createDemoConsoleClient } from '../console/demoClient'
+import type { ConsoleClient } from '../console/types'
 
-export function renderApp(path = '/login', { idleMs }: { idleMs?: number } = {}) {
+export function renderApp(
+  path = '/login',
+  { idleMs, consoleClient = createDemoConsoleClient({ latency: 0 }) }: { idleMs?: number; consoleClient?: ConsoleClient } = {},
+) {
   const client = createMockAuthClient({ latency: 0 })
   const user = userEvent.setup()
   const view = render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider client={client} idleMs={idleMs}>
-        <App />
+        <ConsoleProvider client={consoleClient}>
+          <App />
+        </ConsoleProvider>
       </AuthProvider>
     </MemoryRouter>,
   )

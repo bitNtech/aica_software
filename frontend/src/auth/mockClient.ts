@@ -42,6 +42,8 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
   { email: 'master@example.com', label: 'Master admin', note: 'bitNtech, manages everything' },
   { email: 'ops@example.com', label: 'bitNtech staff', note: 'Reviews sign-ups, cannot suspend' },
   { email: 'frontdesk@example.com', label: 'Front desk', note: 'One hospital, goes straight in' },
+  { email: 'supervisor@example.com', label: 'Supervisor', note: 'Reviews calls and agents, read-only builder' },
+  { email: 'viewer@example.com', label: 'Viewer', note: 'Reads everything, changes nothing' },
   { email: 'admin@example.com', label: 'Admin', note: 'Two hospitals, picks one' },
   { email: 'pending@example.com', label: 'Sign-up in review', note: 'Waiting for bitNtech' },
   { email: 'suspended@example.com', label: 'Suspended org', note: 'Access paused by bitNtech' },
@@ -78,7 +80,7 @@ interface DbInvite extends Invite {
 }
 
 interface Db {
-  v: 1
+  v: 2
   orgs: DbOrg[]
   users: DbUser[]
   invites: Record<string, DbInvite>
@@ -113,7 +115,7 @@ function seed(): Db {
     ...extra,
   })
   return {
-    v: 1,
+    v: 2,
     orgs: [
       { slug: 'arogya-demo', name: 'Arogya Demo Hospital', city: 'Coimbatore', type: 'hospital', languages: ['tamil', 'english', 'tanglish'], status: 'active', createdAt: ago(120) },
       { slug: 'nila-eye-demo', name: 'Nila Eye Clinic (demo)', city: 'Madurai', type: 'clinic', languages: ['tamil', 'tanglish'], status: 'active', createdAt: ago(60) },
@@ -125,6 +127,8 @@ function seed(): Db {
       user('u_master', 'Vikram S', 'master@example.com', { platformRole: 'master_admin' }),
       user('u_ops', 'Divya K', 'ops@example.com', { platformRole: 'staff' }),
       user('u_frontdesk', 'Meena S', 'frontdesk@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'front_desk' }] }),
+      user('u_supervisor', 'Priya N', 'supervisor@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'supervisor' }] }),
+      user('u_viewer', 'Arun V', 'viewer@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'viewer' }] }),
       user('u_admin', 'Karthik R', 'admin@example.com', {
         memberships: [
           { orgSlug: 'arogya-demo', role: 'admin' },
@@ -159,7 +163,7 @@ function loadDb(): Db {
     const raw = window.localStorage.getItem(DB_KEY)
     if (raw) {
       const db = JSON.parse(raw) as Db
-      if (db.v === 1) return db
+      if (db.v === 2) return db
     }
   } catch {
     /* storage blocked or corrupt: start fresh */

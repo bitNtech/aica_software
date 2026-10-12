@@ -74,9 +74,11 @@
   --line-strong: #c9bda7;
   --danger-ink: var(--danger);
   --danger-bg: #fbe9e7;
-  --ok-ink: var(--ok);
+  /* Darker than the brand green and amber, so small text on their tints
+     reaches 4.5:1. */
+  --ok-ink: #146c47;
   --ok-bg: #e5f4ec;
-  --warn-ink: var(--warn);
+  --warn-ink: #8a5200;
   --warn-bg: #fbf0dc;
   --info-bg: #e8edff;
   --info-ink: var(--aica-deep);

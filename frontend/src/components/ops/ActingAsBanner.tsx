@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { asAuthError } from '../../auth/types'
@@ -16,6 +16,7 @@ export function ActingAsBanner() {
   const [error, setError] = useState<string | null>(null)
   // Re-renders every 15 seconds so the minutes left stay current.
   const [, setTick] = useState(0)
+  const ref = useRef<HTMLElement>(null)
 
   const end = useCallback(
     async (ranOut: boolean) => {
@@ -48,11 +49,27 @@ export function ActingAsBanner() {
     }
   }, [expiresAt, end])
 
+  // Sticky frames (the console sidebar) sit below the banner, not under it.
+  const showing = !!impersonator && !!user
+  useEffect(() => {
+    const el = ref.current
+    const root = document.documentElement
+    if (!showing || !el) return
+    const set = () => root.style.setProperty('--acting-h', `${el.offsetHeight}px`)
+    set()
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set)
+    ro?.observe(el)
+    return () => {
+      ro?.disconnect()
+      root.style.removeProperty('--acting-h')
+    }
+  }, [showing])
+
   if (!impersonator || !user) return null
   const mins = Math.max(1, Math.ceil((Date.parse(impersonator.expiresAt) - Date.now()) / 60_000))
 
   return (
-    <section className="acting" aria-label="Acting as another user">
+    <section ref={ref} className="acting" aria-label="Acting as another user">
       <p className="acting__text">
         <span className="acting__tag">Acting as</span>
         <strong className="acting__name">{user.name}</strong>

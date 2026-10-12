@@ -34,7 +34,9 @@ button { cursor: pointer; }
 a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--orange);
+  /* The deeper orange on paper (the brand orange is under 3:1 on cream);
+     the brand orange on dark surfaces. */
+  outline: 2px solid var(--orange-text, var(--orange));
   outline-offset: 3px;
 }
 
@@ -79,7 +81,7 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
   color: var(--ink);
   text-wrap: balance;
 }
-.display em { font-style: normal; color: var(--orange); }
+.display em { font-style: normal; color: var(--orange-text, var(--orange)); }
 
 /* ---- links ---- */
 

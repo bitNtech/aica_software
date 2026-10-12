@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
-import { RedirectIfSignedIn, RequireAuth, RequireStaff } from './auth/guards'
+import { RedirectIfSignedIn, RequireAuth, RequireOrgPage, RequireStaff } from './auth/guards'
 import { ActingAsBanner } from './components/ops/ActingAsBanner'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
 import ChooseOrgPage from './pages/ChooseOrgPage'
 import ConsoleHomePage from './pages/ConsoleHomePage'
+import AgentsPage from './pages/console/AgentsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
 import LoginPage from './pages/LoginPage'
@@ -46,7 +47,10 @@ export default function App() {
       <Route path="/choose" element={member(<ChooseOrgPage />)} />
       <Route path="/pending" element={member(<PendingPage />)} />
       <Route path="/suspended" element={member(<SuspendedPage />)} />
-      <Route path="/o/:slug" element={member(<ConsoleHomePage />)} />
+
+      {/* An organisation's console: access per page from console/access.ts */}
+      <Route path="/o/:slug" element={<RequireOrgPage page="home"><ConsoleHomePage /></RequireOrgPage>} />
+      <Route path="/o/:slug/agents" element={<RequireOrgPage page="agents"><AgentsPage /></RequireOrgPage>} />
 
       {/* bitNtech: master admin and staff */}
       <Route path="/ops" element={staff(<OpsOverviewPage />)} />
