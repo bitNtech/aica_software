@@ -7,14 +7,25 @@ interface Props {
   confirmLabel: string
   busyLabel: string
   busy?: boolean
+  /** Shown when the reason is too short. */
+  tooShort?: string
   onConfirm(reason: string): void
   onCancel(): void
 }
 
-/** An inline "why?" box for actions the other side must be told about —
- * declining a sign-up, suspending an organisation. The reason is required
- * because it is shown to the client word for word. */
-export function ReasonForm({ label, hint, confirmLabel, busyLabel, busy, onConfirm, onCancel }: Props) {
+/** An inline "why?" box for actions that need a reason on record —
+ * declining a sign-up or suspending an organisation (shown to the client word
+ * for word), and the master admin's people actions (kept in the audit log). */
+export function ReasonForm({
+  label,
+  hint,
+  confirmLabel,
+  busyLabel,
+  busy,
+  tooShort = 'Write at least a short sentence — the client will read this.',
+  onConfirm,
+  onCancel,
+}: Props) {
   const id = useId()
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +38,7 @@ export function ReasonForm({ label, hint, confirmLabel, busyLabel, busy, onConfi
   function submit(e: FormEvent) {
     e.preventDefault()
     if (reason.trim().length < 10) {
-      setError('Write at least a short sentence — the client will read this.')
+      setError(tooShort)
       ref.current?.focus()
       return
     }

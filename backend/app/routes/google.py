@@ -86,7 +86,7 @@ def callback(request: Request, svc: Services = Depends(get_services)):
         ensure_profile(svc, uid, email, google["name"] or (user.display_name if user else "") or "")
         result = svc.identity.sign_in_with_custom_token(svc.admin.create_custom_token(uid))
         r = _back_to_login(svc)  # /login sends a signed-in person on to their home
-        start_session(svc, r, result["idToken"], remember=False)
+        start_session(svc, r, result["idToken"], remember=False, request=request)
         svc.store.audit(uid, "login", uid, "google")
         return r
     except ApiError as e:

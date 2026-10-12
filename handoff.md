@@ -3,6 +3,8 @@
 ## Status
 - Phase: Auth backend (FastAPI + Firebase) built and connected to the console frontend. **Not yet run against the real Firebase project:** it's waiting on `backend/.env`, the service-account key and the Google OAuth client (see "Needed from the user").
 - Implementation approval:
+  - 2026-10-12, Option B, master admin powers: People page (roles, disable/enable, sign out everywhere, invites as staff or master admin), audit log viewer, acting as a client user (30 min, audited, client not emailed). Guards: no self-changes, at least one active master admin, client accounts can't hold bitNtech roles, staff can't see People or the audit log. Asking for the password again before risky actions was deferred.
+  - 2026-10-12, master admin for admin@bitntech.in (Option A): `seed_master --no-email`, then promote the account. Option B (wider master-admin powers) is to be planned next.
   - 2026-10-11, sign-in pages
   - 2026-10-11, sign-up and master admin pages
   - 2026-10-12, CI/CD: own GitHub repo for `aica_software` (workflows in `.github/workflows/`), deploy to Vercel for every environment (PR previews and production), separate Firebase project for previews, `*.vercel.app` for now, manual approval before production, Dependabot
@@ -14,6 +16,55 @@
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
+
+## Master admin: admin@bitntech.in (2026-10-12)
+- **Done:**
+  - The user created admin@bitntech.in (with a password) as bitNtech's organisation-wide master admin.
+  - `seed_master` gained `--no-email`, which skips the "set your password" email for existing accounts. New accounts still get it.
+  - The per-address logic is now `seed()`, so tests can call it.
+  - Ran `seed_master --no-email admin@bitntech.in` against the real Firebase project. Output: `existing · master_admin claim set · no email sent`.
+- **Verified:** pytest 65/65, including 4 new tests in `tests/test_seed_master.py`: promote without email and keep the password, email by default, new account always emailed, and the promoted account signs in with `platformRole: master_admin` and reaches `/api/ops/orgs`.
+- **Not verified:**
+  - Signing in as admin@bitntech.in in a browser. The user must sign out and back in, because the claim is fixed in the session cookie when it's created.
+  - Whether support@bitntech.in was ever seeded.
+- **Option B:** built. See "Master admin powers (Option B)".
+
+## Master admin powers (Option B, 2026-10-12)
+- **Backend** (`routes/ops.py`, master admin only):
+  - `GET /api/ops/people`.
+  - `POST /api/ops/people/{uid}/role|disable|enable|sign-out|act-as`.
+  - `GET /api/ops/audit`: one filter at a time; actor and target take an email; pages by `before`.
+  - `POST /api/ops/staff-invites` now takes `role`.
+  - `POST /api/auth/act-as/end`.
+  - Org summaries now include `ownerId`.
+  - New setting `ACT_AS_MINUTES` (default 30).
+- **Role changes and disables** revoke the person's sessions, because the role is fixed in the session cookie. Making or inviting a master admin emails every master admin (`Mailer.master_admin_added`).
+- **Acting as a client:**
+  - The `aica_act_as` HttpOnly cookie holds a random token; `impersonations/{sha256}` holds who, as whom, why and until when.
+  - Every request checks the master admin's own session first, then the record, then the target. If any check fails, the request runs as the master admin.
+  - While acting: Ops and `/api/auth/business` return 403. New sensitive routes should depend on `sessions.not_acting`.
+  - Acting ends on end, on sign-out, on signing in again, or at expiry.
+- **Frontend:**
+  - `/ops/people` and `/ops/audit`; the People and Audit log tabs show only for master admins.
+  - "Act as owner" on the Overview.
+  - `ActingAsBanner` across every page while acting.
+  - The mock client implements all of it, so `npm run dev:demo` works.
+  - Gotcha: React Router applies navigation as a transition. `AuthProvider.actAs` and `endActing` take a `go` callback and swap the session inside the same `startTransition`. Without that, the guard briefly sees the new user on the old page and redirects to /403.
+- **Verified:**
+  - pytest 90/90 (25 new: people, act-as, audit).
+  - Frontend 68/68 (13 new), `tsc` clean, `npm run build` passes.
+  - Headless Chrome against a local API on the fakes, at 1440 and 390 wide: People, the role form, Audit, and the acting banner. Ops answered 403 while acting, and ending returned the master admin's session.
+- **Not verified:**
+  - Against the real Firebase project and Firestore, including the real `list_users` and the audit query with indexes.
+  - A real master-admin alert email.
+- **The user must:**
+  - Create the 3 composite indexes in `backend/firestore.indexes.json` (see `backend/README.md`). Until then, a filtered audit query returns 503 with an explanation.
+  - Optionally add `ACT_AS_MINUTES=30` to `backend/.env.example`. Claude can't edit that file.
+- **Known limitations:**
+  - `GET /people` lists every Firebase user on each load, which is fine for hundreds, not tens of thousands.
+  - The audit cursor is a timestamp; entries with exactly the same timestamp could straddle pages.
+  - `/o/:slug` is still a placeholder, so acting as a client shows little until the portal exists.
+  - Signing out while acting signs the master admin out too.
 
 ## Demo requests through the backend (2026-10-12)
 - **Backend:** `POST /api/leads/demo` (`app/routes/leads.py`) is public but behind the origin check, with 5 per minute per IP.
@@ -150,6 +201,11 @@ Develop production-ready software in this repository. Most work is expected to i
 - **Copy that assumes a policy:** the pages say reset links last an hour and verification links 3 days, which are Firebase's defaults, and invites last 7 days (`INVITE_DAYS`). If anyone changes the expiry in Firebase, change the copy too.
 
 ## Next step
+- **Now:**
+  - Review and commit the Option B changes (not committed yet).
+  - Create the Firestore indexes.
+  - Sign in as admin@bitntech.in against the real backend and try People, Audit and acting as a client.
+- **Then:** asking for the password again before promoting or acting (deferred), or the client portal.
 0. Deployment: the user does the one-time setup in `docs/cicd.md`: two Vercel projects (frontend, backend) with custom domains that share a site, env vars per environment, the preview Firebase project, GitHub secrets, variables and environments, and branch protection. Register `<API_URL>/api/auth/google/callback` on the Google client, and add the new keys to `backend/.env.example`. Then open a test PR to see the first preview deploys.
 1. The user completes "Needed from the user", then run both servers and do one real end-to-end pass: sign up, verify, approve as master admin, sign in, Google sign-in, reset.
 2. Then plan the Ops staff page or the portal shell.

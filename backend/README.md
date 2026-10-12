@@ -29,6 +29,8 @@ Master admins (once, after `.env` and the key are in place):
 
 This creates each user if needed, marks the email verified, sets the `platform_role: master_admin` claim, writes the profile, and emails a "set your password" link. Master admins can also use Google on the same address. It's safe to re-run.
 
+To promote an account that already has a password, skip the email: `.venv/bin/python -m app.scripts.seed_master --no-email admin@bitntech.in`. A new account still gets it. The person must sign out and back in for the role to apply.
+
 Invite bitNtech staff (until the Ops staff page exists): `.venv/bin/python -m app.scripts.invite_staff name@bitntech.in --by "Support"`.
 
 Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
@@ -73,7 +75,14 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | POST | `/api/leads/demo` | anyone, from an allowed origin. The landing page's demo form: validated, emailed to `DEMO_REQUEST_TO` through Resend, not stored. 204 when sent, 503 when Resend fails, 5 per minute per IP. A filled-in `website` honeypot gets 204 and is dropped |
 | GET | `/api/ops/orgs`, `/api/ops/signup-requests` | bitNtech staff and master admin |
 | POST | `/api/ops/signup-requests/{slug}/approve`, `/decline` | bitNtech staff and master admin |
-| POST | `/api/ops/orgs/{slug}/suspend`, `/restore`, `/api/ops/staff-invites` | master admin only |
+| POST | `/api/ops/orgs/{slug}/suspend`, `/restore` | master admin only |
+| POST | `/api/ops/staff-invites` | master admin only. `{"email", "role"}`, where role is `staff` (default) or `master_admin`. Inviting a master admin emails every master admin |
+| GET | `/api/ops/people` | master admin only. Every account, bitNtech first |
+| POST | `/api/ops/people/{uid}/role` | master admin only. `{"role": "master_admin" \| "staff" \| null, "reason"}`. Signs the person out everywhere so the change applies at once. A new master admin is announced to every master admin by email |
+| POST | `/api/ops/people/{uid}/disable` (`{"reason"}`), `/enable`, `/sign-out` | master admin only |
+| POST | `/api/ops/people/{uid}/act-as` | master admin only. `{"reason"}`. Acts as a client user for `ACT_AS_MINUTES` (30) |
+| POST | `/api/auth/act-as/end` | the master admin acting. Returns their own session |
+| GET | `/api/ops/audit?limit=&before=&action=\|actor=\|target=` | master admin only. Newest first; one filter at a time; actor and target take an email |
 
 Errors are always `{"error": {"code", "message", "retryAfter"?}}`, with codes matching the frontend's `AuthErrorCode`.
 
@@ -85,3 +94,17 @@ Protections:
 - Forgot-password and resend give the same answer whether or not the account exists.
 - Invite tokens are stored hashed.
 - Ops decisions are written to the `audit` collection.
+- People management: nobody can change, disable or sign out their own account from the app, and a change that would leave no active master admin is refused. Client accounts (with organisation memberships) can't be given a bitNtech role.
+
+### Acting as a client user
+
+A master admin can act as a client user to see exactly what they see. It's audited and time-limited:
+- It starts with a required reason. An `impersonations/{sha256(token)}` record holds who, as whom, why and until when; the browser holds the token in an HttpOnly `aica_act_as` cookie. The master admin's own session cookie is unchanged.
+- Every request checks the master admin's own session first, then the record (live, not expired, theirs), then the target (exists, not disabled, still a client). If anything fails, the request runs as the master admin again.
+- While acting: all `/api/ops/*` routes and `/api/auth/business` refuse with 403. New sensitive routes should depend on `not_acting`.
+- It ends on `POST /api/auth/act-as/end`, on sign-out, on signing in again, or after `ACT_AS_MINUTES` (default 30, 5 to 120). Start and end go to the audit log. The client isn't emailed.
+- bitNtech accounts can't be acted as, and staff can't act as anyone.
+
+### Firestore indexes for the audit log
+
+Filtering the audit log by action, actor or target needs the three composite indexes in `firestore.indexes.json`. Create them once, either with `firebase deploy --only firestore:indexes` from `backend/`, or by hand in Firebase console → Firestore Database → Indexes → Composite: collection `audit`, fields `action` (or `actor`, or `target`) Ascending, then `at` Descending. Until then, the unfiltered log works and a filtered one answers 503 with an explanation.

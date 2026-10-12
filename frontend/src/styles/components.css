@@ -325,6 +325,83 @@
   .row__side { flex-wrap: wrap; padding-left: calc(44px + 0.9rem); }
 }
 
+/* ---- Ops: people and audit log ---- */
+
+.empty-note { margin: 0; padding: 1.1rem; border: 1px dashed var(--line-strong); border-radius: var(--r-card); color: var(--muted); }
+.ops-section + .ops-section { margin-top: 2.25rem; }
+.people-search { max-width: 26rem; margin: 2rem 0 1.5rem; }
+
+.person-chip {
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font: 500 0.62rem/1 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  vertical-align: 0.15em;
+}
+.role-chip {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  font: 500 0.66rem/1 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.role-chip--master_admin { border-color: var(--orange-text); color: var(--orange-text); }
+.person-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.role-form { display: grid; gap: 0.9rem; }
+.role-form__set { display: grid; gap: 0.5rem; margin: 0; padding: 0; border: 0; }
+.role-form__set legend { margin-bottom: 0.5rem; }
+.role-form__choice { display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; }
+.role-form__choice input { width: 1.1rem; height: 1.1rem; margin-top: 0.2rem; accent-color: var(--plum); }
+.role-form__choice strong { color: var(--ink); }
+.role-form__plain { display: block; font-size: 0.85rem; color: var(--muted); }
+
+.invite-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) auto; align-items: end; gap: 0.9rem; }
+.invite-form__go { min-height: var(--field-h); }
+.invite-form .field__error { grid-column: 1 / -1; }
+
+.audit-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.9rem; margin-bottom: 1.75rem; }
+.audit-filter .field { min-width: min(16rem, 100%); }
+.audit-filter__value { flex: 1; }
+.audit-filter__go { display: flex; gap: 0.5rem; padding-bottom: 0.4rem; }
+
+.audit-wrap { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); overflow-x: auto; }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.audit-table th {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font: 500 0.66rem var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.audit-table td { padding: 0.75rem 1rem; vertical-align: top; color: var(--ink); overflow-wrap: anywhere; }
+.audit-table tr + tr td { border-top: 1px solid var(--line); }
+.audit-table td:first-child { white-space: nowrap; color: var(--text); }
+.audit-table__detail { color: var(--text) !important; max-width: 28rem; }
+.audit-table tr:focus { outline: 2px solid var(--orange); outline-offset: -2px; }
+.audit-more { display: grid; justify-items: start; gap: 0.75rem; margin-top: 1rem; }
+
+@media (max-width: 760px) {
+  .invite-form { grid-template-columns: 1fr; }
+  .audit-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .audit-table, .audit-table tbody, .audit-table tr, .audit-table td { display: block; }
+  .audit-table tr { padding: 0.75rem 1rem; }
+  .audit-table tr + tr { border-top: 1px solid var(--line); }
+  .audit-table tr + tr td { border-top: 0; }
+  .audit-table td { display: grid; grid-template-columns: 5.5rem 1fr; gap: 0.75rem; padding: 0.25rem 0; }
+  .audit-table td::before { content: attr(data-label); font: 500 0.62rem/1.9 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .audit-table td:first-child { white-space: normal; }
+}
+
 .reason {
   display: grid;
   gap: 0.45rem;

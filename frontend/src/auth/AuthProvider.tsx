@@ -1,5 +1,5 @@
-import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AcceptInviteInput, AuthClient, Session, SignInInput, User } from './types'
+import { createContext, startTransition, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { AcceptInviteInput, AuthClient, Impersonator, Session, SignInInput, User } from './types'
 
 type Status = 'restoring' | 'signedOut' | 'signedIn'
 
@@ -11,10 +11,18 @@ interface AuthValue {
   client: AuthClient
   status: Status
   user: User | null
+  /** Set while a master admin acts as `user`. */
+  impersonator: Impersonator | null
   endReason: EndReason
   signIn(input: SignInInput): Promise<Session>
   acceptInvite(token: string, input: AcceptInviteInput): Promise<Session>
   signOut(): Promise<void>
+  /** Master admin only: become `userId` until endActing() or expiry.
+   * `go` runs before the new session applies, so the caller can leave a
+   * page the new user may not see (an Ops page, a client page) first. */
+  actAs(userId: string, reason: string, go: (s: Session) => void): Promise<Session>
+  /** Back to the master admin's own session; `go` as for actAs. */
+  endActing(go: (s: Session) => void): Promise<Session>
   /** Replaces the session with a fresh one from the server, e.g. after the business step. */
   setSession(s: Session): void
   /** Called by /signed-out and /session-expired once they have shown it. */
@@ -99,11 +107,42 @@ export function AuthProvider({
     [client, take],
   )
   const signOut = useCallback(() => end('signedOut'), [end])
+  const swap = useCallback(
+    (go: (s: Session) => void) => (s: Session) => {
+      // React Router applies navigation as a transition. Swapping the session
+      // in the same transition renders both together, so no guard ever sees
+      // the new user on the old page (and bounces them to /403).
+      startTransition(() => {
+        go(s)
+        take(s)
+      })
+      return s
+    },
+    [take],
+  )
+  const actAs = useCallback(
+    (userId: string, reason: string, go: (s: Session) => void) => client.actAs(userId, reason).then(swap(go)),
+    [client, swap],
+  )
+  const endActing = useCallback((go: (s: Session) => void) => client.endActing().then(swap(go)), [client, swap])
   const clearEndReason = useCallback(() => setEndReason(null), [])
 
   const value = useMemo<AuthValue>(
-    () => ({ client, status, user: session?.user ?? null, endReason, signIn, acceptInvite, signOut, setSession: take, clearEndReason }),
-    [client, status, session, endReason, signIn, acceptInvite, signOut, take, clearEndReason],
+    () => ({
+      client,
+      status,
+      user: session?.user ?? null,
+      impersonator: session?.impersonator ?? null,
+      endReason,
+      signIn,
+      acceptInvite,
+      signOut,
+      actAs,
+      endActing,
+      setSession: take,
+      clearEndReason,
+    }),
+    [client, status, session, endReason, signIn, acceptInvite, signOut, actAs, endActing, take, clearEndReason],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

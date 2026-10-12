@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     max_login_attempts: int = 5
     lockout_minutes: int = 15
     invite_days: int = 7
+    # How long a master admin's "act as" session lasts.
+    act_as_minutes: int = Field(30, ge=5, le=120)
 
     # Vercel system variables (hostnames, no scheme), set only on Vercel.
     # Only production deployments exist (see docs/cicd.md).

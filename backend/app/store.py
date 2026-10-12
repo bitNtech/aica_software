@@ -7,6 +7,7 @@ Collections
   invites/{sha256(tok)}  email, orgSlug?, orgName, role, invitedBy, expiresAt, usedAt?
   login_attempts/{sha256(email)}  count, until
   audit/{auto}           at, actor, action, target, detail
+  impersonations/{sha256(tok)}  actorUid, targetUid, reason, startedAt, expiresAt, endedAt?
 """
 from __future__ import annotations
 
@@ -66,8 +67,38 @@ class InviteDoc:
     usedAt: datetime | None = None
 
 
+@dataclass
+class AuditEntry:
+    at: datetime
+    actor: str
+    action: str
+    target: str
+    detail: str = ""
+
+
+@dataclass
+class ImpersonationDoc:
+    """A master admin acting as a client user, for a limited time."""
+
+    actorUid: str
+    targetUid: str
+    reason: str
+    startedAt: datetime
+    expiresAt: datetime
+    endedAt: datetime | None = None
+
+
+# The audit log can be filtered on one of these at a time; each needs a
+# composite index with `at` (backend/firestore.indexes.json).
+AUDIT_FILTERS = ("action", "actor", "target")
+
+
 class SlugTaken(Exception):
     pass
+
+
+class IndexMissing(Exception):
+    """A Firestore query needs a composite index that hasn't been created."""
 
 
 class Store(Protocol):
@@ -83,6 +114,10 @@ class Store(Protocol):
     def set_attempts(self, key: str, count: int, until: datetime | None) -> None: ...
     def clear_attempts(self, key: str) -> None: ...
     def audit(self, actor: str, action: str, target: str, detail: str = "") -> None: ...
+    def list_users(self) -> list[UserDoc]: ...
+    def list_audit(self, limit: int, before: datetime | None = None, field: str | None = None, value: str | None = None) -> list[AuditEntry]: ...  # raises IndexMissing
+    def get_impersonation(self, key: str) -> ImpersonationDoc | None: ...
+    def save_impersonation(self, key: str, doc: ImpersonationDoc) -> None: ...
 
 
 def _user_from(uid: str, d: dict) -> UserDoc:
@@ -154,3 +189,34 @@ class FirestoreStore:
 
     def audit(self, actor: str, action: str, target: str, detail: str = "") -> None:
         self.db.collection("audit").add({"at": now(), "actor": actor, "action": action, "target": target, "detail": detail})
+
+    def list_users(self) -> list[UserDoc]:
+        return [_user_from(s.id, s.to_dict()) for s in self.db.collection("users").stream()]
+
+    def list_audit(self, limit: int, before: datetime | None = None, field: str | None = None, value: str | None = None) -> list[AuditEntry]:
+        from google.api_core.exceptions import FailedPrecondition
+        from google.cloud.firestore_v1 import Query
+        from google.cloud.firestore_v1.base_query import FieldFilter
+
+        q = self.db.collection("audit")
+        if field:
+            q = q.where(filter=FieldFilter(field, "==", value))
+        if before:
+            q = q.where(filter=FieldFilter("at", "<", before))
+        q = q.order_by("at", direction=Query.DESCENDING).limit(limit)
+        try:
+            snaps = list(q.stream())
+        except FailedPrecondition as e:
+            raise IndexMissing() from e
+        out = []
+        for snap in snaps:
+            d = snap.to_dict()
+            out.append(AuditEntry(at=d.get("at") or now(), actor=str(d.get("actor", "")), action=str(d.get("action", "")), target=str(d.get("target", "")), detail=str(d.get("detail", ""))))
+        return out
+
+    def get_impersonation(self, key: str) -> ImpersonationDoc | None:
+        snap = self.db.collection("impersonations").document(key).get()
+        return ImpersonationDoc(**snap.to_dict()) if snap.exists else None
+
+    def save_impersonation(self, key: str, doc: ImpersonationDoc) -> None:
+        self.db.collection("impersonations").document(key).set(asdict(doc))

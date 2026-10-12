@@ -55,6 +55,16 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, childre
               </span>
             ) : null}
           </NavLink>
+          {user.platformRole === 'master_admin' && (
+            <>
+              <NavLink to="/ops/people" className="ops__link">
+                People
+              </NavLink>
+              <NavLink to="/ops/audit" className="ops__link">
+                Audit log
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div className="ops__me">

@@ -80,6 +80,14 @@ class ReasonIn(Camel):
 
 class StaffInviteIn(Camel):
     email: EmailStr
+    role: PlatformRole = "staff"
+
+
+class RoleChangeIn(Camel):
+    """None takes the bitNtech role away."""
+
+    role: PlatformRole | None
+    reason: str = Field(min_length=10, max_length=500)
 
 
 # The landing page's demo form. snake_case on the wire, as the form sends it;
@@ -140,10 +148,20 @@ class UserOut(Camel):
     memberships: list[MembershipOut]
 
 
+class ImpersonatorOut(Camel):
+    """Set while a master admin acts as `user`."""
+
+    name: str
+    email: str
+    reason: str
+    expires_at: str
+
+
 class SessionOut(Camel):
     user: UserOut
     remember: bool
     expires_at: str
+    impersonator: ImpersonatorOut | None = None
 
 
 class EmailOut(Camel):
@@ -182,5 +200,39 @@ class OrgSummaryOut(Camel):
     business_type: BusinessType
     status: OrgStatus
     status_reason: str | None = None
+    owner_id: str
     owner_email: str
     created_at: str
+
+
+class PersonMembershipOut(Camel):
+    org_slug: str
+    org_name: str
+    role: Role
+
+
+class PersonOut(Camel):
+    id: str
+    name: str
+    email: str
+    platform_role: PlatformRole | None = None
+    disabled: bool
+    email_verified: bool
+    memberships: list[PersonMembershipOut]
+    created_at: str | None = None
+
+
+class AuditEntryOut(Camel):
+    at: str
+    actor: str
+    actor_label: str
+    action: str
+    target: str
+    target_label: str
+    detail: str
+
+
+class AuditPageOut(Camel):
+    entries: list[AuditEntryOut]
+    # Pass as `before` for the next page; None on the last page.
+    next_before: str | None = None

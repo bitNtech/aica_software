@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router'
-import { useAuth } from '../../auth/AuthProvider'
+import { Link, useNavigate } from 'react-router'
+import { homeFor, useAuth } from '../../auth/AuthProvider'
 import { BUSINESS_LABEL, STATUS_LABEL } from '../../auth/roles'
 import { asAuthError, type OrgStatus, type OrgSummary } from '../../auth/types'
 import { OpsLayout } from '../../components/ops/OpsLayout'
@@ -17,11 +17,13 @@ const ORDER: Record<OrgStatus, number> = { suspended: 0, pending_review: 1, decl
 
 /** /ops — every organisation, and what needs a decision. */
 export default function OpsOverviewPage() {
-  const { client, user } = useAuth()
+  const { client, user, actAs } = useAuth()
+  const navigate = useNavigate()
   const isMaster = user?.platformRole === 'master_admin'
   const load = useCallback(() => client.listOrgs(), [client])
   const [orgs, reload] = useAsync(load)
-  const [open, setOpen] = useState<string | null>(null)
+  /** Which row's reason box is open: suspending it, or acting as its owner. */
+  const [open, setOpen] = useState<{ slug: string; kind: 'suspend' | 'act' } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
@@ -36,6 +38,17 @@ export default function OpsOverviewPage() {
     } catch (err) {
       setNotice({ tone: 'error', text: asAuthError(err).message })
     } finally {
+      setBusy(null)
+    }
+  }
+
+  async function actAsOwner(o: OrgSummary, reason: string) {
+    setBusy(o.slug)
+    setNotice(null)
+    try {
+      await actAs(o.ownerId, reason, (s) => navigate(homeFor(s.user), { replace: true }))
+    } catch (err) {
+      setNotice({ tone: 'error', text: asAuthError(err).message })
       setBusy(null)
     }
   }
@@ -128,8 +141,13 @@ export default function OpsOverviewPage() {
                   <div className="row__side">
                     <span className={`status-chip status-chip--${o.status}`}>{STATUS_LABEL[o.status]}</span>
                     <span className="row__date">Since {shortDate(o.createdAt)}</span>
-                    {isMaster && o.status === 'active' && open !== o.slug && (
-                      <Button variant="line" size="sm" onClick={() => setOpen(o.slug)} aria-label={`Suspend ${o.name}`}>
+                    {isMaster && o.ownerId && open?.slug !== o.slug && (
+                      <Button variant="line" size="sm" onClick={() => setOpen({ slug: o.slug, kind: 'act' })} aria-label={`Act as the owner of ${o.name}`}>
+                        Act as owner
+                      </Button>
+                    )}
+                    {isMaster && o.status === 'active' && open?.slug !== o.slug && (
+                      <Button variant="line" size="sm" onClick={() => setOpen({ slug: o.slug, kind: 'suspend' })} aria-label={`Suspend ${o.name}`}>
                         Suspend
                       </Button>
                     )}
@@ -151,7 +169,21 @@ export default function OpsOverviewPage() {
                       </Link>
                     )}
                   </div>
-                  {open === o.slug && (
+                  {open?.slug === o.slug && open.kind === 'act' && (
+                    <div className="row__extra">
+                      <ReasonForm
+                        label={`Why act as the owner of ${o.name}?`}
+                        hint={`You'll see AICA exactly as ${o.ownerEmail} does for 30 minutes. The reason goes in the audit log; they aren't emailed.`}
+                        confirmLabel="Act as owner"
+                        busyLabel="Starting…"
+                        busy={busy === o.slug}
+                        tooShort="Write at least a short sentence. It goes in the audit log."
+                        onConfirm={(reason) => void actAsOwner(o, reason)}
+                        onCancel={() => setOpen(null)}
+                      />
+                    </div>
+                  )}
+                  {open?.slug === o.slug && open.kind === 'suspend' && (
                     <div className="row__extra">
                       <ReasonForm
                         label={`Why suspend ${o.name}?`}
