@@ -1,8 +1,8 @@
 import { Link, useLocation } from 'react-router'
 import { ROLE_LABEL } from '../auth/roles'
-import { navFor, PAGE_LABEL, type ConsolePage } from '../console/access'
+import { navFor, PAGE_LABEL, type PageKey } from '../console/access'
 import { useOrg } from '../console/useOrg'
-import { ConsoleLayout } from '../components/console/ConsoleLayout'
+import { ConsolePage } from '../components/console/ConsolePage'
 import { Alert } from '../components/ui/Alert'
 
 /** /o/:slug — where sign-in lands. For now: who you are here, and the pages
@@ -11,13 +11,13 @@ import { Alert } from '../components/ui/Alert'
 export default function ConsoleHomePage() {
   const { user, org } = useOrg()
   // Set by RequireOrgPage when this role can't open the page asked for.
-  const denied = (useLocation().state as { deniedPage?: ConsolePage } | null)?.deniedPage
+  const denied = (useLocation().state as { deniedPage?: PageKey } | null)?.deniedPage
   const pages = navFor(org.role)
     .flatMap((s) => s.items)
     .filter((i) => i.page !== 'home')
 
   return (
-    <ConsoleLayout
+    <ConsolePage
       kicker="Home"
       docTitle="Home"
       title={
@@ -64,7 +64,7 @@ export default function ConsoleHomePage() {
       <p className="empty-note home-soon">
         Today's calls, live activity and the handoff queue arrive here as the console is built out.
       </p>
-    </ConsoleLayout>
+    </ConsolePage>
   )
 }
 

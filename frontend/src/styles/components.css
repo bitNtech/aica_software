@@ -325,6 +325,91 @@
   .row__side { flex-wrap: wrap; padding-left: calc(44px + 0.9rem); }
 }
 
+/* ---- shared controls ---- */
+
+/* "Demo": sample data or a mock backend. One style everywhere. */
+.demo-chip {
+  flex: none;
+  padding: 0.3rem 0.6rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  font: 500 0.62rem/1 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.field__select { appearance: none; padding-right: 2.75rem; background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%236b655e' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 1rem center / 16px no-repeat; }
+.field__area { min-height: 0; padding-top: 0.8rem; padding-bottom: 0.8rem; resize: vertical; line-height: 1.5; }
+
+.switch { display: flex; align-items: flex-start; gap: 0.75rem; }
+.switch__control { flex: none; display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; margin: -8px 0; padding: 0; border: 0; background: none; border-radius: var(--r-pill); }
+.switch__track { position: relative; width: 40px; height: 24px; border-radius: var(--r-pill); background: var(--line-strong); transition: background-color 0.2s var(--ease); }
+.switch__thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px rgb(0 0 0 / 0.25); transition: transform 0.2s var(--out); }
+.switch__control[aria-checked='true'] .switch__track { background: var(--ink); }
+.switch__control[aria-checked='true'] .switch__thumb { transform: translateX(16px); background: var(--bg); }
+.switch__control:disabled { opacity: 0.5; cursor: not-allowed; }
+.switch__label { display: grid; gap: 0.15rem; padding-top: 0.05rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+.switch__hint { font-weight: 400; font-size: 0.85rem; color: var(--muted); }
+@media (forced-colors: active) {
+  .switch__control[aria-checked='true'] .switch__track { background: Highlight; }
+}
+
+.tabs__list, .route-tabs { display: flex; gap: 0.25rem; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 1.5rem; }
+.tabs__tab, .route-tabs a {
+  position: relative;
+  flex: none;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px 8px 0 0;
+  transition: color 0.2s var(--ease);
+}
+.tabs__tab:hover, .route-tabs a:hover { color: var(--ink); }
+.tabs__tab[aria-selected='true'], .route-tabs a[aria-current='page'] { color: var(--ink); }
+.tabs__tab[aria-selected='true']::after, .route-tabs a[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--orange);
+}
+.tabs__tab:focus-visible, .route-tabs a:focus-visible { outline-offset: -3px; }
+.tabs__panel:focus-visible { outline-offset: 4px; border-radius: 4px; }
+@media (forced-colors: active) {
+  .tabs__tab[aria-selected='true']::after, .route-tabs a[aria-current='page']::after { background: Highlight; }
+}
+
+.dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  padding: 1.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.25);
+}
+.dialog::backdrop { background: rgb(5 6 10 / 0.55); }
+.dialog__title { font: 800 1.35rem/1.15 var(--display); letter-spacing: -0.03em; color: var(--ink); }
+.dialog__body { margin-top: 0.75rem; }
+.dialog__body p + p { margin-top: 0.5rem; }
+.dialog__error { margin-top: 0.75rem; }
+.dialog__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.5rem; }
+
+.empty-card__text { color: var(--text); }
+.empty-card__action { margin-top: 0.5rem; }
+
 /* ---- Organisation console ---- */
 
 .console__em { color: var(--ink); font-weight: 700; }

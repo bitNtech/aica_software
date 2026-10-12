@@ -10,7 +10,7 @@ import type { Role } from '../auth/types'
 /** edit: change and act · read: look only · own: only their own items. */
 export type AccessLevel = 'edit' | 'read' | 'own'
 
-export type ConsolePage =
+export type PageKey =
   | 'home'
   | 'agents'
   | 'agentBuilder'
@@ -37,7 +37,7 @@ const BUILDERS: Matrix = { owner: 'edit', admin: 'edit' }
 const BUILD_LIBRARY: Matrix = { owner: 'edit', admin: 'edit', supervisor: 'read', viewer: 'read' }
 const CALL_HANDLERS: Matrix = { owner: 'edit', admin: 'edit', supervisor: 'edit', front_desk: 'edit' }
 
-export const PAGE_ACCESS: Record<ConsolePage, Matrix> = {
+export const PAGE_ACCESS: Record<PageKey, Matrix> = {
   home: ALL_READ,
   // Build
   agents: { owner: 'edit', admin: 'edit', supervisor: 'read', viewer: 'read' },
@@ -61,7 +61,7 @@ export const PAGE_ACCESS: Record<ConsolePage, Matrix> = {
   billing: { owner: 'edit' },
 }
 
-export const PAGE_LABEL: Record<ConsolePage, string> = {
+export const PAGE_LABEL: Record<PageKey, string> = {
   home: 'Home',
   agents: 'Agents',
   agentBuilder: 'the agent builder',
@@ -105,11 +105,11 @@ export function tabAccess(role: Role, tab: AgentTab): AccessLevel | null {
   return AGENT_TAB_ACCESS[tab][role] ?? null
 }
 
-export function pageAccess(role: Role, page: ConsolePage): AccessLevel | null {
+export function pageAccess(role: Role, page: PageKey): AccessLevel | null {
   return PAGE_ACCESS[page][role] ?? null
 }
 
-export function canOpen(role: Role, page: ConsolePage): boolean {
+export function canOpen(role: Role, page: PageKey): boolean {
   return pageAccess(role, page) !== null
 }
 
@@ -156,7 +156,7 @@ export function can(role: Role, action: ConsoleAction): boolean {
 /** The sidebar. Only pages that exist are listed; each step of the build
  * adds its page here. Grouped as in docs/pages-and-access.md. */
 export interface NavItem {
-  page: ConsolePage
+  page: PageKey
   label: string
   /** Relative to /o/:slug. Empty for Home. */
   path: string

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
-import { RedirectIfSignedIn, RequireAuth, RequireOrgPage, RequireStaff } from './auth/guards'
+import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } from './auth/guards'
+import { ConsoleShell } from './components/console/ConsoleShell'
+import type { PageKey } from './console/access'
 import { ActingAsBanner } from './components/ops/ActingAsBanner'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
 import ChooseOrgPage from './pages/ChooseOrgPage'
@@ -21,6 +23,7 @@ import { VerifyEmailPage, VerifyEmailSentPage } from './pages/VerifyEmailPages'
 const guest = (page: ReactNode) => <RedirectIfSignedIn>{page}</RedirectIfSignedIn>
 const member = (page: ReactNode) => <RequireAuth>{page}</RequireAuth>
 const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
+const org = (page: PageKey, element: ReactNode) => <OrgPage page={page}>{element}</OrgPage>
 
 export default function App() {
   return (
@@ -48,9 +51,18 @@ export default function App() {
       <Route path="/pending" element={member(<PendingPage />)} />
       <Route path="/suspended" element={member(<SuspendedPage />)} />
 
-      {/* An organisation's console: access per page from console/access.ts */}
-      <Route path="/o/:slug" element={<RequireOrgPage page="home"><ConsoleHomePage /></RequireOrgPage>} />
-      <Route path="/o/:slug/agents" element={<RequireOrgPage page="agents"><AgentsPage /></RequireOrgPage>} />
+      {/* An organisation's console: one frame, access per page from console/access.ts */}
+      <Route
+        path="/o/:slug"
+        element={
+          <RequireOrg>
+            <ConsoleShell />
+          </RequireOrg>
+        }
+      >
+        <Route index element={org('home', <ConsoleHomePage />)} />
+        <Route path="agents" element={org('agents', <AgentsPage />)} />
+      </Route>
 
       {/* bitNtech: master admin and staff */}
       <Route path="/ops" element={staff(<OpsOverviewPage />)} />

@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import { Navigate, useLocation, useParams } from 'react-router'
 import { FullScreenStatus } from '../components/auth/FullScreenStatus'
-import { canOpen, type ConsolePage } from '../console/access'
+import { canOpen, type PageKey } from '../console/access'
 import { homeFor, useAuth } from './AuthProvider'
 
 function safePath(p: unknown): string | null {
@@ -34,20 +34,17 @@ export function RequireStaff({ children }: { children: ReactNode }) {
   )
 }
 
-/** An organisation page (/o/:slug/...). The person must belong to that
- * organisation, it must be active, and their role must be allowed the page
- * (console/access.ts). Someone in the organisation whose role can't open the
- * page goes to its Home, which says why. The server must make the same check
- * on every call. */
-export function RequireOrgPage({ page, children }: { page: ConsolePage; children: ReactNode }) {
+/** Everything under /o/:slug: the person must belong to that organisation
+ * and it must be active. The server must make the same check on every call. */
+export function RequireOrg({ children }: { children: ReactNode }) {
   return (
     <RequireAuth>
-      <OrgPageGate page={page}>{children}</OrgPageGate>
+      <OrgGate>{children}</OrgGate>
     </RequireAuth>
   )
 }
 
-function OrgPageGate({ page, children }: { page: ConsolePage; children: ReactNode }) {
+function OrgGate({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { slug } = useParams()
   if (!user) return null
@@ -55,10 +52,21 @@ function OrgPageGate({ page, children }: { page: ConsolePage; children: ReactNod
   if (!org) return <Navigate to="/403" replace />
   // In review, declined or suspended: the status pages explain why.
   if (org.orgStatus !== 'active') return <Navigate to={homeFor(user)} replace />
-  if (!canOpen(org.role, page)) return <Navigate to={`/o/${org.orgSlug}`} replace state={{ deniedPage: page }} />
-  // Keyed by organisation: switching organisation starts each page afresh,
+  // Keyed by organisation: switching organisation starts everything afresh,
   // so one organisation's data never shows under another's name.
   return <Fragment key={org.orgSlug}>{children}</Fragment>
+}
+
+/** One organisation page, inside <RequireOrg>: the person's role must be
+ * allowed it (console/access.ts). If not, they go to the organisation's
+ * Home, which says why. */
+export function OrgPage({ page, children }: { page: PageKey; children: ReactNode }) {
+  const { user } = useAuth()
+  const { slug } = useParams()
+  const org = user?.memberships.find((m) => m.orgSlug === slug)
+  if (!org) return null
+  if (!canOpen(org.role, page)) return <Navigate to={`/o/${org.orgSlug}`} replace state={{ deniedPage: page }} />
+  return children
 }
 
 /** Pages for signed-out users. A signed-in user is sent on to where they

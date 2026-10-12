@@ -5,9 +5,10 @@ import { can } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
 import type { AgentStatus, AgentSummary } from '../../console/types'
 import { useOrg } from '../../console/useOrg'
-import { ConsoleLayout } from '../../components/console/ConsoleLayout'
+import { ConsolePage } from '../../components/console/ConsolePage'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { EmptyState } from '../../components/ui/EmptyState'
 import { TextField } from '../../components/ui/Field'
 import { Spinner } from '../../components/ui/Spinner'
 import { shortDate } from '../../lib/time'
@@ -57,7 +58,7 @@ export default function AgentsPage() {
   }, [summary, agents.state])
 
   return (
-    <ConsoleLayout
+    <ConsolePage
       kicker="Build"
       docTitle="Agents"
       title="Agents"
@@ -93,16 +94,13 @@ export default function AgentsPage() {
       )}
 
       {agents.state === 'ready' && all.length === 0 && (
-        <section className="empty-card" aria-labelledby="no-agents-h">
-          <h2 id="no-agents-h" className="empty-card__title">
-            No agents yet
-          </h2>
+        <EmptyState title="No agents yet">
           <p>
             {canCreate
               ? 'An agent answers one of your phone lines. You’ll build the first one from recordings of your past calls, once the agent builder arrives.'
               : 'When an owner or admin creates an agent, it appears here.'}
           </p>
-        </section>
+        </EmptyState>
       )}
 
       {agents.state === 'ready' && all.length > 0 && (
@@ -163,7 +161,7 @@ export default function AgentsPage() {
           )}
         </>
       )}
-    </ConsoleLayout>
+    </ConsolePage>
   )
 }
 

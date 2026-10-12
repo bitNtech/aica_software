@@ -27,7 +27,7 @@ describe('console frame', () => {
     expect(within(nav()).getByRole('link', { name: /home/i })).toHaveAttribute('aria-current', 'page')
     expect(within(nav()).getByRole('link', { name: /agents/i })).toBeInTheDocument()
     expect(within(pageHeader()).getByText('Demo data')).toBeInTheDocument()
-    expect(within(pageHeader()).getByText(/isn't your organisation's real setup/i)).toBeInTheDocument()
+    expect(within(pageHeader()).getByText(/not your organisation's real setup/i)).toBeInTheDocument()
     expect(within(sidebar()).getByText('Supervisor')).toBeInTheDocument()
   })
 

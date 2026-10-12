@@ -1,4 +1,13 @@
-import { useId, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import {
+  useId,
+  useState,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react'
 
 interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> {
   label: string
@@ -149,6 +158,91 @@ export function Checkbox({ label, hint, className, ...input }: CheckboxProps) {
           </span>
         )}
       </label>
+    </div>
+  )
+}
+
+/** Label, hint and error around any control, wired up the same way as
+ * TextField: the error and hint describe the control. */
+function useFieldIds(hint: ReactNode, error: string | null | undefined, extra?: string) {
+  const id = useId()
+  const hintId = hint ? `${id}-hint` : undefined
+  const errId = error ? `${id}-err` : undefined
+  return { id, hintId, errId, describedBy: [errId, hintId, extra].filter(Boolean).join(' ') || undefined }
+}
+
+function FieldMessages({ hint, hintId, error, errId }: { hint?: ReactNode; hintId?: string; error?: string | null; errId?: string }) {
+  return (
+    <>
+      {error && (
+        <p className="field__error" id={errId}>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <circle cx="8" cy="8" r="7" fill="currentColor" />
+            <path d="M8 4.5v4.2M8 11.2v.3" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          {error}
+        </p>
+      )}
+      {hint && (
+        <p className="field__hint" id={hintId}>
+          {hint}
+        </p>
+      )}
+    </>
+  )
+}
+
+interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'id'> {
+  label: string
+  hint?: ReactNode
+  error?: string | null
+  options: { value: string; label: string }[]
+  ref?: Ref<HTMLSelectElement>
+}
+
+export function SelectField({ label, hint, error, options, className, ref, ...select }: SelectProps) {
+  const { id, hintId, errId, describedBy } = useFieldIds(hint, error, select['aria-describedby'])
+  return (
+    <div className={['field', error && 'field--error', className].filter(Boolean).join(' ')}>
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <select {...select} ref={ref} id={id} className="field__input field__select" aria-invalid={error ? true : undefined} aria-describedby={describedBy}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <FieldMessages hint={hint} hintId={hintId} error={error} errId={errId} />
+    </div>
+  )
+}
+
+interface TextAreaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'id'> {
+  label: string
+  hint?: ReactNode
+  error?: string | null
+  ref?: Ref<HTMLTextAreaElement>
+}
+
+export function TextAreaField({ label, hint, error, className, rows = 4, ref, ...area }: TextAreaProps) {
+  const { id, hintId, errId, describedBy } = useFieldIds(hint, error, area['aria-describedby'])
+  return (
+    <div className={['field', error && 'field--error', className].filter(Boolean).join(' ')}>
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <textarea
+        {...area}
+        ref={ref}
+        id={id}
+        rows={rows}
+        className="field__input field__area"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+      />
+      <FieldMessages hint={hint} hintId={hintId} error={error} errId={errId} />
     </div>
   )
 }

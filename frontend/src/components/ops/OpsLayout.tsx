@@ -68,7 +68,7 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, childre
         </nav>
 
         <div className="ops__me">
-          {client.isDemo && <span className="ops__demo">Demo</span>}
+          {client.isDemo && <span className="demo-chip">Demo</span>}
           <span className="ops__who">
             <span className="ops__name">{user.name}</span>
             <span className={`ops__role ops__role--${user.platformRole}`}>{ROLE_LABEL[user.platformRole]}</span>

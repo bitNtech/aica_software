@@ -138,6 +138,9 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 .btn--plum { background: var(--ink); color: var(--bg); }
 .btn--plum:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 88%, var(--orange)); }
 
+.btn--danger { background: var(--danger-ink); color: var(--bg); }
+.btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-ink) 85%, var(--ink)); }
+
 .btn--line { border-color: var(--line-strong); color: var(--ink); background: transparent; }
 .btn--line:hover:not(:disabled) { border-color: var(--ink); }
 

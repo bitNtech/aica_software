@@ -161,17 +161,6 @@
   }
 }
 
-.demo-chip {
-  flex: none;
-  padding: 0.3rem 0.6rem;
-  border: 1px dashed var(--line-strong);
-  border-radius: 6px;
-  font: 500 0.62rem/1 var(--mono);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--muted);
-  white-space: nowrap;
-}
 
 /* ---- narrow: a top bar, and the sidebar as a panel ---- */
 
