@@ -1,8 +1,9 @@
-
 name: CI/CD
 
-# Pull requests run CI only.
-# Pushes to main run CI, then production backend and frontend.
+# Pull requests: CI only. The `main` ruleset requires these checks to pass
+# before a PR can merge, and merging is the approval.
+# main: CI again on the merged code, then production: backend first (with a
+# smoke test), then frontend. If CI fails, nothing deploys. See docs/cicd.md.
 on:
   pull_request:
   push:
@@ -14,12 +15,14 @@ permissions:
 
 concurrency:
   group: pipeline-${{ github.ref }}
+  # Supersede stale PR runs; never interrupt a production deploy.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
+  # Skips until both Vercel project IDs are set as repository variables.
   production-backend:
     name: Production (backend)
     needs: ci
@@ -32,9 +35,9 @@ jobs:
     with:
       target: backend
       project-id: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-      environment: production
     secrets: inherit
 
+  # The frontend never ships ahead of the API it depends on.
   production-frontend:
     name: Production (frontend)
     needs: production-backend
@@ -42,5 +45,4 @@ jobs:
     with:
       target: frontend
       project-id: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
-      environment: production
     secrets: inherit

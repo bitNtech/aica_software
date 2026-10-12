@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 # Post-deploy smoke test: smoke.sh <frontend|backend> <deployment-url>
 # Set VERCEL_AUTOMATION_BYPASS_SECRET when Vercel Deployment Protection is on.
