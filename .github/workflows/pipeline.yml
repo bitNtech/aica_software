@@ -1,9 +1,8 @@
+
 name: CI/CD
 
-# PRs: CI, then Vercel preview deployments of the backend and the frontend,
-# linked on the PR. main: CI, then production after approval in the
-# `production` environment. The two are separate Vercel projects on separate
-# hosts (see docs/cicd.md).
+# Pull requests run CI only.
+# Pushes to main run CI, then production backend and frontend.
 on:
   pull_request:
   push:
@@ -15,75 +14,20 @@ permissions:
 
 concurrency:
   group: pipeline-${{ github.ref }}
-  # Supersede stale PR runs; never interrupt a production deploy.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  # Fork and Dependabot PRs get no secrets, so they stop after CI. Every deploy
-  # job also skips until both Vercel project IDs are set as repository variables.
-  preview-backend:
-    name: Preview (backend)
-    needs: ci
-    if: >-
-      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
-    uses: ./.github/workflows/deploy.yml
-    with:
-      target: backend
-      project-id: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-      environment: preview
-      alias: ${{ vars.PREVIEW_API_DOMAIN }}
-    secrets: inherit
-
-  preview-frontend:
-    name: Preview (frontend)
-    needs: ci
-    if: >-
-      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
-    uses: ./.github/workflows/deploy.yml
-    with:
-      target: frontend
-      project-id: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
-      environment: preview
-      alias: ${{ vars.PREVIEW_FRONTEND_DOMAIN }}
-    secrets: inherit
-
-  preview-comment:
-    name: Link the previews on the PR
-    needs: [preview-backend, preview-frontend]
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-          FRONTEND: ${{ vars.PREVIEW_FRONTEND_DOMAIN && format('https://{0}', vars.PREVIEW_FRONTEND_DOMAIN) || needs.preview-frontend.outputs.url }}
-          FRONTEND_DEPLOY: ${{ needs.preview-frontend.outputs.url }}
-          BACKEND_DEPLOY: ${{ needs.preview-backend.outputs.url }}
-        run: |
-          body="Preview for ${GITHUB_SHA::7} (smoke tests passed): $FRONTEND
-          Deployments: frontend $FRONTEND_DEPLOY · backend $BACKEND_DEPLOY"
-          gh pr comment "$PR" --edit-last --body "$body" || gh pr comment "$PR" --body "$body"
-
-  # Add required reviewers to the `production` environment in the repo
-  # settings; each job waits for its own approval. The backend goes first, so
-  # the frontend never ships ahead of an API it depends on.
   production-backend:
     name: Production (backend)
     needs: ci
     if: >-
-      vars.VERCEL_BACKEND_PROJECT_ID != '' && vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
-      github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      vars.VERCEL_BACKEND_PROJECT_ID != '' &&
+      vars.VERCEL_FRONTEND_PROJECT_ID != '' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
     uses: ./.github/workflows/deploy.yml
     with:
       target: backend
