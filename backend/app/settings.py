@@ -53,21 +53,20 @@ class Settings(BaseSettings):
     invite_days: int = 7
 
     # Vercel system variables (hostnames, no scheme), set only on Vercel.
-    vercel_env: str = ""
+    # Only production deployments exist (see docs/cicd.md).
     vercel_url: str = ""
-    vercel_branch_url: str = ""
     vercel_project_production_url: str = ""
 
     @model_validator(mode="after")
     def _defaults(self) -> Settings:
         """The frontend and this API are deployed separately, so on Vercel
         APP_URL must be set: this deployment's own address is the API's, not
-        the frontend's. API_URL defaults to that address, and cookies to
-        Secure. Explicitly set values always win."""
+        the frontend's. API_URL defaults to the project's production address,
+        and cookies to Secure. Explicitly set values always win."""
         if self.vercel_url:
             if "app_url" not in self.model_fields_set:
                 raise ValueError("APP_URL must be set on Vercel: the frontend's public URL, e.g. https://aica.bitntech.in")
-            own = self.vercel_project_production_url if self.vercel_env == "production" else self.vercel_branch_url or self.vercel_url
+            own = self.vercel_project_production_url or self.vercel_url
             if "api_url" not in self.model_fields_set and own:
                 self.api_url = f"https://{own}"
             if "cookie_secure" not in self.model_fields_set:

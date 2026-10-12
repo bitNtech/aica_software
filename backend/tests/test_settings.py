@@ -41,7 +41,7 @@ def test_missing_file_and_no_json(tmp_path):
 
 # ---------------------------------------------------------------- deployment
 
-DEPLOY_ENV = ("APP_URL", "API_URL", "ALLOWED_ORIGINS", "COOKIE_SECURE", "COOKIE_SAMESITE", "VERCEL_ENV", "VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL")
+DEPLOY_ENV = ("APP_URL", "API_URL", "ALLOWED_ORIGINS", "COOKIE_SECURE", "COOKIE_SAMESITE", "VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL")
 
 
 @pytest.fixture()
@@ -73,32 +73,28 @@ def test_separate_api_host(clean_env):
 
 
 def test_vercel_requires_app_url(clean_env):
-    clean_env.setenv("VERCEL_ENV", "preview")
     clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
     with pytest.raises(ValueError, match="APP_URL must be set"):
         settings()
 
 
-def test_vercel_preview_api_url_is_its_own(clean_env):
-    clean_env.setenv("VERCEL_ENV", "preview")
-    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
-    clean_env.setenv("APP_URL", "https://preview.aica.bitntech.in")
-    s = settings()
-    assert s.api_url == "https://aica-api-abc123.vercel.app"
-    assert s.origins == {"https://preview.aica.bitntech.in"}
-    assert s.cookie_secure is True
-
-
-def test_vercel_production_api_url_is_production(clean_env):
-    clean_env.setenv("VERCEL_ENV", "production")
+def test_vercel_api_url_is_production(clean_env):
     clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
     clean_env.setenv("VERCEL_PROJECT_PRODUCTION_URL", "aica-api.vercel.app")
     clean_env.setenv("APP_URL", "https://aica.bitntech.in")
-    assert settings().api_url == "https://aica-api.vercel.app"
+    s = settings()
+    assert s.api_url == "https://aica-api.vercel.app"
+    assert s.origins == {"https://aica.bitntech.in"}
+    assert s.cookie_secure is True
+
+
+def test_vercel_api_url_falls_back_to_the_deployment(clean_env):
+    clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
+    clean_env.setenv("APP_URL", "https://aica.bitntech.in")
+    assert settings().api_url == "https://aica-api-abc123.vercel.app"
 
 
 def test_explicit_settings_win_on_vercel(clean_env):
-    clean_env.setenv("VERCEL_ENV", "production")
     clean_env.setenv("VERCEL_URL", "aica-api-abc123.vercel.app")
     clean_env.setenv("APP_URL", "https://aica.bitntech.in")
     clean_env.setenv("API_URL", "https://api.aica.bitntech.in")

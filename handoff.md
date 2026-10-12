@@ -72,6 +72,18 @@
 - **First GitHub run:** frontend and backend passed. Security failed on the gitleaks license; fixed in the follow-up commit.
 - **Open Dependabot PRs:** 11 (actions v7, gitleaks-action v3, which is now unused, react-router 8 major, and Python ranges). Review them; don't bulk-merge. react-router 8 is a major upgrade.
 
+## Production-only CI/CD (2026-10-12)
+- **Approved:** previews removed; `main` is the only long-lived branch; PR checks must pass to merge; merging the PR is the approval (0 required reviews); no environment approval after merge.
+- **Flow:** PR → CI (frontend, backend, security). The `main` ruleset requires all three to merge. Merge → CI on `main` → backend production + smoke test → frontend production + smoke test. Any failure stops the deploy. See `docs/cicd.md`.
+- **Code:**
+  - `pipeline.yml`: CI only on PRs.
+  - `deploy.yml`: production only (the `environment`/`alias` inputs and the preview-domain step are gone).
+  - `smoke.sh`: the leading blank line is gone, so the shebang works.
+  - `settings.py`: `VERCEL_ENV` and `VERCEL_BRANCH_URL` handling is gone; the API URL defaults to the production URL.
+  - `docs/cicd.md`: rewritten for production only.
+- **GitHub settings, done with `gh`:** see the completion report for this change.
+- **Vercel, for the user:** delete the Preview environment variables in both projects. The preview Firebase project is no longer used.
+
 ## Goal
 Develop production-ready software in this repository. Most work is expected to involve frontend implementation and integration with externally hosted ASR, TTS, and LLM services.
 
