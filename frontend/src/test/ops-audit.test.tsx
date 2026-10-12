@@ -21,7 +21,7 @@ describe('/ops/audit', () => {
     const { user } = renderApp()
     await signIn(user, 'master@example.com')
     await suspendNila(user)
-    await user.click(screen.getByRole('button', { name: /restore nila eye clinic/i }))
+    await user.click(await screen.findByRole('button', { name: /restore nila eye clinic/i }))
     await screen.findByText(/is active again/i)
     await user.click(screen.getByRole('link', { name: /audit log/i }))
 
@@ -39,7 +39,7 @@ describe('/ops/audit', () => {
     const { user } = renderApp()
     await signIn(user, 'master@example.com')
     await suspendNila(user)
-    await user.click(screen.getByRole('button', { name: /restore nila eye clinic/i }))
+    await user.click(await screen.findByRole('button', { name: /restore nila eye clinic/i }))
     await screen.findByText(/is active again/i)
     await user.click(screen.getByRole('link', { name: /audit log/i }))
     await screen.findByRole('table')
