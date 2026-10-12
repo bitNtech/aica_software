@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { LANGUAGE_LABEL } from '../../auth/roles'
 import { asAuthError } from '../../auth/types'
 import { can } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
-import type { AgentStatus, AgentSummary } from '../../console/types'
+import { BUILDER_STEPS, type AgentStatus, type AgentSummary } from '../../console/types'
+import { STEP_META, stepIndex } from './builder/steps'
 import { useOrg } from '../../console/useOrg'
 import { ConsolePage } from '../../components/console/ConsolePage'
 import { Alert } from '../../components/ui/Alert'
-import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { TextField } from '../../components/ui/Field'
 import { Spinner } from '../../components/ui/Spinner'
@@ -30,7 +31,6 @@ export default function AgentsPage() {
   const [agents, reload] = useAsync(load)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
-  const soonId = useId()
   const filterName = useId()
   const search = useRef<HTMLInputElement>(null)
   const canCreate = can(org.role, 'agent.create')
@@ -65,15 +65,9 @@ export default function AgentsPage() {
       lede={<p>Each agent answers one phone line. It's built from recordings of your past calls, then tested and published.</p>}
       actions={
         canCreate && (
-          <>
-            {/* Not `disabled`: it stays focusable, so its explanation is read. */}
-            <Button variant="line" className="btn--inactive" aria-disabled="true" aria-describedby={soonId} onClick={(e) => e.preventDefault()}>
-              New agent
-            </Button>
-            <span className="console__soon" id={soonId}>
-              The agent builder is coming soon.
-            </span>
-          </>
+          <Link className="btn btn--orange" to={`/o/${org.orgSlug}/agents/new`}>
+            <span>New agent</span>
+          </Link>
         )
       }
     >
@@ -94,10 +88,19 @@ export default function AgentsPage() {
       )}
 
       {agents.state === 'ready' && all.length === 0 && (
-        <EmptyState title="No agents yet">
+        <EmptyState
+          title="No agents yet"
+          action={
+            canCreate && (
+              <Link className="btn btn--plum btn--sm" to={`/o/${org.orgSlug}/agents/new`}>
+                <span>Build your first agent</span>
+              </Link>
+            )
+          }
+        >
           <p>
             {canCreate
-              ? 'An agent answers one of your phone lines. You’ll build the first one from recordings of your past calls, once the agent builder arrives.'
+              ? 'An agent answers one of your phone lines. You build it from recordings of your past calls.'
               : 'When an owner or admin creates an agent, it appears here.'}
           </p>
         </EmptyState>
@@ -155,7 +158,7 @@ export default function AgentsPage() {
           ) : (
             <ul className="rows" aria-label="Agents">
               {shown.map((a) => (
-                <AgentRow key={a.id} agent={a} />
+                <AgentRow key={a.id} agent={a} base={`/o/${org.orgSlug}/agents`} canBuild={canCreate} />
               ))}
             </ul>
           )}
@@ -165,7 +168,7 @@ export default function AgentsPage() {
   )
 }
 
-function AgentRow({ agent: a }: { agent: AgentSummary }) {
+function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: string; canBuild: boolean }) {
   return (
     <li className="agent-row">
       <div className="agent-row__main">
@@ -173,6 +176,19 @@ function AgentRow({ agent: a }: { agent: AgentSummary }) {
         <span className="row__meta">
           {a.useCase} <i aria-hidden="true">·</i> {a.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}
         </span>
+        {a.setupStep && (
+          <span className="agent-row__setup">
+            Setup: step {stepIndex(a.setupStep) + 1} of {BUILDER_STEPS.length}, {STEP_META[a.setupStep].label.toLowerCase()}
+            {canBuild && (
+              <>
+                {' '}
+                <Link className="link" to={`${base}/drafts/${a.id}/${a.setupStep}`}>
+                  Continue setup<span className="sr-only"> of {a.name}</span>
+                </Link>
+              </>
+            )}
+          </span>
+        )}
       </div>
       <dl className="agent-row__facts">
         <div>

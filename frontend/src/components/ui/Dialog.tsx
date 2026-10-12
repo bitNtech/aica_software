@@ -48,6 +48,10 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, 
         e.preventDefault()
         if (!busy) onCancel()
       }}
+      // Some browsers close anyway on a second Escape: keep state in step.
+      onClose={() => {
+        if (open) onCancel()
+      }}
     >
       <h2 id={`${id}-title`} className="dialog__title">
         {title}
@@ -70,6 +74,59 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, 
           Cancel
         </Button>
       </div>
+    </dialog>
+  )
+}
+
+interface ModalProps {
+  open: boolean
+  title: string
+  onClose(): void
+  children: ReactNode
+  /** Wider, for content like transcripts. */
+  wide?: boolean
+}
+
+/** A dialog to read or work in (not a yes/no question): a native modal
+ * <dialog> with a Close button. Escape closes it; focus goes back to the
+ * button that opened it. */
+export function Modal({ open, title, onClose, children, wide }: ModalProps) {
+  const ref = useRef<HTMLDialogElement>(null)
+  const close = useRef<HTMLButtonElement>(null)
+  const id = useId()
+
+  useEffect(() => {
+    const d = ref.current
+    if (!d) return
+    if (open && !d.open) {
+      d.showModal()
+      close.current?.focus()
+    }
+    if (!open && d.open) d.close()
+  }, [open])
+
+  return (
+    <dialog
+      ref={ref}
+      className={`dialog${wide ? ' dialog--wide' : ''}`}
+      aria-labelledby={`${id}-title`}
+      onCancel={(e) => {
+        e.preventDefault()
+        onClose()
+      }}
+      onClose={() => {
+        if (open) onClose()
+      }}
+    >
+      <div className="dialog__head">
+        <h2 id={`${id}-title`} className="dialog__title">
+          {title}
+        </h2>
+        <button ref={close} type="button" className="dialog__close" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      {open && <div className="dialog__body">{children}</div>}
     </dialog>
   )
 }

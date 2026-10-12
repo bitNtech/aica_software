@@ -50,7 +50,7 @@ export function ConsolePage({ kicker, title, lede, docTitle, actions, children }
         {client.isDemo && (
           <p className="console__demo">
             <span className="demo-chip">Demo data</span>
-            <span>Sample data for trying AICA, not your organisation's real setup. Changes last until you reload the page.</span>
+            <span>Sample data for trying AICA, not your organisation's real setup. Changes stay in this browser tab until you close it.</span>
           </p>
         )}
       </header>

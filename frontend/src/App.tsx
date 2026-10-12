@@ -8,6 +8,8 @@ import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from '.
 import ChooseOrgPage from './pages/ChooseOrgPage'
 import ConsoleHomePage from './pages/ConsoleHomePage'
 import AgentsPage from './pages/console/AgentsPage'
+import BuilderRoute from './pages/console/builder/BuilderPage'
+import NewAgentPage from './pages/console/builder/NewAgentPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
 import LoginPage from './pages/LoginPage'
@@ -62,6 +64,8 @@ export default function App() {
       >
         <Route index element={org('home', <ConsoleHomePage />)} />
         <Route path="agents" element={org('agents', <AgentsPage />)} />
+        <Route path="agents/new" element={org('agentBuilder', <NewAgentPage />)} />
+        <Route path="agents/drafts/:draftId/:step?" element={org('agentBuilder', <BuilderRoute />)} />
       </Route>
 
       {/* bitNtech: master admin and staff */}

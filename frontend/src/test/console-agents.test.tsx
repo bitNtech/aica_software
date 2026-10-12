@@ -112,13 +112,10 @@ describe('/o/:slug/agents', () => {
     expect(within(nav()).getByRole('link', { name: /agents/i })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('lets owners and admins reach New agent, which explains it isn’t ready', async () => {
+  it('lets owners and admins start a new agent', async () => {
     const { user } = renderApp('/o/arogya-demo/agents')
     await signIn(user, 'admin@example.com')
-    const button = await screen.findByRole('button', { name: /new agent/i })
-    expect(button).toHaveAttribute('aria-disabled', 'true')
-    expect(button).not.toBeDisabled() // still focusable
-    expect(button).toHaveAccessibleDescription(/agent builder is coming soon/i)
+    expect(await screen.findByRole('link', { name: /new agent/i })).toHaveAttribute('href', '/o/arogya-demo/agents/new')
   })
 
   it('is read-only for supervisors and viewers', async () => {
@@ -126,7 +123,7 @@ describe('/o/:slug/agents', () => {
       const view = renderApp('/o/arogya-demo/agents')
       await signIn(view.user, email)
       await within(view.container).findByRole('list', { name: /agents/i })
-      expect(within(view.container).queryByRole('button', { name: /new agent/i })).not.toBeInTheDocument()
+      expect(within(view.container).queryByRole('link', { name: /new agent/i })).not.toBeInTheDocument()
       view.unmount()
       localStorage.clear()
       sessionStorage.clear()
@@ -161,7 +158,8 @@ describe('/o/:slug/agents', () => {
     const { user } = renderApp('/o/nila-eye-demo/agents')
     await signIn(user, 'admin@example.com')
     expect(await screen.findByRole('heading', { name: /no agents yet/i })).toBeInTheDocument()
-    expect(screen.getByText(/build the first one from recordings/i)).toBeInTheDocument()
+    expect(screen.getByText(/build it from recordings of your past calls/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /build your first agent/i })).toBeInTheDocument()
     expect(screen.queryByLabelText(/search agents/i)).not.toBeInTheDocument()
   })
 

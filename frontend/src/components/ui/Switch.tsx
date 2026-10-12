@@ -28,14 +28,17 @@ export function Switch({ label, hint, checked, onChange, disabled }: Props) {
           <span className="switch__thumb" />
         </span>
       </button>
-      <label className="switch__label" htmlFor={id}>
-        {label}
+      <div className="switch__text">
+        {/* The hint is outside the label: read once, as the description. */}
+        <label className="switch__label" htmlFor={id}>
+          {label}
+        </label>
         {hint && (
           <span className="switch__hint" id={`${id}-hint`}>
             {hint}
           </span>
         )}
-      </label>
+      </div>
     </div>
   )
 }

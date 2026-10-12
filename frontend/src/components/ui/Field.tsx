@@ -142,22 +142,42 @@ export function PasswordField({ capsWarning = true, onKeyUp, onKeyDown, onBlur, 
 interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'id'> {
   label: ReactNode
   hint?: ReactNode
+  error?: string | null
   ref?: Ref<HTMLInputElement>
 }
 
-export function Checkbox({ label, hint, className, ...input }: CheckboxProps) {
+/** The hint and error sit outside the <label>, so they're read once, as the
+ * description, not again as part of the name. */
+export function Checkbox({ label, hint, error, className, ...input }: CheckboxProps) {
   const id = useId()
+  const hintId = hint ? `${id}-hint` : undefined
+  const errId = error ? `${id}-err` : undefined
+  const describedBy = [errId, hintId, input['aria-describedby']].filter(Boolean).join(' ') || undefined
   return (
     <div className={['check', className].filter(Boolean).join(' ')}>
-      <input {...input} type="checkbox" id={id} className="check__box" aria-describedby={hint ? `${id}-hint` : undefined} />
-      <label htmlFor={id} className="check__label">
-        {label}
+      <input
+        {...input}
+        type="checkbox"
+        id={id}
+        className="check__box"
+        aria-invalid={error ? true : input['aria-invalid']}
+        aria-describedby={describedBy}
+      />
+      <div className="check__text">
+        <label htmlFor={id} className="check__label">
+          {label}
+        </label>
         {hint && (
-          <span className="check__hint" id={`${id}-hint`}>
+          <span className="check__hint" id={hintId}>
             {hint}
           </span>
         )}
-      </label>
+        {error && (
+          <p className="field__error check__err" id={errId}>
+            {error}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
