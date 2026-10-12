@@ -1,6 +1,7 @@
 import {
   AuthError,
   type AcceptInviteInput,
+  type AuditEntry,
   type AuthClient,
   type BusinessType,
   type Invite,
@@ -8,6 +9,7 @@ import {
   type Membership,
   type OrgStatus,
   type OrgSummary,
+  type Person,
   type PlatformRole,
   type Role,
   type Session,
@@ -83,6 +85,16 @@ interface Db {
   /** token → email */
   resetTokens: Record<string, string>
   verifyTokens: Record<string, string>
+  /** Added after v1 shipped; older saved demos lack it. */
+  audit?: AuditEntry[]
+}
+
+/** A master admin acting as a client user. */
+interface Acting {
+  actorId: string
+  targetId: string
+  reason: string
+  expiresAt: string
 }
 
 const DAY = 864e5
@@ -137,6 +149,8 @@ function seed(): Db {
 
 const DB_KEY = 'aica.demo.db'
 const SESSION_KEY = 'aica.demo.session'
+const ACTING_KEY = 'aica.demo.acting'
+const ACT_AS_MS = 30 * 60_000
 const MAX_ATTEMPTS = 5
 const LOCKOUT_MS = 15 * 60_000
 
@@ -188,6 +202,27 @@ function clearSaved() {
   }
 }
 
+function readActing(): Acting | null {
+  try {
+    const raw = window.sessionStorage.getItem(ACTING_KEY)
+    return raw ? (JSON.parse(raw) as Acting) : null
+  } catch {
+    return null
+  }
+}
+
+function writeActing(a: Acting | null) {
+  try {
+    if (a) window.sessionStorage.setItem(ACTING_KEY, JSON.stringify(a))
+    else window.sessionStorage.removeItem(ACTING_KEY)
+  } catch {
+    /* storage blocked: acting lasts until reload */
+  }
+}
+
+const ACTING_MSG = "You're acting as someone. End that first."
+const LAST_MASTER_MSG = 'AICA needs at least one active master admin. Make someone else a master admin first.'
+
 const token = (prefix: string) => `${prefix}${Math.random().toString(36).slice(2, 10)}`
 
 function slugify(name: string, taken: (s: string) => boolean): string {
@@ -213,6 +248,8 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
   const db = loadDb()
   const attempts = new Map<string, { count: number; until: number }>()
   let currentId: string | null = readSaved()?.id ?? null
+  let acting: Acting | null = readActing()
+  db.audit ??= []
   let lastReset: string | null = null
   let lastVerify: string | null = null
 
@@ -249,13 +286,46 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
     }),
   })
 
-  const session = (u: DbUser, remember: boolean): Session => ({
-    user: publicUser(u),
-    remember,
-    expiresAt: new Date(Date.now() + 8 * 36e5).toISOString(),
-  })
+  const audit = (actor: string, action: string, target: string, detail = '') => {
+    db.audit!.push({ at: new Date().toISOString(), actor, actorLabel: actor, action, target, targetLabel: target, detail })
+  }
+
+  const me = () => db.users.find((u) => u.id === currentId)
+
+  /** The acting session this browser holds, if it is still good. The same
+   * checks as the backend makes on every request. */
+  const liveActing = (): { a: Acting; target: DbUser } | null => {
+    if (!acting || acting.actorId !== currentId || Date.parse(acting.expiresAt) <= Date.now()) return null
+    if (me()?.platformRole !== 'master_admin') return null
+    const target = db.users.find((u) => u.id === acting!.targetId)
+    return target && !target.locked && !target.platformRole ? { a: acting, target } : null
+  }
+
+  const session = (u: DbUser, remember: boolean): Session => {
+    const live = u.id === currentId ? liveActing() : null
+    const base = live ? live.target : u
+    const actor = live ? me() : undefined
+    return {
+      user: publicUser(base),
+      remember,
+      expiresAt: new Date(Date.now() + 8 * 36e5).toISOString(),
+      impersonator: live && actor ? { name: actor.name, email: actor.email, reason: live.a.reason, expiresAt: live.a.expiresAt } : null,
+    }
+  }
+
+  const stopActing = () => {
+    const live = liveActing()
+    if (live) {
+      audit(live.a.actorId, 'act_as_ended', live.a.targetId)
+      save()
+    }
+    acting = null
+    writeActing(null)
+  }
 
   const start = (u: DbUser, remember: boolean): Session => {
+    acting = null
+    writeActing(null)
     clearSaved()
     try {
       store(remember)?.setItem(SESSION_KEY, u.id)
@@ -267,12 +337,29 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
   }
 
   const requireStaff = (masterOnly = false) => {
-    const me = db.users.find((u) => u.id === currentId)
-    if (!me?.platformRole || (masterOnly && me.platformRole !== 'master_admin')) {
+    if (liveActing()) throw new AuthError('forbidden', ACTING_MSG)
+    const self = me()
+    if (!self?.platformRole || (masterOnly && self.platformRole !== 'master_admin')) {
       throw new AuthError('forbidden', masterOnly ? 'Only the master admin can do that.' : 'Only bitNtech accounts can do that.')
     }
-    return me
+    return self
   }
+
+  /** A master admin acting on someone else's account. */
+  const other = (id: string, selfMessage = "You can't change your own account here.") => {
+    const caller = requireStaff(true)
+    if (id === caller.id) throw new AuthError('invalid_input', selfMessage)
+    const u = db.users.find((x) => x.id === id)
+    if (!u) throw new AuthError('invalid_input', "That account doesn't exist.")
+    return { caller, u }
+  }
+
+  const keepAMaster = (u: DbUser) => {
+    const others = db.users.filter((x) => x.platformRole === 'master_admin' && !x.locked && x.id !== u.id)
+    if (u.platformRole === 'master_admin' && others.length === 0) throw new AuthError('invalid_input', LAST_MASTER_MSG)
+  }
+
+  const label = (v: string) => db.users.find((u) => u.id === v)?.email ?? v
 
   const ownerOf = (slug: string) => db.users.find((u) => u.memberships.some((m) => m.orgSlug === slug && m.role === 'owner'))
   /** The person bitNtech contacts: the owner, else the first admin. */
@@ -312,6 +399,7 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
     },
 
     async signOut() {
+      stopActing()
       clearSaved()
       currentId = null
     },
@@ -355,14 +443,15 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
 
     async completeBusiness(business) {
       await wait()
-      const me = db.users.find((u) => u.id === currentId)
-      if (!me) throw new AuthError('invalid_input', 'Sign in to continue.')
-      if (me.platformRole || me.memberships.length) throw new AuthError('invalid_input', 'Your account already belongs to an organisation.')
+      if (liveActing()) throw new AuthError('forbidden', ACTING_MSG)
+      const self = me()
+      if (!self) throw new AuthError('invalid_input', 'Sign in to continue.')
+      if (self.platformRole || self.memberships.length) throw new AuthError('invalid_input', 'Your account already belongs to an organisation.')
       const slug = slugify(business.name, (s) => !!org(s))
       db.orgs.push({ slug, name: business.name.trim(), city: business.city.trim(), type: business.type, languages: business.languages, status: 'pending_review', createdAt: new Date().toISOString() })
-      me.memberships.push({ orgSlug: slug, role: 'owner' })
+      self.memberships.push({ orgSlug: slug, role: 'owner' })
       save()
-      return session(me, readSaved()?.remember ?? false)
+      return session(self, readSaved()?.remember ?? false)
     },
 
     async resendVerification(email: string) {
@@ -491,10 +580,12 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
         if (!ownerOf(slug)?.verified) throw new AuthError('invalid_input', "The owner hasn't verified their email yet.")
         o.status = 'active'
         delete o.statusReason
+        audit(currentId!, 'signup_approved', slug)
       } else {
         if (!reason?.trim()) throw new AuthError('invalid_input', 'Give the business a reason.')
         o.status = 'declined'
         o.statusReason = reason.trim()
+        audit(currentId!, 'signup_declined', slug, o.statusReason)
       }
       save()
     },
@@ -510,6 +601,7 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
           businessType: o.type,
           status: o.status,
           statusReason: o.statusReason,
+          ownerId: contactOf(o.slug)?.id ?? '',
           ownerEmail: contactOf(o.slug)?.email ?? '—',
           createdAt: o.createdAt,
         }),
@@ -526,12 +618,121 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
         if (!reason?.trim()) throw new AuthError('invalid_input', 'Give the organisation a reason.')
         o.status = 'suspended'
         o.statusReason = reason.trim()
+        audit(currentId!, 'org_suspended', slug, o.statusReason)
       } else {
         if (o.status !== 'suspended') throw new AuthError('invalid_input', 'This organisation is not suspended.')
         o.status = 'active'
         delete o.statusReason
+        audit(currentId!, 'org_restored', slug)
       }
       save()
+    },
+
+    async inviteStaff(email, role) {
+      await wait()
+      const caller = requireStaff(true)
+      const addr = email.trim().toLowerCase()
+      if (validateEmail(addr)) throw new AuthError('invalid_input', 'Enter a valid email address.')
+      if (byEmail(addr)) throw new AuthError('email_taken', 'That email already has an AICA account.')
+      db.invites[token('i')] = { email: addr, orgName: 'BitNTech', role, invitedBy: caller.name, expiresAt: ahead(7) }
+      audit(caller.id, 'staff_invited', addr, role)
+      save()
+    },
+
+    async listPeople() {
+      await wait()
+      requireStaff(true)
+      const rank = (r?: PlatformRole) => (r === 'master_admin' ? 0 : r === 'staff' ? 1 : 2)
+      return [...db.users]
+        .sort((a, b) => rank(a.platformRole) - rank(b.platformRole) || a.name.localeCompare(b.name))
+        .map(
+          (u): Person => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            platformRole: u.platformRole ?? null,
+            disabled: !!u.locked,
+            emailVerified: u.verified,
+            memberships: u.memberships.map((m) => ({ orgSlug: m.orgSlug, orgName: org(m.orgSlug)?.name ?? m.orgSlug, role: m.role })),
+            createdAt: null,
+          }),
+        )
+    },
+
+    async setPlatformRole(id, role, reason) {
+      await wait()
+      const { caller, u } = other(id)
+      if ((u.platformRole ?? null) === role) throw new AuthError('invalid_input', 'They already have that role.')
+      if (role && u.memberships.length) throw new AuthError('invalid_input', 'This is a client account. Invite their bitNtech email address instead.')
+      if (role !== 'master_admin') keepAMaster(u)
+      if (reason.trim().length < 10) throw new AuthError('invalid_input', 'Give a reason.')
+      audit(caller.id, 'role_changed', u.id, `${u.platformRole ?? 'none'} → ${role ?? 'none'}: ${reason.trim()}`)
+      u.platformRole = role ?? undefined
+      save()
+    },
+
+    async setDisabled(id, disabled, reason) {
+      await wait()
+      const { caller, u } = other(id)
+      if (disabled) {
+        if (u.locked) throw new AuthError('invalid_input', 'This account is already disabled.')
+        keepAMaster(u)
+        if (!reason || reason.trim().length < 10) throw new AuthError('invalid_input', 'Give a reason.')
+        u.locked = true
+        audit(caller.id, 'user_disabled', u.id, reason.trim())
+      } else {
+        if (!u.locked) throw new AuthError('invalid_input', "This account isn't disabled.")
+        u.locked = false
+        audit(caller.id, 'user_enabled', u.id)
+      }
+      save()
+    },
+
+    async signOutEverywhere(id) {
+      await wait()
+      const { caller, u } = other(id, 'To sign yourself out, use Sign out.')
+      audit(caller.id, 'sessions_revoked', u.id)
+      save()
+    },
+
+    async actAs(id, reason) {
+      await wait()
+      const { caller, u } = other(id, "You can't act as yourself.")
+      if (u.platformRole) throw new AuthError('invalid_input', "bitNtech accounts can't be acted as.")
+      if (u.locked) throw new AuthError('invalid_input', 'This account is disabled.')
+      if (reason.trim().length < 10) throw new AuthError('invalid_input', 'Give a reason.')
+      acting = { actorId: caller.id, targetId: u.id, reason: reason.trim(), expiresAt: new Date(Date.now() + ACT_AS_MS).toISOString() }
+      writeActing(acting)
+      audit(caller.id, 'act_as_started', u.id, acting.reason)
+      save()
+      return session(caller, readSaved()?.remember ?? false)
+    },
+
+    async endActing() {
+      await wait()
+      const self = me()
+      if (!self) throw new AuthError('invalid_input', 'Sign in to continue.')
+      stopActing()
+      return session(self, readSaved()?.remember ?? false)
+    },
+
+    async listAudit(query) {
+      await wait()
+      requireStaff(true)
+      const filters = (['action', 'actor', 'target'] as const).filter((k) => query[k]?.trim())
+      if (filters.length > 1) throw new AuthError('invalid_input', 'Filter on one thing at a time.')
+      const key = filters[0]
+      let value = key ? query[key]!.trim() : ''
+      if (key && key !== 'action' && value.includes('@')) value = byEmail(value)?.id ?? value.toLowerCase()
+      const rows = [...db.audit!]
+        .reverse()
+        .filter((e) => !key || e[key] === value)
+        .filter((e) => !query.before || e.at < query.before)
+      const page = rows.slice(0, 50)
+      return {
+        entries: page.map((e) => ({ ...e, actorLabel: label(e.actor), targetLabel: label(e.target) })),
+        nextBefore: rows.length > 50 ? page[page.length - 1].at : null,
+      }
     },
   }
 }

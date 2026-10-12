@@ -2,9 +2,11 @@ import {
   AuthError,
   type AcceptInviteInput,
   type AuthClient,
+  type AuditPage,
   type AuthErrorCode,
   type Invite,
   type OrgSummary,
+  type Person,
   type Session,
   type SignInInput,
   type SignUpInput,
@@ -83,6 +85,21 @@ export function createHttpAuthClient(base = apiBase()): AuthClient {
       call<void>('POST', `/ops/orgs/${encodeURIComponent(slug)}/${suspended ? 'suspend' : 'restore'}`, suspended ? { reason } : undefined),
 
     // A top-level navigation to the backend, which sets the cookie on its own host.
+    inviteStaff: (email, role) => call<void>('POST', '/ops/staff-invites', { email, role }),
+    listPeople: () => call<Person[]>('GET', '/ops/people'),
+    setPlatformRole: (id, role, reason) => call<void>('POST', `/ops/people/${encodeURIComponent(id)}/role`, { role, reason }),
+    setDisabled: (id, disabled, reason) =>
+      call<void>('POST', `/ops/people/${encodeURIComponent(id)}/${disabled ? 'disable' : 'enable'}`, disabled ? { reason } : undefined),
+    signOutEverywhere: (id) => call<void>('POST', `/ops/people/${encodeURIComponent(id)}/sign-out`),
+    actAs: (id, reason) => call<Session>('POST', `/ops/people/${encodeURIComponent(id)}/act-as`, { reason }),
+    endActing: () => call<Session>('POST', '/auth/act-as/end'),
+    listAudit: (query) => {
+      const params = new URLSearchParams()
+      for (const [k, v] of Object.entries(query)) if (v) params.set(k, v)
+      const qs = params.toString()
+      return call<AuditPage>('GET', `/ops/audit${qs ? `?${qs}` : ''}`)
+    },
+
     googleSignInUrl: () => apiUrl('/api/auth/google/start', base),
   }
 }

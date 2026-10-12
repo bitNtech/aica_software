@@ -11,7 +11,7 @@ from app.errors import ApiError
 from app.identity import AuthUser, EmailExists, InvalidSession
 from app.services import Services
 from app.settings import Settings
-from app.store import InviteDoc, OrgDoc, SlugTaken, UserDoc
+from app.store import AuditEntry, InviteDoc, OrgDoc, SlugTaken, UserDoc, now
 
 
 @dataclass
@@ -50,6 +50,9 @@ class FakeFirebase:
     def get_user(self, uid):
         a = self.accounts.get(uid)
         return copy.deepcopy(a.user) if a else None
+
+    def list_users(self):
+        return [copy.deepcopy(a.user) for a in self.accounts.values()]
 
     def get_user_by_email(self, email):
         a = self.by_email(email)
@@ -150,6 +153,8 @@ class MemoryStore:
         self.invites: dict[str, InviteDoc] = {}
         self.attempts: dict[str, tuple[int, object]] = {}
         self.audits: list[tuple] = []
+        self.audit_log: list[AuditEntry] = []
+        self.impersonations: dict = {}
 
     def get_user(self, uid):
         return copy.deepcopy(self.users.get(uid))
@@ -188,6 +193,28 @@ class MemoryStore:
 
     def audit(self, actor, action, target, detail=""):
         self.audits.append((actor, action, target, detail))
+        # Strictly increasing, so paging by time never skips a tie.
+        at = now()
+        if self.audit_log and at <= self.audit_log[-1].at:
+            at = self.audit_log[-1].at + timedelta(microseconds=1)
+        self.audit_log.append(AuditEntry(at, actor, action, target, detail))
+
+    def list_users(self):
+        return [copy.deepcopy(u) for u in self.users.values()]
+
+    def list_audit(self, limit, before=None, field=None, value=None):
+        rows = sorted(self.audit_log, key=lambda e: e.at, reverse=True)
+        if field:
+            rows = [e for e in rows if getattr(e, field) == value]
+        if before:
+            rows = [e for e in rows if e.at < before]
+        return copy.deepcopy(rows[:limit])
+
+    def get_impersonation(self, key):
+        return copy.deepcopy(self.impersonations.get(key))
+
+    def save_impersonation(self, key, doc):
+        self.impersonations[key] = copy.deepcopy(doc)
 
 
 @dataclass
@@ -212,6 +239,9 @@ class FakeMailer:
 
     def signup_decided(self, to, org_name, approved, reason, url):
         return self._rec("approved" if approved else "declined", to, url)
+
+    def master_admin_added(self, to, who, by, invited, url):
+        return self._rec("master-alert", ",".join(to), url)
 
     leads: list[tuple[list[str], dict]] = field(default_factory=list)
     fail_leads: bool = False

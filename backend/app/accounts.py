@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from .models import MembershipOut, SessionOut, UserOut
+from .models import ImpersonatorOut, MembershipOut, SessionOut, UserOut
 from .services import Services
 from .sessions import Caller
 from .store import OrgDoc, SlugTaken, UserDoc
@@ -42,10 +42,16 @@ def user_out(svc: Services, uid: str, email: str, platform_role: str | None) -> 
 
 
 def session_out(svc: Services, caller: Caller) -> SessionOut:
+    imp = caller.impersonator
+    acting = None
+    if imp:
+        doc = svc.store.get_user(imp.uid)
+        acting = ImpersonatorOut(name=(doc.name if doc else "") or imp.email.split("@")[0], email=imp.email, reason=imp.reason, expires_at=iso(imp.expires_at))
     return SessionOut(
         user=user_out(svc, caller.uid, caller.email, caller.platform_role),
         remember=caller.remember,
         expires_at=iso(datetime.fromtimestamp(caller.expires_at, timezone.utc)),
+        impersonator=acting,
     )
 
 

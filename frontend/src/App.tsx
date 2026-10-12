@@ -1,13 +1,16 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import { RedirectIfSignedIn, RequireAuth, RequireStaff } from './auth/guards'
+import { ActingAsBanner } from './components/ops/ActingAsBanner'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
 import ChooseOrgPage from './pages/ChooseOrgPage'
 import ConsoleHomePage from './pages/ConsoleHomePage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
 import LoginPage from './pages/LoginPage'
+import OpsAuditPage from './pages/ops/OpsAuditPage'
 import OpsOverviewPage from './pages/ops/OpsOverviewPage'
+import OpsPeoplePage from './pages/ops/OpsPeoplePage'
 import OpsRequestsPage from './pages/ops/OpsRequestsPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SignupPage from './pages/SignupPage'
@@ -20,7 +23,9 @@ const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ActingAsBanner />
+      <Routes>
       {/* "/" is the landing page: index.html and src/landing/, not this app (see vite.config.ts). */}
 
       {/* Signed out */}
@@ -46,9 +51,12 @@ export default function App() {
       {/* bitNtech: master admin and staff */}
       <Route path="/ops" element={staff(<OpsOverviewPage />)} />
       <Route path="/ops/requests" element={staff(<OpsRequestsPage />)} />
+      <Route path="/ops/people" element={staff(<OpsPeoplePage />)} />
+      <Route path="/ops/audit" element={staff(<OpsAuditPage />)} />
 
       <Route path="/403" element={<ForbiddenPage />} />
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }

@@ -33,12 +33,23 @@ export interface User {
   memberships: Membership[]
 }
 
+/** The master admin behind a session that acts as a client user. */
+export interface Impersonator {
+  name: string
+  email: string
+  reason: string
+  /** ISO timestamp: when acting ends on its own. */
+  expiresAt: string
+}
+
 export interface Session {
   user: User
   /** "Keep me signed in": no sign-out after inactivity. */
   remember: boolean
   /** ISO timestamp. */
   expiresAt: string
+  /** Set while a master admin acts as `user`. */
+  impersonator?: Impersonator | null
 }
 
 export interface SignInInput {
@@ -96,9 +107,49 @@ export interface OrgSummary {
   businessType: BusinessType
   status: OrgStatus
   statusReason?: string
+  ownerId: string
   ownerEmail: string
   /** ISO timestamp. */
   createdAt: string
+}
+
+/** Any account, as the master admin's People page lists it. */
+export interface Person {
+  id: string
+  name: string
+  email: string
+  platformRole?: PlatformRole | null
+  disabled: boolean
+  emailVerified: boolean
+  memberships: { orgSlug: string; orgName: string; role: Role }[]
+  /** ISO timestamp; absent for an account with no AICA profile yet. */
+  createdAt?: string | null
+}
+
+export interface AuditEntry {
+  /** ISO timestamp. */
+  at: string
+  actor: string
+  /** The actor's email when known, else the raw value (e.g. "seed"). */
+  actorLabel: string
+  action: string
+  target: string
+  targetLabel: string
+  detail: string
+}
+
+export interface AuditPage {
+  entries: AuditEntry[]
+  /** Pass as `before` for the next page; null on the last page. */
+  nextBefore?: string | null
+}
+
+/** One filter at a time. `actor` and `target` take an email. */
+export interface AuditQuery {
+  before?: string
+  action?: string
+  actor?: string
+  target?: string
 }
 
 export type AuthErrorCode =
@@ -162,6 +213,19 @@ export interface AuthClient {
   listOrgs(): Promise<OrgSummary[]>
   /** Master admin only. */
   setOrgSuspended(orgSlug: string, suspended: boolean, reason?: string): Promise<void>
+
+  /* ---- Master admin only ---- */
+  inviteStaff(email: string, role: PlatformRole): Promise<void>
+  listPeople(): Promise<Person[]>
+  /** null takes the bitNtech role away. Signs the person out everywhere. */
+  setPlatformRole(userId: string, role: PlatformRole | null, reason: string): Promise<void>
+  setDisabled(userId: string, disabled: boolean, reason?: string): Promise<void>
+  signOutEverywhere(userId: string): Promise<void>
+  /** Starts acting as a client user; the session that comes back is theirs. */
+  actAs(userId: string, reason: string): Promise<Session>
+  /** Back to the master admin's own session. Works after expiry too. */
+  endActing(): Promise<Session>
+  listAudit(query: AuditQuery): Promise<AuditPage>
 
   /** Where "Continue with Google" goes; absent when Google isn't offered. */
   googleSignInUrl?(): string

@@ -15,7 +15,7 @@ from ..models import BusinessIn, CodeIn, EmailIn, EmailOut, LoginIn, ResetIn, Se
 from ..passwords import password_problem
 from ..ratelimit import limit
 from ..services import Services, get_services
-from ..sessions import Caller, current_caller, end_session, read_session, start_session
+from ..sessions import ACT_COOKIE, Caller, acting_record, clear_act_cookie, end_session, not_acting, read_session, start_session
 from ..store import UserDoc, hash_key, now
 
 log = logging.getLogger("aica.auth")
@@ -62,7 +62,7 @@ def login(body: LoginIn, request: Request, response: Response, svc: Services = D
         raise ApiError(403, "email_unverified", "Verify your email before signing in.")
 
     svc.store.clear_attempts(key)
-    start_session(svc, response, result["idToken"], body.remember)
+    start_session(svc, response, result["idToken"], body.remember, request)
     caller = Caller(
         uid=user.uid,
         email=user.email,
@@ -74,9 +74,36 @@ def login(body: LoginIn, request: Request, response: Response, svc: Services = D
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response, svc: Services = Depends(get_services)):
+def logout(request: Request, response: Response, svc: Services = Depends(get_services)):
     # Clears this browser only. Password resets and suspensions revoke every session.
+    if request.cookies.get(ACT_COOKIE):
+        try:
+            _end_acting(request, svc)
+        except ApiError:
+            log.warning("could not close the acting session at sign-out; it expires on its own")
     end_session(response, svc)
+
+
+def _end_acting(request: Request, svc: Services) -> Caller | None:
+    """Closes this browser's acting session, if live. Returns the master admin."""
+    real = read_session(request, svc, acting=False)
+    record = acting_record(request, svc, real) if real else None
+    if record:
+        key, doc = record
+        doc.endedAt = now()
+        svc.store.save_impersonation(key, doc)
+        svc.store.audit(real.uid, "act_as_ended", doc.targetUid)
+    return real
+
+
+@router.post("/act-as/end", response_model=SessionOut, response_model_by_alias=True)
+def end_acting(request: Request, response: Response, svc: Services = Depends(get_services)):
+    """Back to the master admin's own session."""
+    real = _end_acting(request, svc)
+    if not real:
+        raise ApiError(401, "unauthenticated", "Not signed in.")
+    clear_act_cookie(response, svc)
+    return session_out(svc, real)
 
 
 @router.post("/signup", response_model=EmailOut, response_model_by_alias=True, dependencies=[Depends(limit("signup", 5))])
@@ -172,7 +199,7 @@ def reset_password(body: ResetIn, svc: Services = Depends(get_services)):
 
 
 @router.post("/business", response_model=SessionOut, response_model_by_alias=True, dependencies=[Depends(limit("business", 5))])
-def complete_business(body: BusinessIn, caller: Caller = Depends(current_caller), svc: Services = Depends(get_services)):
+def complete_business(body: BusinessIn, caller: Caller = Depends(not_acting), svc: Services = Depends(get_services)):
     """For someone who signed in with Google and has no organisation yet."""
     if caller.platform_role:
         raise bad_input("bitNtech accounts don't sign up a business.")

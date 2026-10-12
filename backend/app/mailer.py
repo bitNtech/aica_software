@@ -125,6 +125,22 @@ class Mailer:
             "declined",
         )
 
+    def master_admin_added(self, to: list[str], who: str, by: str, invited: bool, url: str) -> bool:
+        """To every master admin: the most powerful role just gained someone."""
+        verb = "invited" if invited else "made"
+        return self.send(
+            to,
+            _one_line(f"New AICA master admin: {who}")[:150],
+            _page(
+                "A new master admin.",
+                f"{by} {verb} {who} a master admin on AICA. Master admins manage every organisation and every bitNtech account, and can act as client users.",
+                "Open the audit log",
+                url,
+                "If you didn't expect this, review it in AICA Ops now.",
+            ),
+            "master-admin-alert",
+        )
+
     def demo_request(self, to: list[str], lead: dict[str, str]) -> bool:
         """The landing page's "Book a demo" form, to the team. Unlike the
         emails above, this one is the whole point of the request: the caller

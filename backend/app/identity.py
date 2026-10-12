@@ -81,6 +81,9 @@ class FirebaseAdmin:
         except self._auth.UserNotFoundError:
             return None
 
+    def list_users(self) -> list[AuthUser]:
+        return [self._to_user(rec) for rec in self._auth.list_users(app=self._app).iterate_all()]
+
     def create_user(self, email: str, password: str | None, name: str, email_verified: bool = False) -> str:
         try:
             kwargs = dict(email=email, display_name=name, email_verified=email_verified, app=self._app)
