@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import Nav from './components/Nav'
 import Footer from './components/Footer'
 import StickyCta from './components/StickyCta'
@@ -52,6 +53,7 @@ export default function App() {
       </main>
       <Footer />
       <StickyCta />
+      <Analytics />
     </>
   )
 }
