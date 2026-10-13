@@ -17,12 +17,16 @@ export interface StepProps {
   attempt: number
   /** The step sets this to its own check; Next calls it. */
   validator: RefObject<() => StepErrors>
+  /** Saves pending changes now (e.g. before publishing). Rejects on failure. */
+  save(): Promise<void>
+  /** The draft is gone (published): no more saves. */
+  done(): void
 }
 
 /** What's missing, at the top of the step, focused on a failed Next. */
-export function ErrorSummary({ errors, attempt }: { errors: StepErrors; attempt: number }) {
+export function ErrorSummary({ errors, attempt, hrefFor }: { errors: StepErrors; attempt: number; hrefFor?(key: string): string | undefined }) {
   const ref = useRef<HTMLDivElement>(null)
-  const list = Object.values(errors)
+  const list = Object.entries(errors)
   const has = list.length > 0
 
   useEffect(() => {
@@ -36,9 +40,31 @@ export function ErrorSummary({ errors, attempt }: { errors: StepErrors; attempt:
     // live updates while fixing would read it again on every change.
     <Alert ref={ref} live={false} tone="error" title={list.length === 1 ? 'One thing to fix before going on' : `${list.length} things to fix before going on`} className="builder__errors">
       <ul className="builder__error-list">
-        {list.map((m) => (
-          <li key={m}>{m}</li>
-        ))}
+        {list.map(([key, m]) => {
+          const href = hrefFor?.(key)
+          return (
+            <li key={key}>
+              {href ? (
+                <a
+                  className="link"
+                  href={href}
+                  onClick={(e) => {
+                    // Focus the row rather than jumping the URL's hash.
+                    const el = document.querySelector<HTMLElement>(href)
+                    if (!el) return
+                    e.preventDefault()
+                    el.focus()
+                    el.scrollIntoView?.({ block: 'center' })
+                  }}
+                >
+                  {m}
+                </a>
+              ) : (
+                m
+              )}
+            </li>
+          )
+        })}
       </ul>
     </Alert>
   )

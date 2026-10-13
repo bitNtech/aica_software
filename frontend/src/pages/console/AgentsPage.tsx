@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { LANGUAGE_LABEL } from '../../auth/roles'
 import { asAuthError } from '../../auth/types'
 import { can } from '../../console/access'
@@ -34,6 +34,16 @@ export default function AgentsPage() {
   const filterName = useId()
   const search = useRef<HTMLInputElement>(null)
   const canCreate = can(org.role, 'agent.create')
+  // Set by the builder after publishing. Shown once: it's cleared from the
+  // history entry so a reload or Back doesn't show it again.
+  const location = useLocation()
+  const [notice] = useState(() => (location.state as { notice?: string } | null)?.notice)
+  useEffect(() => {
+    if (!notice) return
+    // Without a navigation, which would move focus again.
+    const entry = window.history.state as { usr?: unknown } | null
+    if (entry?.usr) window.history.replaceState({ ...entry, usr: null }, '')
+  }, [notice])
 
   const all = agents.state === 'ready' ? [...agents.data].sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.name.localeCompare(b.name)) : []
   const q = query.trim().toLowerCase()
@@ -71,6 +81,12 @@ export default function AgentsPage() {
         )
       }
     >
+      {notice && (
+        <Alert tone="ok" className="ops-section__notice">
+          {notice}
+        </Alert>
+      )}
+
       {agents.state === 'loading' && (
         <div className="loading-row" role="status">
           <Spinner />

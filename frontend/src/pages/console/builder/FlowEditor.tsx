@@ -11,9 +11,11 @@ import {
   blankNode,
   confidenceLabel,
   countNodes,
-  findParent,
+  findNode,
+  lowConfidence,
   mergeIntents,
   moveNode,
+  neighbour,
   position,
   removeNode,
   updateNode,
@@ -27,37 +29,57 @@ interface Props {
   readOnly?: boolean
   /** Opens the list of calls a node was seen in. */
   onShowCalls?(node: FlowNode): void
+  /** Id for the summary line, so the page can move focus to it. */
+  summaryId?: string
 }
-
-const NEEDS_REVIEW = 0.7
 
 /**
  * The conversation flow as an editable outline: intents at the top, their
  * steps and branches nested under them. Each row can be expanded, edited,
  * moved, or given new steps; editing opens a small form under the row.
  */
-export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls }: Props) {
+export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls, summaryId }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<string | null>(null)
   /** A node just added: removed again if its form is cancelled while empty. */
   const [fresh, setFresh] = useState<string | null>(null)
   const [reviewOnly, setReviewOnly] = useState(false)
+  /** A row id, or 'add' for the Add intent button when the list is empty. */
   const [focusId, setFocusId] = useState<string | null>(null)
+  /** Said to screen readers after a move or delete. */
+  const [note, setNote] = useState('')
+  /** The flow before the last delete, so it can be undone. */
+  const [undo, setUndo] = useState<{ id: string; label: string; flow: FlowNode[] } | null>(null)
+  const addIntent = useRef<HTMLButtonElement>(null)
 
   // After a move or delete, put focus back on a sensible row.
   useEffect(() => {
     if (!focusId) return
-    document.querySelector<HTMLElement>(`[data-node-focus="${focusId}"]`)?.focus()
+    if (focusId === 'add') addIntent.current?.focus()
+    else {
+      // A move keeps focus on its button, unless the row can't move further.
+      const el = document.querySelector<HTMLButtonElement>(`[data-node-focus="${focusId}"]`)
+      const row = focusId.startsWith('move:') ? focusId.split(':')[1] : null
+      if (el && !el.disabled) el.focus()
+      else if (row) document.querySelector<HTMLElement>(`[data-node-focus="${row}"]`)?.focus()
+    }
     setFocusId(null)
   }, [focusId, flow])
 
+  /** Every change but a delete makes the undo stale. */
+  const change = (next: FlowNode[]) => {
+    setUndo(null)
+    onChange(next)
+  }
+
   const intents = flow.length
   const total = countNodes(flow)
-  const review = flow.filter((n) => (n.confidence ?? 1) < NEEDS_REVIEW || errors[n.id] || allIds(n.children).some((c) => errors[c])).length
+  const flagged = (n: FlowNode) => lowConfidence([n]).length > 0 || !!errors[n.id] || allIds(n.children).some((c) => errors[c])
+  const review = flow.filter(flagged).length
 
   function add(parentId: string | null, kind: FlowNodeKind) {
     const node = blankNode(kind)
-    onChange(addNode(flow, parentId, node))
+    change(addNode(flow, parentId, node))
     if (parentId) setCollapsed((c) => new Set([...c].filter((x) => x !== parentId)))
     setEditing(node.id)
     setFresh(node.id)
@@ -65,23 +87,34 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
 
   function cancelEdit(id: string) {
     if (fresh === id) {
-      const parent = findParent(flow, id)
-      onChange(removeNode(flow, id))
-      setFocusId(parent ? parent.id : null)
+      change(removeNode(flow, id))
+      setFocusId(neighbour(flow, id) ?? 'add')
     } else setFocusId(id)
     setEditing(null)
     setFresh(null)
   }
 
   function remove(id: string) {
-    const parent = findParent(flow, id)
+    const node = findNode(flow, id)
+    const kind = node ? KIND_LABEL[node.kind].toLowerCase() : 'item'
     onChange(removeNode(flow, id))
+    setUndo({ id, label: `${kind} “${node?.label || 'unnamed'}”`, flow })
+    setNote(`Deleted the ${kind}.`)
     setEditing(null)
     setFresh(null)
-    setFocusId(parent ? parent.id : null)
+    setFocusId(neighbour(flow, id) ?? 'add')
   }
 
-  const visible = (n: FlowNode) => !reviewOnly || (n.confidence ?? 1) < NEEDS_REVIEW || !!errors[n.id] || allIds(n.children).some((c) => errors[c])
+  function move(node: FlowNode, dir: -1 | 1) {
+    const next = moveNode(flow, node.id, dir)
+    change(next)
+    const { first, last } = position(next, node.id)
+    setNote(`Moved ${dir < 0 ? 'up' : 'down'}${first ? ', now first' : last ? ', now last' : ''}.`)
+    setFocusId(`move:${node.id}:${dir}`)
+  }
+
+  // A row being added or edited stays in view, even when filtered.
+  const visible = (n: FlowNode) => !reviewOnly || flagged(n) || [n.id, ...allIds(n.children)].some((id) => id === editing || id === fresh)
 
   const toggle = (id: string) =>
     setCollapsed((c) => {
@@ -100,6 +133,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
     const conf = node.confidence !== undefined ? confidenceLabel(node.confidence) : null
     const err = errors[node.id]
     const listId = `kids-${node.id}`
+    const Title = node.kind === 'intent' ? 'h3' : 'p'
     return (
       <li key={node.id} className={`flow__item flow__item--${node.kind}`}>
         <div className={['flow__row', err && 'flow__row--error', editing === node.id && 'is-editing'].filter(Boolean).join(' ')}>
@@ -109,7 +143,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
               className="flow__toggle"
               aria-expanded={open}
               aria-controls={listId}
-              aria-label={`${open ? 'Collapse' : 'Expand'} ${node.label || 'unnamed'}`}
+              aria-label={`Steps in ${node.label || 'unnamed'}`}
               onClick={() => toggle(node.id)}
             >
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -120,20 +154,25 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
             <span className="flow__toggle flow__toggle--none" aria-hidden="true" />
           )}
           <div className="flow__main">
-            <p className="flow__title">
+            {/* Intents are headings, so screen-reader users can jump between them. */}
+            <Title className="flow__title">
               <span className={`flow__kind flow__kind--${node.kind}`}>{KIND_LABEL[node.kind]}</span>
-              <span className="flow__label" tabIndex={-1} data-node-focus={node.id}>
+              <span className="flow__label" id={`node-${node.id}`} tabIndex={-1} data-node-focus={node.id}>
                 {node.label || <em className="flow__unnamed">Unnamed</em>}
               </span>
-            </p>
+            </Title>
             {node.kind === 'step' && node.say && <p className="flow__say">“{node.say}”</p>}
             {node.kind === 'branch' && node.condition && <p className="flow__say">When: {node.condition}</p>}
             <p className="flow__meta">
               {conf && <span className={`conf conf--${conf.level}`}>{conf.text}</span>}
               {node.sourceCallIds.length > 0 && onShowCalls && (
-                <button type="button" className="btn-text flow__calls" onClick={() => onShowCalls(node)}>
+                <button
+                  type="button"
+                  className="btn-text flow__calls"
+                  aria-label={`Seen in ${node.sourceCallIds.length} ${node.sourceCallIds.length === 1 ? 'call' : 'calls'}: ${node.label}`}
+                  onClick={() => onShowCalls(node)}
+                >
                   Seen in {node.sourceCallIds.length} {node.sourceCallIds.length === 1 ? 'call' : 'calls'}
-                  <span className="sr-only">: {node.label}</span>
                 </button>
               )}
               {node.sourceCallIds.length === 0 && node.confidence === undefined && <span className="flow__added">Added by hand</span>}
@@ -142,43 +181,33 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
           </div>
           {!readOnly && (
             <div className="flow__actions">
-              <button type="button" className="flow__act" onClick={() => setEditing(editing === node.id ? null : node.id)} aria-expanded={editing === node.id}>
-                Edit<span className="sr-only"> {node.label}</span>
+              <button
+                type="button"
+                className="flow__act"
+                aria-label={`Edit ${node.label || 'unnamed'}`}
+                aria-expanded={editing === node.id}
+                onClick={() => setEditing(editing === node.id ? null : node.id)}
+              >
+                Edit
               </button>
               {node.kind !== 'step' && (
-                <button type="button" className="flow__act" onClick={() => add(node.id, 'step')}>
-                  Add step<span className="sr-only"> to {node.label}</span>
+                <button type="button" className="flow__act" aria-label={`Add step to ${node.label || 'unnamed'}`} onClick={() => add(node.id, 'step')}>
+                  Add step
                 </button>
               )}
               {node.kind === 'intent' && (
-                <button type="button" className="flow__act" onClick={() => add(node.id, 'branch')}>
-                  Add branch<span className="sr-only"> to {node.label}</span>
+                <button type="button" className="flow__act" aria-label={`Add branch to ${node.label || 'unnamed'}`} onClick={() => add(node.id, 'branch')}>
+                  Add branch
                 </button>
               )}
-              <button
-                type="button"
-                className="flow__act flow__act--icon"
-                aria-label={`Move ${node.label || 'unnamed'} up`}
-                disabled={first}
-                onClick={() => {
-                  onChange(moveNode(flow, node.id, -1))
-                  setFocusId(node.id)
-                }}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="flow__act flow__act--icon"
-                aria-label={`Move ${node.label || 'unnamed'} down`}
-                disabled={last}
-                onClick={() => {
-                  onChange(moveNode(flow, node.id, 1))
-                  setFocusId(node.id)
-                }}
-              >
-                ↓
-              </button>
+              <span className="flow__moves">
+                <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${node.label || 'unnamed'} up`} title="Move up" data-node-focus={`move:${node.id}:-1`} disabled={first} onClick={() => move(node, -1)}>
+                  ↑
+                </button>
+                <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${node.label || 'unnamed'} down`} title="Move down" data-node-focus={`move:${node.id}:1`} disabled={last} onClick={() => move(node, 1)}>
+                  ↓
+                </button>
+              </span>
             </div>
           )}
         </div>
@@ -188,13 +217,14 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
             node={node}
             intents={depth === 0 ? flow.filter((n) => n.id !== node.id) : []}
             onSave={(patch) => {
-              onChange(updateNode(flow, node.id, patch))
+              change(updateNode(flow, node.id, patch))
               setEditing(null)
               setFresh(null)
               setFocusId(node.id)
             }}
             onMerge={(into) => {
-              onChange(mergeIntents(flow, node.id, into))
+              change(mergeIntents(flow, node.id, into))
+              setNote('Intents merged.')
               setEditing(null)
               setFocusId(into)
             }}
@@ -216,10 +246,13 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
 
   return (
     <div className="flow">
+      <p className="sr-only" role="status">
+        {note}
+      </p>
       <div className="flow__bar">
-        <p className="flow__summary">
+        <p className="flow__summary" id={summaryId} tabIndex={-1}>
           {intents} {intents === 1 ? 'intent' : 'intents'}, {total - intents} steps and branches.{' '}
-          {review > 0 ? <strong>{review} need a look.</strong> : 'Nothing flagged.'}
+          {review > 0 ? <strong>{review} {review === 1 ? 'needs' : 'need'} a look.</strong> : 'Nothing flagged.'}
         </p>
         <div className="flow__tools">
           <Switch label="Only what needs a look" checked={reviewOnly} onChange={setReviewOnly} />
@@ -232,6 +265,24 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
         </div>
       </div>
 
+      {undo && !readOnly && (
+        <div className="flow__undo">
+          <span>Deleted the {undo.label}.</span>
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() => {
+              onChange(undo.flow)
+              setUndo(null)
+              setNote('Delete undone.')
+              setFocusId(undo.id)
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+
       {shown.length > 0 ? (
         <ul className="flow__tree" aria-label="Conversation flow">
           {shown.map((n) => row(n, 0))}
@@ -242,7 +293,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls 
 
       {!readOnly && (
         <div>
-          <Button variant="line" size="sm" onClick={() => add(null, 'intent')}>
+          <Button ref={addIntent} variant="line" size="sm" onClick={() => add(null, 'intent')}>
             Add intent
           </Button>
         </div>

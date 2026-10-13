@@ -3,7 +3,7 @@ import { LANGUAGE_LABEL } from '../../../../auth/roles'
 import type { Language } from '../../../../auth/types'
 import { asAuthError } from '../../../../auth/types'
 import { useConsole } from '../../../../console/ConsoleProvider'
-import type { BotBehaviour, SpeakingRate, Tone } from '../../../../console/types'
+import type { BotBehaviour, SpeakingRate, Tone, Voice } from '../../../../console/types'
 import { Alert } from '../../../../components/ui/Alert'
 import { Button } from '../../../../components/ui/Button'
 import { ChoiceGroup } from '../../../../components/ui/Choice'
@@ -28,7 +28,8 @@ const LANGS: Language[] = ['tamil', 'english', 'tanglish']
 export const MAX_RULES = 12
 
 /** Checks a behaviour; shared with the agent workspace. */
-export function checkBehaviour(b: BotBehaviour, voiceLanguages?: Language[]): StepErrors {
+/** `voice` is the chosen voice, if it's one AICA has. */
+export function checkBehaviour(b: BotBehaviour, voice: Voice | undefined): StepErrors {
   const e: StepErrors = {}
   const persona = b.persona.trim()
   if (persona.length < 2 || persona.length > 30) e.persona = 'Give the agent a spoken name of 2 to 30 characters.'
@@ -37,8 +38,9 @@ export function checkBehaviour(b: BotBehaviour, voiceLanguages?: Language[]): St
   if (!b.greeting.trim()) e.greeting = 'Write the greeting callers hear first.'
   else if (b.greeting.length > 300) e.greeting = 'Keep the greeting under 300 characters: callers hear all of it before they can speak.'
   if (b.closing.length > 200) e.closing = 'Keep the closing under 200 characters.'
-  if (voiceLanguages) {
-    const missing = b.languages.filter((l) => !voiceLanguages.includes(l))
+  if (!voice) e.voice = 'Choose a voice.'
+  else {
+    const missing = b.languages.filter((l) => !voice.languages.includes(l))
     if (missing.length) e.voice = `This voice doesn't speak ${missing.map((l) => LANGUAGE_LABEL[l]).join(' or ')}. Choose another voice, or remove the language.`
   }
   return e
@@ -54,9 +56,8 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
 
   const voice = voices.state === 'ready' ? voices.data.find((v) => v.id === b.voiceId) : undefined
   const check = () => {
-    const e = checkBehaviour(b, voice?.languages)
+    const e = checkBehaviour(b, voice)
     if (voices.state !== 'ready') e.voice = voices.state === 'error' ? 'Voices didn’t load. Try again before going on.' : 'Wait for the voices to load.'
-    else if (!voice) e.voice = 'Choose a voice.'
     return e
   }
   validator.current = check

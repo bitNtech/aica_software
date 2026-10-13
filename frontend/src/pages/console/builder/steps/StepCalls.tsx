@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { LANGUAGE_LABEL } from '../../../../auth/roles'
 import { asAuthError } from '../../../../auth/types'
 import { useConsole } from '../../../../console/ConsoleProvider'
-import type { SourceCall } from '../../../../console/types'
+import type { AgentDraft, SourceCall } from '../../../../console/types'
 import { Alert } from '../../../../components/ui/Alert'
 import { Checkbox } from '../../../../components/ui/Field'
 import { FileDrop } from '../../../../components/ui/FileDrop'
@@ -48,6 +48,17 @@ export function checkRecordings(files: File[]): { ok: File[]; rejected: string[]
   return { ok, rejected }
 }
 
+export function checkCalls(draft: AgentDraft, library: SourceCall[]): StepErrors {
+  const e: StepErrors = {}
+  const chosen = library.filter((c) => draft.sourceCallIds.includes(c.id))
+  const ready = chosen.filter((c) => c.status === 'ready').length
+  const waiting = chosen.filter(isProcessing).length
+  if (ready < MIN_CALLS) e.calls = `Choose at least ${MIN_CALLS} ready calls. More calls give a better first draft.`
+  else if (waiting > 0) e.calls = `Wait for ${waiting} chosen ${waiting === 1 ? 'call' : 'calls'} to finish processing, or untick ${waiting === 1 ? 'it' : 'them'}.`
+  if (!draft.consent) e.consent = 'Confirm the callers agreed to these recordings being used.'
+  return e
+}
+
 /** Step 0: pick past calls to learn from, or add recordings. */
 export function StepCalls({ draft, org, update, showErrors, attempt, validator }: StepProps) {
   const client = useConsole()
@@ -74,7 +85,6 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
   const selected = new Set(draft.sourceCallIds)
   const chosen = list.filter((c) => selected.has(c.id))
   const readyChosen = chosen.filter((c) => c.status === 'ready').length
-  const waiting = chosen.filter(isProcessing).length
   const ready = list.filter((c) => c.status === 'ready')
   const allReadyChosen = ready.length > 0 && ready.every((c) => selected.has(c.id))
   const someReadyChosen = ready.some((c) => selected.has(c.id))
@@ -85,15 +95,7 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
     if (all.current) all.current.indeterminate = someReadyChosen && !allReadyChosen
   }, [someReadyChosen, allReadyChosen])
 
-  const check = (): StepErrors => {
-    const e: StepErrors = {}
-    if (calls.state !== 'ready') e.calls = 'Wait for your calls to load.'
-    else if (readyChosen < MIN_CALLS)
-      e.calls = `Choose at least ${MIN_CALLS} ready calls. More calls give a better first draft.`
-    else if (waiting > 0) e.calls = `Wait for ${waiting} chosen ${waiting === 1 ? 'call' : 'calls'} to finish processing, or untick ${waiting === 1 ? 'it' : 'them'}.`
-    if (!draft.consent) e.consent = 'Confirm the callers agreed to these recordings being used.'
-    return e
-  }
+  const check = (): StepErrors => (calls.state !== 'ready' ? { calls: 'Wait for your calls to load.' } : checkCalls(draft, list))
   validator.current = check
   const errors = showErrors ? check() : {}
 

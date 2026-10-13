@@ -55,10 +55,13 @@ export interface ConsoleClient {
   saveDraft(orgSlug: string, draft: AgentDraft): Promise<AgentDraft>
   discardDraft(orgSlug: string, draftId: string): Promise<void>
   /** Builder step 3: reads the draft's calls and fills in its flow,
-   * attributes and global flows (replacing what's there). */
+   * attributes and global flows (replacing what's there).
+   * Real API: a job (start, then poll or stream progress, cancellable),
+   * with a draft revision so autosave can't overwrite its result. */
   extractFlow(orgSlug: string, draftId: string): Promise<AgentDraft>
   /** Builder step 7: turns the draft into a live agent on `numberId`, or a
-   * paused one with no number. */
+   * paused one with no number. Safe to retry: a draft that's already been
+   * published returns the agent it became (real API: an idempotency key). */
   publishDraft(orgSlug: string, draftId: string, numberId: string | null): Promise<AgentSummary>
 
   // ---- library
@@ -228,6 +231,10 @@ export interface AgentDraft {
   /** Internal name, e.g. "OPD appointments". */
   name: string
   behaviour: BotBehaviour
+  /** What the flow was last read from (step 3); unset until it's been read.
+   * Reading again is then only on request, and a change of calls or job
+   * since shows the flow may be out of date. */
+  extraction?: { at: string; callIds: string[]; subTypeId: string | null }
   /** Empty until extracted from the source calls (step 3). */
   flow: FlowNode[]
   attributes: Attribute[]

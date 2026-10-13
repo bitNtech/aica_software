@@ -1,12 +1,23 @@
 import { useCallback } from 'react'
 import { asAuthError } from '../../../../auth/types'
 import { useConsole } from '../../../../console/ConsoleProvider'
+import type { AgentDraft } from '../../../../console/types'
 import { Alert } from '../../../../components/ui/Alert'
 import { ChoiceGroup } from '../../../../components/ui/Choice'
 import { TextField } from '../../../../components/ui/Field'
 import { Spinner } from '../../../../components/ui/Spinner'
 import { useAsync } from '../../../../lib/useAsync'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
+
+export function checkType(draft: AgentDraft): StepErrors {
+  const e: StepErrors = {}
+  if (!draft.typeId) e.type = 'Choose the kind of business.'
+  else if (!draft.subTypeId) e.subType = 'Choose what this agent does.'
+  const name = draft.name.trim()
+  if (name.length < 3) e.name = 'Give the agent a name of at least 3 characters, e.g. “OPD appointments”.'
+  else if (name.length > 60) e.name = 'Keep the name under 60 characters.'
+  return e
+}
 
 /** Step 1: the kind of business, the job this agent does, and its name. */
 export function StepType({ draft, update, showErrors, attempt, validator }: StepProps) {
@@ -17,15 +28,7 @@ export function StepType({ draft, update, showErrors, attempt, validator }: Step
   const type = types.state === 'ready' ? types.data.find((t) => t.id === draft.typeId) : undefined
   const sub = type?.subTypes.find((s) => s.id === draft.subTypeId)
 
-  const check = (): StepErrors => {
-    const e: StepErrors = {}
-    if (!draft.typeId) e.type = 'Choose the kind of business.'
-    else if (!draft.subTypeId) e.subType = 'Choose what this agent does.'
-    const name = draft.name.trim()
-    if (name.length < 3) e.name = 'Give the agent a name of at least 3 characters, e.g. “OPD appointments”.'
-    else if (name.length > 60) e.name = 'Keep the name under 60 characters.'
-    return e
-  }
+  const check = () => checkType(draft)
   validator.current = check
   const errors = showErrors ? check() : {}
 

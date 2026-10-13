@@ -13,9 +13,13 @@ import { BuilderSteps } from './BuilderSteps'
 import { STEP_META, isStep, later, stepIndex } from './steps'
 import type { StepErrors, StepProps } from './StepShared'
 import { useAutosave, type SaveState } from './useAutosave'
+import { StepAttributes } from './steps/StepAttributes'
 import { StepBehaviour } from './steps/StepBehaviour'
 import { StepCalls } from './steps/StepCalls'
-import { StepPending } from './steps/StepPending'
+import { StepContext } from './steps/StepContext'
+import { StepFlow } from './steps/StepFlow'
+import { StepGlobal } from './steps/StepGlobal'
+import { StepReview } from './steps/StepReview'
 import { StepType } from './steps/StepType'
 import './Builder.css'
 
@@ -23,11 +27,11 @@ const STEP_VIEW: Record<BuilderStep, (p: StepProps) => ReactNode> = {
   calls: StepCalls,
   type: StepType,
   behaviour: StepBehaviour,
-  flow: StepPending,
-  attributes: StepPending,
-  global: StepPending,
-  context: StepPending,
-  review: StepPending,
+  flow: StepFlow,
+  attributes: StepAttributes,
+  global: StepGlobal,
+  context: StepContext,
+  review: StepReview,
 }
 
 /** /o/:slug/agents/drafts/:draftId/:step — the agent builder. The draft is
@@ -159,7 +163,7 @@ function BuilderPage() {
   }
 
   const tries = attempt.step === step ? attempt.n : 0
-  const props: StepProps = { draft, org, update, showErrors: tries > 0, attempt: tries, validator }
+  const props: StepProps = { draft, org, update, showErrors: tries > 0, attempt: tries, validator, save: () => autosave.flush(), done: autosave.cancel }
 
   return (
     <ConsolePage

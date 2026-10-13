@@ -29,7 +29,7 @@ const GLOBAL_WORDS: [GlobalFlowKind, RegExp][] = [
   ['emergency', /chest pain|breath|bleed|accident|unconscious|emergency|faint|stroke/i],
   ['handoff', /\b(person|human|staff|someone|operator|reception(ist)?)\b|talk to/i],
   ['end_call', /\b(bye|thank(s| you)|that'?s all|nandri)\b/i],
-  ['repeat', /\b(repeat|again|slow(ly|er)?|sorry\?|pardon)\b/i],
+  ['repeat', /\b(repeat|again|slow(ly|er)?|pardon)\b|\bsorry\?/i],
 ]
 
 /** Tamil/Tanglish words callers use, mapped to the English the flows use. */
@@ -46,8 +46,9 @@ const SYNONYMS: [RegExp, string][] = [
 const words = (s: string) => s.toLowerCase().match(/[a-z]{3,}/g) ?? []
 
 function steps(intent: FlowNode): FlowNode[] {
-  // Branches: follow the first one in the simulator.
-  return intent.children.flatMap((c) => (c.kind === 'branch' ? c.children : [c]))
+  // The simulator can't tell which branch applies: it follows the first.
+  const first = intent.children.find((c) => c.kind === 'branch')
+  return intent.children.flatMap((c) => (c.kind !== 'branch' ? [c] : c === first ? c.children : []))
 }
 
 function bestIntent(flow: FlowNode[], message: string): FlowNode | null {
@@ -67,8 +68,11 @@ function bestIntent(flow: FlowNode[], message: string): FlowNode | null {
 export function simulate(draft: AgentDraft, tools: AgentTool[], knowledge: KnowledgeSource[], state: SimState, message: string): { reply: SimReply; state: SimState } {
   const global = (kind: GlobalFlowKind) => draft.globalFlows.find((g) => g.kind === kind && g.enabled)
 
+  const asking = bestIntent(draft.flow, message)
   for (const [kind, re] of GLOBAL_WORDS) {
     const g = global(kind)
+    // "Thank you, can I book…" is a request, not a goodbye.
+    if (kind === 'end_call' && asking) continue
     if (g && re.test(message)) {
       const transfer = (kind === 'handoff' || kind === 'emergency') && tools.find((t) => t.builtin === 'transfer' && draft.context.toolIds.includes(t.id))
       return {
@@ -80,7 +84,7 @@ export function simulate(draft: AgentDraft, tools: AgentTool[], knowledge: Knowl
 
   // Carry on with the current intent unless the caller clearly changed topic.
   const current = state.intentId ? draft.flow.find((n) => n.id === state.intentId) : null
-  const matched = bestIntent(draft.flow, message)
+  const matched = asking
   const intent = matched && matched.id !== current?.id ? matched : (current ?? matched)
   if (!intent) {
     const g = global('out_of_scope')

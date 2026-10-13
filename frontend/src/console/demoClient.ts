@@ -16,7 +16,7 @@ import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v2'
+const STORE_KEY = 'aica.demo.console.v3'
 
 /** One organisation's sample data. */
 interface OrgData {
@@ -30,6 +30,8 @@ interface OrgData {
   knowledge: KnowledgeSource[]
   tools: AgentTool[]
   numbers: PhoneNumber[]
+  /** Published draft id → the agent it became, so a retried publish is safe. */
+  published: Record<string, string>
 }
 
 export interface DemoConsoleOptions {
@@ -51,6 +53,7 @@ function seedOrg(slug: string): OrgData {
     knowledge: seedKnowledge(),
     tools: seedTools(),
     numbers: seedNumbers(),
+    published: {},
   }
 }
 
@@ -250,6 +253,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       dr.flow = extractFlow(dr.subTypeId, dr.typeId, calls)
       dr.attributes = extractAttributes(dr.subTypeId)
       dr.globalFlows = defaultGlobalFlows()
+      dr.extraction = { at: new Date().toISOString(), callIds: calls.map((c) => c.id), subTypeId: dr.subTypeId }
       // Start from the knowledge and tools that suit the job.
       dr.context = {
         ...dr.context,
@@ -264,6 +268,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async publishDraft(o, id, numberId) {
       await wait()
       const d = org(o)
+      const done = d.published[id] && d.agents.find((a) => a.id === d.published[id])
+      if (done) return copy(done)
       const dr = findDraft(o, id)
       const number = numberId ? d.numbers.find((n) => n.id === numberId) : null
       if (numberId && !number) throw notFound('phone number')
@@ -285,6 +291,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       d.agents.push(agent)
       d.configs[agentId] = { ...copy(dr), id: agentId, updatedAt: now }
       d.drafts = d.drafts.filter((x) => x.id !== id)
+      d.published[id] = agentId
       if (number) number.agentId = agentId
       for (const k of d.knowledge) if (dr.context.knowledgeSourceIds.includes(k.id)) k.usedByAgentIds.push(agentId)
       keep()

@@ -77,7 +77,7 @@ export function position(nodes: FlowNode[], id: string): { first: boolean; last:
  * their source calls are combined, and `from` goes. */
 export function mergeIntents(nodes: FlowNode[], from: string, into: string): FlowNode[] {
   const source = nodes.find((n) => n.id === from)
-  if (!source || from === into) return nodes
+  if (!source || from === into || !nodes.some((n) => n.id === into)) return nodes
   return nodes
     .filter((n) => n.id !== from)
     .map((n) =>
@@ -132,10 +132,26 @@ export function checkFlow(nodes: FlowNode[]): Record<string, string> {
   return e
 }
 
-/** Confidence in words, for chips and screen readers. */
+/** Below this, a node is flagged to check against its calls. */
+export const NEEDS_REVIEW = 0.7
+
+/** Confidence in words, for chips and screen readers. Low is exactly what
+ * the copy asks people to check: below 70%. */
 export function confidenceLabel(c: number): { level: 'high' | 'medium' | 'low'; text: string } {
   const pct = Math.round(c * 100)
   if (c >= 0.8) return { level: 'high', text: `High confidence, ${pct}%` }
-  if (c >= 0.6) return { level: 'medium', text: `Medium confidence, ${pct}%` }
+  if (c >= NEEDS_REVIEW) return { level: 'medium', text: `Medium confidence, ${pct}%` }
   return { level: 'low', text: `Low confidence, ${pct}%` }
+}
+
+/** Every node, at any depth, AICA wasn't sure about. */
+export function lowConfidence(nodes: FlowNode[]): FlowNode[] {
+  return nodes.flatMap((n) => [...((n.confidence ?? 1) < NEEDS_REVIEW ? [n] : []), ...lowConfidence(n.children)])
+}
+
+/** The node just before or after `id` among its siblings, or its parent. */
+export function neighbour(nodes: FlowNode[], id: string): string | null {
+  const list = siblingsOf(nodes, id) ?? []
+  const i = list.findIndex((n) => n.id === id)
+  return list[i - 1]?.id ?? list[i + 1]?.id ?? findParent(nodes, id)?.id ?? null
 }

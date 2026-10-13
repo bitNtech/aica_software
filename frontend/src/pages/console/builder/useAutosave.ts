@@ -14,6 +14,8 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
   /** The last save failed (not just "changed since"). */
   const failed = useRef(false)
   const cancelled = useRef(false)
+  /** The page has gone: late changes (say, a slow reply) aren't saved. */
+  const gone = useRef(false)
   const running = useRef<Promise<void>>(Promise.resolve())
   const timer = useRef<number | undefined>(undefined)
   latest.current = value
@@ -39,6 +41,7 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
 
   /** Call after every change made by the person. */
   const changed = useCallback(() => {
+    if (gone.current) return
     dirty.current = true
     setState('unsaved')
     window.clearTimeout(timer.current)
@@ -60,6 +63,13 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
   const cancel = useCallback(() => {
     cancelled.current = true
     window.clearTimeout(timer.current)
+  }, [])
+
+  useEffect(() => {
+    gone.current = false
+    return () => {
+      gone.current = true
+    }
   }, [])
 
   // Leaving the page saves what's pending rather than dropping it.

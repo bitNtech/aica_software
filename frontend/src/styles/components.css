@@ -365,6 +365,12 @@
 .switch__control[aria-checked='true'] .switch__track { background: var(--ink); border-color: var(--ink); }
 .switch__control[aria-checked='true'] .switch__thumb { transform: translateX(16px); background: var(--bg); }
 .switch__control:disabled { opacity: 0.5; cursor: not-allowed; }
+.switch__control[aria-disabled='true'] { cursor: not-allowed; }
+/* A small label for a state, e.g. "Required", "Always on". */
+.flag { padding: 0.15rem 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-pill); font-size: 0.75rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.flag--quiet { color: var(--muted); }
+.flag--warn { border-color: transparent; background: var(--warn-bg); color: var(--warn-ink); }
+.switch__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; }
 .switch__text { display: grid; gap: 0.15rem; padding-top: 0.05rem; min-width: 0; }
 .switch__label { font-weight: 600; color: var(--ink); cursor: pointer; }
 .switch__hint { font-weight: 400; font-size: 0.85rem; color: var(--muted); }
