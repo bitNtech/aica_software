@@ -8,6 +8,10 @@ interface Props {
   accept: string
   multiple?: boolean
   disabled?: boolean
+  /** A file is needed, or the one chosen won't do: marks the input, so
+   * focusing it reads the error (pass the error's id). */
+  invalid?: boolean
+  errorId?: string
   onFiles(files: File[]): void
 }
 
@@ -16,14 +20,14 @@ interface Props {
  * a native file input behind a visible label, so it works with the keyboard
  * and screen readers; dropping is an extra for mouse users.
  */
-export function FileDrop({ label, hint, accept, multiple, disabled, onFiles }: Props) {
+export function FileDrop({ label, hint, accept, multiple, disabled, invalid, errorId, onFiles }: Props) {
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
 
   return (
     <div
-      className={['file-drop', over && 'is-over', disabled && 'is-disabled'].filter(Boolean).join(' ')}
+      className={['file-drop', over && 'is-over', disabled && 'is-disabled', invalid && 'is-invalid'].filter(Boolean).join(' ')}
       onDragOver={(e) => {
         // Always handled, so a drop never makes the browser open the file.
         e.preventDefault()
@@ -53,7 +57,8 @@ export function FileDrop({ label, hint, accept, multiple, disabled, onFiles }: P
         // Not disabled while busy: it may hold focus, which would drop to
         // <body>. Busy pickers ignore new files instead (onFiles).
         aria-disabled={disabled || undefined}
-        aria-describedby={hint ? `${id}-hint` : undefined}
+        aria-invalid={invalid || undefined}
+        aria-describedby={[invalid && errorId, hint && `${id}-hint`].filter(Boolean).join(' ') || undefined}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? [])
           // Reset, so choosing the same file again still fires a change.

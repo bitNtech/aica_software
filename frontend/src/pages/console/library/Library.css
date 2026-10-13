@@ -1,0 +1,90 @@
+/* The organisation's library: Call uploads, Knowledge, Tools and
+   integrations, Phone numbers. Builder.css comes with them for the shared
+   form layout (step__grid, step__stack, rules__button). */
+
+.lib__section { display: grid; gap: 0.9rem; min-width: 0; margin-bottom: 2.5rem; }
+.lib__heading { font: 800 1.2rem/1.2 var(--display); letter-spacing: -0.025em; color: var(--ink); }
+.lib__sub { margin-top: -0.4rem; color: var(--muted); font-size: 0.92rem; max-width: 46rem; }
+.lib__head-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem; }
+.lib__bar { display: flex; flex-wrap: wrap; gap: 1rem; }
+.lib__ro-note { margin: -0.5rem 0 1.5rem; font-size: 0.9rem; color: var(--muted); }
+.lib-form__done { font-size: 0.9rem; color: var(--ok-ink); }
+
+/* A list of things, one row each. */
+.lib-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.lib-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: start; gap: 0.5rem 1.25rem; padding: 0.95rem 1.1rem; }
+.lib-row + .lib-row { border-top: 1px solid var(--line); }
+.lib-row--switch { grid-template-columns: minmax(0, 1fr); }
+.lib-row__main { display: grid; gap: 0.25rem; min-width: 0; }
+.lib-row__name { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; font: 700 1rem/1.4 var(--sans); letter-spacing: normal; color: var(--ink); overflow-wrap: anywhere; }
+.lib-row__open { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; cursor: pointer; }
+.lib-row__open:hover { text-decoration-color: currentColor; }
+.lib-row__origin { overflow-wrap: anywhere; }
+.lib-row__mono { font-family: var(--mono); font-size: 0.92rem; letter-spacing: 0.02em; }
+.lib-row__label { font-weight: 400; color: var(--muted); }
+.lib-row__used { font-size: 0.85rem; color: var(--text); }
+.lib-row__warn { font-size: 0.85rem; font-weight: 600; color: var(--danger-ink); }
+.lib-row__soon { font-size: 0.85rem; color: var(--warn-ink); }
+.lib-row__actions { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; }
+.lib-row__remove { color: var(--danger-ink); }
+
+.status-chip--kb-ready { background: var(--ok-bg); color: var(--ok-ink); }
+.status-chip--kb-indexing { background: var(--info-bg); color: var(--info-ink); }
+.status-chip--kb-failed { background: var(--danger-bg); color: var(--danger-ink); }
+
+/* Facts about one thing. */
+.lib-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem 1.25rem; margin: 0; }
+.lib-facts dt { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.lib-facts dd { margin: 0.1rem 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.lib-facts--row { margin-top: 0.35rem; }
+.lib-facts__origin { font-size: 0.9rem; }
+
+/* Try a question. */
+.lib-ask { padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg-2); }
+.lib-ask__form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.75rem; }
+.passages { display: grid; gap: 0.5rem; padding-left: 1.4rem; color: var(--text); overflow-wrap: anywhere; }
+.passages--scored li { display: grid; gap: 0.15rem; }
+.passages__text { color: var(--ink); }
+
+/* Forms in dialogs. */
+.lib-form { display: grid; gap: 1rem; }
+.lib-form__file { font-size: 0.9rem; color: var(--ink); overflow-wrap: anywhere; }
+.lib-form__actions { flex-wrap: wrap; align-items: center; }
+.lib-form__delete { margin-left: auto; }
+.lib-form__url { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
+.lib-detail { display: grid; gap: 1.5rem; }
+.lib-detail__section { display: grid; gap: 0.6rem; }
+
+.lib-params { display: grid; gap: 0.75rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.lib-params legend { margin-bottom: 0.35rem; }
+.lib-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8rem minmax(0, 1.3fr);
+  align-items: end;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.lib-param__end { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1.5rem; }
+
+.lib-test { display: grid; gap: 0.35rem; margin-top: 0.75rem; padding: 0.85rem 1rem; border-radius: 12px; }
+.lib-test--ok { background: var(--ok-bg); color: var(--ok-ink); }
+.lib-test--fail { background: var(--danger-bg); color: var(--danger-ink); }
+.lib-test__title { font-weight: 700; }
+.lib-test__code { font-size: 0.8rem; color: var(--text); }
+.lib-test__body { font-family: var(--mono); font-size: 0.85rem; overflow-wrap: anywhere; color: var(--ink); }
+
+.lib-secret { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: start; gap: 0.75rem; max-width: 52rem; }
+
+.faq { display: grid; gap: 0.75rem; }
+.faq__list { display: grid; gap: 0.75rem; padding: 0; list-style: none; }
+.faq__item { display: grid; gap: 0.6rem; padding: 0.85rem; border: 1px solid var(--line); border-radius: 12px; }
+
+@media (max-width: 760px) {
+  .lib-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .lib-row__actions { grid-column: 1 / -1; }
+  .lib-param { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lib-secret, .lib-ask__form, .lib-form__url { grid-template-columns: minmax(0, 1fr); }
+  .lib-secret .rules__button, .lib-ask__form .rules__button { margin-top: 0; justify-self: start; }
+}

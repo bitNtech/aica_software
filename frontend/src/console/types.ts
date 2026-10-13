@@ -71,6 +71,39 @@ export interface ConsoleClient {
   listTools(orgSlug: string): Promise<AgentTool[]>
   listNumbers(orgSlug: string): Promise<PhoneNumber[]>
 
+  /** Removes a recording from the library. Flows already read from it keep working. */
+  deleteCall(orgSlug: string, callId: string): Promise<void>
+
+  // ---- knowledge library
+  addKnowledge(orgSlug: string, source: NewKnowledge): Promise<KnowledgeSource>
+  updateKnowledge(orgSlug: string, id: string, patch: KnowledgePatch): Promise<KnowledgeSource>
+  /** Reads the file or page again (indexing), e.g. after it changed. */
+  refreshKnowledge(orgSlug: string, id: string): Promise<KnowledgeSource>
+  /** Refused while an agent uses it. */
+  deleteKnowledge(orgSlug: string, id: string): Promise<void>
+  /** The first passages of a source, to check it was read right. */
+  listPassages(orgSlug: string, id: string): Promise<Passage[]>
+  /** The passages an agent would find for `question` in these sources. */
+  searchKnowledge(orgSlug: string, sourceIds: string[], question: string): Promise<Passage[]>
+
+  // ---- tools and integrations
+  /** Creates (no id yet) or updates an HTTP tool, or switches a built-in one. */
+  saveTool(orgSlug: string, tool: AgentTool): Promise<AgentTool>
+  /** Refused while an agent uses it. */
+  deleteTool(orgSlug: string, id: string): Promise<void>
+  /** Runs the tool once with sample inputs, from AICA's servers. */
+  testTool(orgSlug: string, id: string, inputs: Record<string, string>): Promise<ToolTestResult>
+  listCredentials(orgSlug: string): Promise<Credential[]>
+  /** Sets or replaces a secret's value; the value is never returned. */
+  setCredential(orgSlug: string, name: string, value: string): Promise<Credential>
+  /** Refused while a tool uses it. */
+  deleteCredential(orgSlug: string, name: string): Promise<void>
+
+  // ---- phone numbers
+  updateNumber(orgSlug: string, id: string, patch: NumberPatch): Promise<PhoneNumber>
+  /** Asks bitNtech for another number; they set it up and it appears here. */
+  requestNumber(orgSlug: string, note: string): Promise<void>
+
   // ---- agent workspace (a published agent)
   getAgent(orgSlug: string, agentId: string): Promise<AgentDetail>
   /** Saves edits as unpublished changes; callers keep answering the live version. */
@@ -115,6 +148,8 @@ export interface SourceCall {
   topic?: string
   /** Bytes; absent for sample calls. */
   size?: number
+  /** Agents and drafts whose flow was read from it, by name. */
+  usedBy?: string[]
 }
 
 /** A call transcript. `text` may hold personal details marked as
@@ -292,6 +327,69 @@ export interface KnowledgeSource {
   /** Web pages can be re-read on a schedule. */
   refreshEvery: 'never' | 'daily' | 'weekly'
   usedByAgentIds: string[]
+  /** Questions and answers, for an FAQ. */
+  faq?: FaqEntry[]
+  /** Why indexing failed, in words for the user. */
+  error?: string
+  /** Agents and drafts set up to use it, by name (any version). */
+  usedBy?: string[]
+}
+
+export interface FaqEntry {
+  q: string
+  a: string
+}
+
+/** A new knowledge source: a file (document or table), a web page, or an FAQ written here. */
+export type NewKnowledge =
+  | { kind: 'document' | 'table'; name: string; description: string; fileName: string; size: number; file?: Blob; expiresAt: string | null }
+  | { kind: 'web'; name: string; description: string; url: string; refreshEvery: KnowledgeSource['refreshEvery']; expiresAt: string | null }
+  | { kind: 'faq'; name: string; description: string; faq: FaqEntry[]; expiresAt: string | null }
+
+export interface KnowledgePatch {
+  name?: string
+  description?: string
+  expiresAt?: string | null
+  refreshEvery?: KnowledgeSource['refreshEvery']
+  faq?: FaqEntry[]
+}
+
+/** A piece of a knowledge source, as the agent finds it when answering. */
+export interface Passage {
+  sourceId: string
+  sourceName: string
+  text: string
+  /** 0–1: how close it is to the question; absent when just listing. */
+  score?: number
+}
+
+/** A secret an HTTP tool uses, by name. Its value is set once and never
+ * sent back to the browser. */
+export interface Credential {
+  name: string
+  /** ISO timestamp of when the value was last set. */
+  setAt: string
+  /** Who set it, by name. */
+  setBy: string
+}
+
+/** What a test run of a tool returned (from AICA's servers, not the browser). */
+export interface ToolTestResult {
+  ok: boolean
+  /** HTTP status, for HTTP tools. */
+  status?: number
+  ms: number
+  /** The reply, shortened, or what went wrong, in words. */
+  summary: string
+}
+
+export interface NumberPatch {
+  label?: string
+  /** null to leave it unanswered by any agent. */
+  agentId?: string | null
+  hours?: string
+  afterHours?: PhoneNumber['afterHours']
+  transferTo?: string | null
 }
 
 export interface ToolParam {
@@ -320,6 +418,8 @@ export interface AgentTool {
   enabled: boolean
   /** ISO timestamp of the last successful test run, or null. */
   lastTestedAt?: string | null
+  /** Agents (and drafts) set up to use it, by name. */
+  usedBy?: string[]
 }
 
 export interface PhoneNumber {

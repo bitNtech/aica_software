@@ -7,6 +7,8 @@ import type {
   AgentTool,
   AgentVersion,
   ConsoleClient,
+  Credential,
+  FlowNode,
   KnowledgeSource,
   PhoneNumber,
   SourceCall,
@@ -18,6 +20,8 @@ import { defaultGlobalFlows, extractAttributes, extractFlow } from './demo/extra
 import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
+import { passagesOf, search, seedCredentials } from './demo/passages'
+import { checkTool } from './toolRules'
 import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
 
 /**
@@ -29,7 +33,7 @@ import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v4'
+const STORE_KEY = 'aica.demo.console.v5'
 
 /** Versions kept per agent in the demo. */
 const KEEP_VERSIONS = 6
@@ -56,6 +60,9 @@ interface OrgData {
   numbers: PhoneNumber[]
   /** Published draft id → the agent it became, so a retried publish is safe. */
   published: Record<string, string>
+  /** Knowledge being (re)indexed: when it started (ms). */
+  indexing: Record<string, number>
+  credentials: Credential[]
 }
 
 export interface DemoConsoleOptions {
@@ -78,6 +85,8 @@ function seedOrg(slug: string): OrgData {
     tools: seedTools(),
     numbers: seedNumbers(),
     published: {},
+    indexing: {},
+    credentials: seedCredentials(),
   }
 }
 
@@ -198,6 +207,53 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     }
   }
 
+  /** Every setup in the organisation, by the name to show for it: each
+   * agent's live version and draft changes, and builder drafts. */
+  const setups = (o: string): { name: string; spec: Pick<AgentSpec, 'flow' | 'context'>; draft?: AgentDraft }[] => {
+    const d = org(o)
+    const out: { name: string; spec: Pick<AgentSpec, 'flow' | 'context'>; draft?: AgentDraft }[] = []
+    for (const a of d.agents) {
+      try {
+        const r = recordOf(o, a.id)
+        // Every version it keeps: a rollback can make any of them live again.
+        out.push({ name: a.name, spec: r.working }, ...r.versions.map((v) => ({ name: a.name, spec: v.spec })))
+      } catch {
+        /* an agent without a setup: nothing uses anything */
+      }
+    }
+    for (const dr of d.drafts) out.push({ name: dr.name.trim() || 'Untitled agent', spec: dr, draft: dr })
+    return out
+  }
+  const names = (xs: string[]) => [...new Set(xs)].sort()
+  const flowCalls = (nodes: FlowNode[]): string[] => nodes.flatMap((n) => [...n.sourceCallIds, ...flowCalls(n.children)])
+  const callUsers = (o: string, id: string) => names(setups(o).filter((x) => x.draft?.sourceCallIds.includes(id) || flowCalls(x.spec.flow).includes(id)).map((x) => x.name))
+  const toolUsers = (o: string, id: string) => names(setups(o).filter((x) => x.spec.context.toolIds.includes(id)).map((x) => x.name))
+  const knowledgeUsers = (o: string, id: string) => names(setups(o).filter((x) => x.spec.context.knowledgeSourceIds.includes(id)).map((x) => x.name))
+
+  /** Knowledge being indexed is ready once its time is up. */
+  const refreshKnowledgeStatus = (d: OrgData) => {
+    for (const k of d.knowledge) {
+      const started = d.indexing[k.id]
+      if (started === undefined) continue
+      if (processingMs === 0 || Date.now() - started >= processingMs) {
+        k.status = 'ready'
+        k.refreshedAt = new Date().toISOString()
+        if (!k.passages) k.passages = passagesOf(k).length * 7
+        delete d.indexing[k.id]
+      }
+    }
+  }
+  const findKnowledge = (o: string, id: string) => {
+    const k = org(o).knowledge.find((x) => x.id === id)
+    if (!k) throw notFound('knowledge source')
+    return k
+  }
+  const findTool = (o: string, id: string) => {
+    const t = org(o).tools.find((x) => x.id === id)
+    if (!t) throw notFound('tool')
+    return t
+  }
+
   /** Publishes `spec` as the agent's next version. */
   const release = (o: string, id: string, spec: AgentSpec, note: string) => {
     const d = org(o)
@@ -243,7 +299,18 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const d = org(o)
       refresh(d)
       keep()
-      return copy([...d.calls].sort((a, b) => b.addedAt.localeCompare(a.addedAt)))
+      return copy([...d.calls].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).map((c) => ({ ...c, usedBy: callUsers(o, c.id) })))
+    },
+
+    async deleteCall(o, id) {
+      await wait()
+      const d = org(o)
+      if (!d.calls.some((c) => c.id === id)) throw notFound('call')
+      d.calls = d.calls.filter((c) => c.id !== id)
+      delete d.processing[id]
+      // Drafts stop learning from it; flows already read keep their steps.
+      for (const dr of d.drafts) dr.sourceCallIds = dr.sourceCallIds.filter((x) => x !== id)
+      keep()
     },
 
     async addRecordings(o, files) {
@@ -396,17 +463,241 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listKnowledge(o) {
       await wait()
-      return copy(org(o).knowledge)
+      const d = org(o)
+      refreshKnowledgeStatus(d)
+      keep()
+      return copy(d.knowledge.map((k) => ({ ...k, usedBy: knowledgeUsers(o, k.id) })))
+    },
+
+    async addKnowledge(o, input) {
+      await wait()
+      const d = org(o)
+      const name = input.name.trim()
+      if (name.length < 3) throw new AuthError('invalid_input', 'Give the source a name of at least 3 characters.')
+      if (d.knowledge.some((k) => k.name.toLowerCase() === name.toLowerCase())) throw new AuthError('invalid_input', `There's already a source called “${name}”.`)
+      if (input.kind === 'web' && !/^https:\/\/[^\s/]+\.[^\s]+$/i.test(input.url.trim())) throw new AuthError('invalid_input', 'Give a full web address starting with https://.')
+      if (input.kind === 'faq' && input.faq.filter((f) => f.q.trim() && f.a.trim()).length === 0) throw new AuthError('invalid_input', 'Add at least one question with its answer.')
+      const k: KnowledgeSource = {
+        id: newId('kb'),
+        name,
+        kind: input.kind,
+        origin: input.kind === 'web' ? input.url.trim() : input.kind === 'faq' ? `${input.faq.filter((f) => f.q.trim() && f.a.trim()).length} questions` : input.fileName,
+        description: input.description.trim(),
+        status: 'indexing',
+        passages: input.kind === 'faq' ? input.faq.length : 0,
+        refreshedAt: new Date().toISOString(),
+        expiresAt: input.expiresAt,
+        refreshEvery: input.kind === 'web' ? input.refreshEvery : 'never',
+        usedByAgentIds: [],
+        faq: input.kind === 'faq' ? input.faq.filter((f) => f.q.trim() && f.a.trim()) : undefined,
+      }
+      if ((input.kind === 'document' || input.kind === 'table') && input.size === 0) {
+        k.status = 'failed'
+        k.error = 'The file is empty. Export it again and re-upload it.'
+      } else d.indexing[k.id] = Date.now()
+      d.knowledge.push(k)
+      refreshKnowledgeStatus(d)
+      keep()
+      return copy(k)
+    },
+
+    async updateKnowledge(o, id, patch) {
+      await wait()
+      const d = org(o)
+      const k = findKnowledge(o, id)
+      // Check everything first: a refused change changes nothing.
+      const name = patch.name?.trim()
+      if (name !== undefined) {
+        if (name.length < 3) throw new AuthError('invalid_input', 'Give the source a name of at least 3 characters.')
+        if (d.knowledge.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw new AuthError('invalid_input', `There's already a source called “${name}”.`)
+      }
+      const faq = patch.faq?.filter((f) => f.q.trim() && f.a.trim())
+      if (faq && !faq.length) throw new AuthError('invalid_input', 'Keep at least one question with its answer.')
+
+      if (name !== undefined) k.name = name
+      if (patch.description !== undefined) k.description = patch.description.trim()
+      if (patch.expiresAt !== undefined) k.expiresAt = patch.expiresAt
+      if (patch.refreshEvery !== undefined) k.refreshEvery = patch.refreshEvery
+      if (faq && JSON.stringify(faq) !== JSON.stringify(k.faq)) {
+        k.faq = faq
+        k.origin = `${faq.length} questions`
+        k.passages = faq.length
+        // Edited answers are indexed again.
+        k.status = 'indexing'
+        d.indexing[k.id] = Date.now()
+      }
+      refreshKnowledgeStatus(d)
+      keep()
+      return copy(k)
+    },
+
+    async refreshKnowledge(o, id) {
+      await wait()
+      const d = org(o)
+      const k = findKnowledge(o, id)
+      if (k.kind === 'faq') throw new AuthError('invalid_input', 'An FAQ written here is always up to date.')
+      k.status = 'indexing'
+      delete k.error
+      d.indexing[k.id] = Date.now()
+      refreshKnowledgeStatus(d)
+      keep()
+      return copy(k)
+    },
+
+    async deleteKnowledge(o, id) {
+      await wait()
+      const d = org(o)
+      const k = findKnowledge(o, id)
+      const users = knowledgeUsers(o, id)
+      if (users.length) throw new AuthError('invalid_input', `${users.join(', ')} ${users.length === 1 ? 'uses' : 'use'} “${k.name}”. Take it out of ${users.length === 1 ? 'that agent' : 'those agents'} first.`)
+      d.knowledge = d.knowledge.filter((x) => x.id !== id)
+      delete d.indexing[id]
+      keep()
+    },
+
+    async listPassages(o, id) {
+      await wait()
+      const k = findKnowledge(o, id)
+      if (k.status !== 'ready') throw new AuthError('invalid_input', k.status === 'failed' ? 'This source couldn’t be read, so it has no sections.' : 'This source is still being read. Its sections will show soon.')
+      return copy(passagesOf(k))
+    },
+
+    async searchKnowledge(o, ids, question) {
+      await wait()
+      return copy(search(org(o).knowledge.filter((k) => ids.includes(k.id)), question))
     },
 
     async listTools(o) {
       await wait()
-      return copy(org(o).tools)
+      return copy(org(o).tools.map((t) => ({ ...t, usedBy: toolUsers(o, t.id) })))
+    },
+
+    async saveTool(o, tool) {
+      await wait()
+      const d = org(o)
+      const existing = d.tools.find((t) => t.id === tool.id)
+      if (existing?.kind === 'builtin') {
+        // Built-in tools can only be switched on or off.
+        existing.enabled = tool.enabled
+        keep()
+        return copy({ ...existing, usedBy: toolUsers(o, existing.id) })
+      }
+      // An id that's gone was deleted elsewhere: don't quietly make a new one.
+      if (tool.id && !existing) throw notFound('tool')
+      const problems = Object.values(checkTool(tool, d.tools))
+      if (problems.length) throw new AuthError('invalid_input', problems[0])
+      const name = tool.name.trim()
+      if (tool.credentialName && !d.credentials.some((c) => c.name === tool.credentialName)) throw new AuthError('invalid_input', `There's no secret called ${tool.credentialName}. Add it under Secrets first.`)
+      // Changed (or new), so not tested yet.
+      const next: AgentTool = { ...copy(tool), name, url: tool.url!.trim(), kind: 'http', id: existing ? tool.id : newId('tool'), lastTestedAt: null }
+      delete next.usedBy
+      if (existing) d.tools[d.tools.indexOf(existing)] = next
+      else d.tools.push(next)
+      keep()
+      return copy({ ...next, usedBy: toolUsers(o, next.id) })
+    },
+
+    async deleteTool(o, id) {
+      await wait()
+      const d = org(o)
+      const t = findTool(o, id)
+      if (t.kind === 'builtin') throw new AuthError('invalid_input', 'Built-in tools can be switched off, not deleted.')
+      const users = toolUsers(o, id)
+      if (users.length) throw new AuthError('invalid_input', `${users.join(', ')} ${users.length === 1 ? 'uses' : 'use'} “${t.name}”. Take it out of ${users.length === 1 ? 'that agent' : 'those agents'} first.`)
+      d.tools = d.tools.filter((x) => x.id !== id)
+      keep()
+    },
+
+    async testTool(o, id, inputs) {
+      await wait()
+      const d = org(o)
+      const t = findTool(o, id)
+      const ms = Math.round(180 + Math.random() * 600)
+      const missing = t.params.filter((p) => p.required && !inputs[p.name]?.trim()).map((p) => p.name)
+      if (missing.length) return { ok: false, ms: 0, summary: `Fill in ${missing.join(', ')} to run a test.` }
+      if (!t.enabled) return { ok: false, ms: 0, summary: 'The tool is switched off. Switch it on to test it.' }
+      if (t.kind === 'builtin') return { ok: true, ms, summary: 'Works. In a test nothing is sent to anyone.' }
+      if (t.credentialName && !d.credentials.some((c) => c.name === t.credentialName))
+        return { ok: false, status: 401, ms, summary: `The secret ${t.credentialName} isn't set, so the system refused the request.` }
+      const sample = Object.entries(inputs).slice(0, 2).map(([k, v]) => `"${k}": "${v}"`).join(', ')
+      t.lastTestedAt = new Date().toISOString()
+      keep()
+      return { ok: true, status: 200, ms, summary: `{ "ok": true${sample ? `, ${sample}` : ''} } (a sample reply: the demo doesn't call your system)` }
+    },
+
+    async listCredentials(o) {
+      await wait()
+      return copy(org(o).credentials)
+    },
+
+    async setCredential(o, name, value) {
+      await wait()
+      const d = org(o)
+      const key = name.trim().toUpperCase()
+      if (!/^[A-Z][A-Z0-9_]{2,39}$/.test(key)) throw new AuthError('invalid_input', 'Use 3 to 40 capital letters, digits and underscores, starting with a letter, e.g. HIS_API_KEY.')
+      if (!value.trim()) throw new AuthError('invalid_input', 'Paste the secret’s value.')
+      // The demo keeps only that it was set, never the value.
+      const c: Credential = { name: key, setAt: new Date().toISOString(), setBy: 'You' }
+      d.credentials = [...d.credentials.filter((x) => x.name !== key), c].sort((a, b) => a.name.localeCompare(b.name))
+      keep()
+      return copy(c)
+    },
+
+    async deleteCredential(o, name) {
+      await wait()
+      const d = org(o)
+      const users = d.tools.filter((t) => t.credentialName === name)
+      if (users.length) throw new AuthError('invalid_input', `${users.map((t) => `“${t.name}”`).join(', ')} ${users.length === 1 ? 'uses' : 'use'} ${name}. Change ${users.length === 1 ? 'that tool' : 'those tools'} first.`)
+      d.credentials = d.credentials.filter((c) => c.name !== name)
+      keep()
     },
 
     async listNumbers(o) {
       await wait()
       return copy(org(o).numbers)
+    },
+
+    async updateNumber(o, id, patch) {
+      await wait()
+      const d = org(o)
+      const n = d.numbers.find((x) => x.id === id)
+      if (!n) throw notFound('phone number')
+      // Check first: a refused change changes nothing.
+      const label = patch.label?.trim()
+      if (label !== undefined && label.length < 2) throw new AuthError('invalid_input', 'Give the number a label, e.g. “Main reception”.')
+      if (patch.hours !== undefined && !patch.hours.trim()) throw new AuthError('invalid_input', 'Say when the agent answers, e.g. “8 AM to 8 PM”.')
+      const agent = patch.agentId ? d.agents.find((a) => a.id === patch.agentId) : null
+      if (patch.agentId && !agent) throw notFound('agent')
+      const transfer = patch.transferTo !== undefined ? patch.transferTo?.trim() || null : n.transferTo
+      const after = patch.afterHours ?? n.afterHours
+      if (after === 'transfer' && !transfer) throw new AuthError('invalid_input', 'Say where calls go after hours, or choose another option.')
+
+      if (label !== undefined) n.label = label
+      if (patch.hours !== undefined) n.hours = patch.hours.trim()
+      n.afterHours = after
+      n.transferTo = transfer
+      if (patch.agentId !== undefined && patch.agentId !== n.agentId) {
+        // The agent that answered it has no number now, so it's paused.
+        const before = d.agents.find((a) => a.id === n.agentId)
+        if (before) {
+          before.phoneNumber = null
+          before.status = 'paused'
+        }
+        if (agent) {
+          // An agent answers one number: its old one is freed.
+          for (const x of d.numbers) if (x.agentId === agent.id) x.agentId = null
+          agent.phoneNumber = n.number
+        }
+        n.agentId = agent?.id ?? null
+      }
+      keep()
+      return copy(n)
+    },
+
+    async requestNumber(o, note) {
+      await wait()
+      org(o)
+      if (note.length > 500) throw new AuthError('invalid_input', 'Keep the note under 500 characters.')
     },
 
     async getAgent(o, id) {

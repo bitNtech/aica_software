@@ -10,6 +10,10 @@ import ConsoleHomePage from './pages/ConsoleHomePage'
 import AgentsPage from './pages/console/AgentsPage'
 import BuilderRoute from './pages/console/builder/BuilderPage'
 import AgentWorkspaceRoute from './pages/console/agent/AgentWorkspacePage'
+import KnowledgePage from './pages/console/library/KnowledgePage'
+import NumbersPage from './pages/console/library/NumbersPage'
+import ToolsPage from './pages/console/library/ToolsPage'
+import UploadsPage from './pages/console/library/UploadsPage'
 import NewAgentPage from './pages/console/builder/NewAgentPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
@@ -68,6 +72,10 @@ export default function App() {
         <Route path="agents/new" element={org('agentBuilder', <NewAgentPage />)} />
         <Route path="agents/drafts/:draftId/:step?" element={org('agentBuilder', <BuilderRoute />)} />
         <Route path="agents/:agentId/:tab?" element={org('agentWorkspace', <AgentWorkspaceRoute />)} />
+        <Route path="uploads" element={org('uploads', <UploadsPage />)} />
+        <Route path="knowledge" element={org('knowledge', <KnowledgePage />)} />
+        <Route path="integrations" element={org('integrations', <ToolsPage />)} />
+        <Route path="numbers" element={org('numbers', <NumbersPage />)} />
       </Route>
 
       {/* bitNtech: master admin and staff */}

@@ -38,7 +38,6 @@
 }
 
 .ws__sections { display: grid; gap: 2.25rem; min-width: 0; }
-.ws__subhead { font-weight: 700; color: var(--ink); }
 
 .ws__publish { display: grid; gap: 1rem; }
 

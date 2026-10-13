@@ -58,7 +58,6 @@ a.builder-steps__link:hover { background: var(--bg-2); }
 
 .builder__errors { outline: none; }
 .builder__errors:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 3px; }
-.builder__error-list { display: grid; gap: 0.25rem; padding-left: 1.1rem; list-style: disc; }
 .builder__action-error { margin-top: -0.5rem; }
 .builder__alert-actions { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-top: 0.5rem; }
 
@@ -90,9 +89,6 @@ a.builder-steps__link:hover { background: var(--bg-2); }
 .call-pick__side { display: flex; align-items: center; gap: 1rem; }
 .call-pick__error { grid-column: 1 / -1; margin: 0; font-size: 0.85rem; color: var(--danger-ink); }
 
-.status-chip--call-ready { background: var(--ok-bg); color: var(--ok-ink); }
-.status-chip--call-queued, .status-chip--call-transcribing, .status-chip--call-extracting { background: var(--info-bg); color: var(--info-ink); }
-.status-chip--call-failed { background: var(--danger-bg); color: var(--danger-ink); }
 
 /* ---- step 1: what the template covers ---- */
 

@@ -174,7 +174,13 @@ export const NAV: NavSection[] = [
   { items: [{ page: 'home', label: 'Home', path: '', description: 'Today at a glance.' }] },
   {
     heading: 'Build',
-    items: [{ page: 'agents', label: 'Agents', path: 'agents', description: 'The voice agents that answer your phone lines.' }],
+    items: [
+      { page: 'agents', label: 'Agents', path: 'agents', description: 'The voice agents that answer your phone lines.' },
+      { page: 'uploads', label: 'Call uploads', path: 'uploads', description: 'Recordings of past calls that agents learn from.' },
+      { page: 'knowledge', label: 'Knowledge', path: 'knowledge', description: 'Schedules, prices and FAQs the agents answer from.' },
+      { page: 'integrations', label: 'Tools and integrations', path: 'integrations', description: 'What agents can do during a call, and your connected systems.' },
+      { page: 'numbers', label: 'Phone numbers', path: 'numbers', description: 'Your lines, the agent on each, and its hours.' },
+    ],
   },
 ]
 

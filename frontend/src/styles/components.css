@@ -81,10 +81,12 @@
   transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), background-color 0.2s var(--ease);
 }
 .field--trailing .field__input { padding-right: 4.75rem; }
-.field__input::placeholder { color: var(--muted); opacity: 0.75; }
+.field__input::placeholder { color: var(--muted); opacity: 1; }
 .field__input:hover:not(:focus):not([readonly]) { border-color: color-mix(in srgb, var(--ink) 45%, var(--line-strong)); }
-.field__input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent); }
-.field__input:focus-visible { outline: none; }
+.field__input:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: var(--orange); box-shadow: 0 0 0 4px color-mix(in srgb, var(--orange) 22%, transparent); }
+/* Transparent, not none: forced colours (Windows High Contrast) drop the
+   shadow but turn this outline into a visible focus ring. */
+.field__input:focus-visible { outline: 2px solid transparent; }
 .field__input[readonly] { background: var(--bg-2); color: var(--text); cursor: default; }
 .field--error .field__input { border-color: var(--danger-ink); }
 .field--error .field__input:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger-ink) 20%, transparent); }
@@ -366,6 +368,9 @@
 .switch__control[aria-checked='true'] .switch__thumb { transform: translateX(16px); background: var(--bg); }
 .switch__control:disabled { opacity: 0.5; cursor: not-allowed; }
 .switch__control[aria-disabled='true'] { cursor: not-allowed; }
+/* A heading inside a section or dialog. */
+.ws__subhead { font-weight: 700; color: var(--ink); }
+
 /* A small label for a state, e.g. "Required", "Always on". */
 .flag { padding: 0.15rem 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-pill); font-size: 0.75rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .flag--quiet { color: var(--muted); }
@@ -450,6 +455,7 @@
 .dialog__close:hover { border-color: var(--ink); }
 .dialog[open] { max-height: calc(100dvh - 2rem); overflow-y: auto; }
 
+.file-drop.is-invalid { border-color: var(--danger-ink); }
 .file-drop {
   display: grid;
   justify-items: center;
@@ -580,6 +586,12 @@
 .status-chip--live { background: var(--ok-bg); color: var(--ok-ink); }
 .status-chip--draft { background: var(--bg-2); color: var(--muted); }
 .status-chip--paused { background: var(--warn-bg); color: var(--warn-ink); }
+/* Recordings and knowledge being processed. */
+.status-chip--call-ready { background: var(--ok-bg); color: var(--ok-ink); }
+.status-chip--call-queued, .status-chip--call-transcribing, .status-chip--call-extracting { background: var(--info-bg); color: var(--info-ink); }
+.status-chip--call-failed { background: var(--danger-bg); color: var(--danger-ink); }
+/* A short list of problems inside an alert. */
+.builder__error-list { display: grid; gap: 0.25rem; padding-left: 1.1rem; list-style: disc; }
 
 @media (max-width: 760px) {
   .agent-row { grid-template-columns: minmax(0, 1fr) auto; }
