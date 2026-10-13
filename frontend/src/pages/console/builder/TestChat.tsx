@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import type { AgentDraft, AgentTool, KnowledgeSource } from '../../../console/types'
+import type { AgentTool, KnowledgeSource } from '../../../console/types'
 import { Button } from '../../../components/ui/Button'
 import { TextField } from '../../../components/ui/Field'
 import { GLOBAL_META } from './steps/StepGlobal'
-import { SIM_START, simulate, type SimReply, type SimState } from './simulate'
+import { SIM_START, simulate, type SimAgent, type SimReply, type SimState } from './simulate'
 
 interface Line {
   from: 'caller' | 'agent'
@@ -18,7 +18,7 @@ const SUGGESTIONS = ['I want to book an appointment', 'Is my blood test report r
  * browser from the agent's flow, with the path, tools and knowledge each
  * reply used; the real agent (speech, the LLM) runs on AICA's servers.
  */
-export function TestChat({ draft, tools, knowledge }: { draft: AgentDraft; tools: AgentTool[]; knowledge: KnowledgeSource[] }) {
+export function TestChat({ draft, tools, knowledge }: { draft: SimAgent; tools: AgentTool[]; knowledge: KnowledgeSource[] }) {
   const greeting: Line = { from: 'agent', text: draft.behaviour.greeting || 'Hello!' }
   const [lines, setLines] = useState<Line[]>([greeting])
   const [state, setState] = useState<SimState>(SIM_START)

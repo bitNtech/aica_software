@@ -39,6 +39,32 @@ export function GlobalFlowsEditor({
 }) {
   const set = (kind: GlobalFlowKind, patch: Partial<GlobalFlow>) => onChange(flows.map((g) => (g.kind === kind ? { ...g, ...patch } : g)))
   const id = useId()
+  // Look only: plain text, not controls that can't be used.
+  if (readOnly) {
+    return (
+      <ul className="globals">
+        {flows.map((g) => (
+          <li key={g.kind} className={`globals__item${g.enabled ? '' : ' is-off'}`}>
+            <p className="globals__ro-title">
+              <strong>{GLOBAL_META[g.kind].label}</strong> <span className={`flag${g.enabled ? '' : ' flag--quiet'}`}>{g.enabled ? 'On' : 'Off'}</span>
+            </p>
+            {g.enabled && (
+              <dl className="globals__ro">
+                <div>
+                  <dt>When</dt>
+                  <dd>{g.trigger}</dd>
+                </div>
+                <div>
+                  <dt>What the agent says or does</dt>
+                  <dd>{g.response}</dd>
+                </div>
+              </dl>
+            )}
+          </li>
+        ))}
+      </ul>
+    )
+  }
   return (
     <ul className="globals">
       {flows.map((g) => {
@@ -51,7 +77,6 @@ export function GlobalFlowsEditor({
               labelId={`${id}-${g.kind}`}
               hint={meta.hint}
               checked={g.enabled}
-              disabled={readOnly}
               locked={locked ? 'Always on' : undefined}
               onChange={(v) => set(g.kind, { enabled: v })}
             />
@@ -62,7 +87,6 @@ export function GlobalFlowsEditor({
                   label="When"
                   rows={3}
                   value={g.trigger}
-                  readOnly={readOnly}
                   error={errors[`${g.kind}-trigger`]}
                   onChange={(e) => set(g.kind, { trigger: e.target.value })}
                 />
@@ -70,7 +94,6 @@ export function GlobalFlowsEditor({
                   label="What the agent says or does"
                   rows={3}
                   value={g.response}
-                  readOnly={readOnly}
                   error={errors[`${g.kind}-response`]}
                   onChange={(e) => set(g.kind, { response: e.target.value })}
                 />

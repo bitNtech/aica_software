@@ -239,7 +239,7 @@ describe('builder robustness', () => {
     fail = false
     await user.click(screen.getByRole('button', { name: /retry/i }))
     expect(await screen.findByText(/your changes are saved now/i)).toBeInTheDocument()
-    expect(screen.getByText(/all changes saved/i)).toBeInTheDocument()
+    expect(screen.getByText(/draft saved/i)).toBeInTheDocument()
   })
 
   it('forgets demo drafts when someone signs out', async () => {
@@ -252,6 +252,8 @@ describe('builder robustness', () => {
     await user.click(await screen.findByRole('button', { name: /arogya/i }))
     await user.click(await screen.findByRole('link', { name: /^agents$/i }))
     const list = await screen.findByRole('list', { name: /agents/i })
-    expect(within(list).queryByText(/setup: step/i)).not.toBeInTheDocument()
+    // Only the sample draft is left; the one started here is gone.
+    expect(within(list).getAllByText(/setup: step/i)).toHaveLength(1)
+    expect(within(list).queryByRole('heading', { name: /untitled agent/i })).not.toBeInTheDocument()
   })
 })

@@ -1,15 +1,15 @@
-import { useCallback, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useId } from 'react'
 import { LANGUAGE_LABEL } from '../../../../auth/roles'
 import type { Language } from '../../../../auth/types'
 import { asAuthError } from '../../../../auth/types'
 import { useConsole } from '../../../../console/ConsoleProvider'
 import type { BotBehaviour, SpeakingRate, Tone, Voice } from '../../../../console/types'
 import { Alert } from '../../../../components/ui/Alert'
-import { Button } from '../../../../components/ui/Button'
 import { ChoiceGroup } from '../../../../components/ui/Choice'
 import { SelectField, TextAreaField, TextField } from '../../../../components/ui/Field'
 import { Switch } from '../../../../components/ui/Switch'
-import { useAsync } from '../../../../lib/useAsync'
+import { useAsync, type Async } from '../../../../lib/useAsync'
+import { ListEditor } from '../ListEditor'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
 
 const TONES: { value: Tone; label: string; hint: string }[] = [
@@ -52,7 +52,6 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
   const load = useCallback(() => client.listVoices(), [client])
   const [voices, reload] = useAsync(load)
   const b = draft.behaviour
-  const set = (patch: Partial<BotBehaviour>) => update((d) => ({ ...d, behaviour: { ...d.behaviour, ...patch } }))
 
   const voice = voices.state === 'ready' ? voices.data.find((v) => v.id === b.voiceId) : undefined
   const check = () => {
@@ -66,7 +65,30 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
   return (
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} />
+      <BehaviourEditor behaviour={b} onChange={(behaviour) => update((d) => ({ ...d, behaviour }))} errors={errors} voices={voices} onReloadVoices={reload} />
+    </div>
+  )
+}
 
+/** Persona, tone, languages, greeting, voice and rules; shared with the
+ * agent workspace. The caller loads the voices, since its checks need them. */
+export function BehaviourEditor({
+  behaviour: b,
+  onChange,
+  errors,
+  voices,
+  onReloadVoices,
+}: {
+  behaviour: BotBehaviour
+  onChange(next: BotBehaviour): void
+  errors: StepErrors
+  voices: Async<Voice[]>
+  onReloadVoices(): void
+}) {
+  const set = (patch: Partial<BotBehaviour>) => onChange({ ...b, ...patch })
+  const id = useId()
+  return (
+    <>
       <section className="step__section step__narrow">
         <TextField
           label="Spoken name"
@@ -132,7 +154,7 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
         {voices.state === 'error' ? (
           <Alert tone="error" title="Couldn't load voices">
             <p>{asAuthError(voices.error).message}</p>
-            <button type="button" className="btn-text" onClick={reload}>
+            <button type="button" className="btn-text" onClick={onReloadVoices}>
               Try again
             </button>
           </Alert>
@@ -157,88 +179,23 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
         </div>
       </section>
 
-      <section className="step__section" aria-labelledby="rules-h">
-        <h2 id="rules-h" className="step__heading">
+      <section className="step__section" aria-labelledby={`${id}-rules`}>
+        <h2 id={`${id}-rules`} className="step__heading">
           Rules it must always follow
         </h2>
         <p className="step__sub">AICA checks every reply against these. Write each as one plain sentence.</p>
-        <RulesEditor rules={b.rules} onChange={(rules) => set({ rules })} />
+        <ListEditor
+          items={b.rules}
+          onChange={(rules) => set({ rules })}
+          noun="rule"
+          label="Add a rule"
+          placeholder="e.g. Never quote a price that isn’t in the price list."
+          empty="No rules yet. Add the things it must never do, and the things it must always do."
+          max={MAX_RULES}
+          minLength={8}
+          tooShort="Write the rule as a short sentence."
+        />
       </section>
-    </div>
-  )
-}
-
-function RulesEditor({ rules, onChange }: { rules: string[]; onChange(rules: string[]): void }) {
-  const [text, setText] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  /** Announced politely after adding or removing. */
-  const [note, setNote] = useState('')
-  const input = useRef<HTMLInputElement>(null)
-  const list = useRef<HTMLUListElement>(null)
-
-  function add(e: FormEvent) {
-    e.preventDefault()
-    const rule = text.trim()
-    if (rule.length < 8) setError('Write the rule as a short sentence.')
-    else if (rule.length > 160) setError('Keep each rule under 160 characters.')
-    else if (rules.some((r) => r.toLowerCase() === rule.toLowerCase())) setError('That rule is already in the list.')
-    else if (rules.length >= MAX_RULES) setError(`Up to ${MAX_RULES} rules. Remove one first.`)
-    else {
-      onChange([...rules, rule])
-      setText('')
-      setError(null)
-      setNote(`Rule added. ${rules.length + 1} rules.`)
-      return
-    }
-    input.current?.focus()
-  }
-
-  function remove(i: number) {
-    onChange(rules.filter((_, j) => j !== i))
-    setNote(`Rule removed. ${rules.length - 1} ${rules.length - 1 === 1 ? 'rule' : 'rules'} left.`)
-    // Focus stays in the list: the next rule's button, else the input.
-    requestAnimationFrame(() => {
-      const buttons = list.current?.querySelectorAll('button')
-      ;(buttons?.[Math.min(i, (buttons?.length ?? 1) - 1)] ?? input.current)?.focus()
-    })
-  }
-
-  return (
-    <div className="rules">
-      {rules.length > 0 ? (
-        <ul className="rules__list" ref={list}>
-          {rules.map((r, i) => (
-            <li key={r} className="rules__item">
-              <span>{r}</span>
-              <button type="button" className="btn-text" onClick={() => remove(i)} aria-label={`Remove rule: ${r}`}>
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="empty-note">No rules yet. Add the things it must never do, and the things it must always do.</p>
-      )}
-      <p className="sr-only" role="status">
-        {note}
-      </p>
-      {/* Its own small form: Enter adds the rule. */}
-      <form onSubmit={add} noValidate className="rules__form">
-          <TextField
-            ref={input}
-            label="Add a rule"
-            value={text}
-            placeholder="e.g. Never quote a price that isn’t in the price list."
-            error={error}
-            onChange={(e) => {
-              setText(e.target.value)
-              if (error) setError(null)
-            }}
-          />
-          <Button type="submit" variant="line" className="rules__button">
-            Add rule
-          </Button>
-      </form>
-    </div>
+    </>
   )
 }

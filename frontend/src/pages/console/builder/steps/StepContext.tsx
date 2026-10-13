@@ -42,6 +42,8 @@ export function ContextEditor({
   errors = {},
   readOnly,
   onTools,
+  part,
+  library,
 }: {
   orgSlug: string
   context: AgentContext
@@ -50,13 +52,20 @@ export function ContextEditor({
   readOnly?: boolean
   /** Reports the organisation's tools once loaded, for checks. */
   onTools?(tools: AgentTool[]): void
+  /** Only one half, for the workspace's Knowledge and Tools tabs. */
+  part?: 'knowledge' | 'tools'
+  /** The library, when the page already has it: not loaded again. */
+  library?: { knowledge: KnowledgeSource[]; tools: AgentTool[] }
 }) {
   const client = useConsole()
   // A report, not an input: held in a ref so a new callback each render
   // doesn't reload the library.
   const report = useRef(onTools)
   report.current = onTools
+  const given = useRef(library)
+  given.current = library
   const load = useCallback(async () => {
+    if (given.current) return given.current
     const [knowledge, tools] = await Promise.all([client.listKnowledge(orgSlug), client.listTools(orgSlug)])
     report.current?.(tools)
     return { knowledge, tools }
@@ -67,7 +76,7 @@ export function ContextEditor({
   const toggle = (key: 'knowledgeSourceIds' | 'toolIds', id: string, on: boolean) =>
     set({ [key]: on ? [...context[key], id] : context[key].filter((x) => x !== id) })
 
-  if (lib.state === 'loading') {
+  if (!library && lib.state === 'loading') {
     return (
       <div className="loading-row" role="status">
         <Spinner />
@@ -75,7 +84,7 @@ export function ContextEditor({
       </div>
     )
   }
-  if (lib.state === 'error') {
+  if (!library && lib.state === 'error') {
     return (
       <Alert tone="error" title="Couldn't load your knowledge and tools">
         <p>{asAuthError(lib.error).message}</p>
@@ -86,108 +95,112 @@ export function ContextEditor({
     )
   }
 
-  const { knowledge, tools } = lib.data
+  const { knowledge, tools } = library ?? (lib.state === 'ready' ? lib.data : { knowledge: [], tools: [] })
   return (
     <>
-      <section className="step__section" aria-labelledby={`${id}-kb`}>
-        <h2 id={`${id}-kb`} className="step__heading">
-          Knowledge it answers from
-        </h2>
-        {knowledge.length === 0 ? (
-          <p className="empty-note">Your knowledge library is empty. Add documents, web pages or FAQs to it, then choose them here.</p>
-        ) : (
-          <fieldset className="pick-list" aria-labelledby={`${id}-kb`} aria-describedby={errors.knowledge ? `${id}-kb-err` : undefined}>
-            {knowledge.map((k) => (
-              <div key={k.id} className="pick-list__row">
+      {part !== 'tools' && (
+        <section className="step__section" aria-labelledby={`${id}-kb`}>
+          <h2 id={`${id}-kb`} className="step__heading">
+            Knowledge it answers from
+          </h2>
+          {knowledge.length === 0 ? (
+            <p className="empty-note">Your knowledge library is empty. Add documents, web pages or FAQs to it, then choose them here.</p>
+          ) : (
+            <fieldset className="pick-list" aria-labelledby={`${id}-kb`} aria-describedby={errors.knowledge ? `${id}-kb-err` : undefined}>
+              {knowledge.map((k) => (
+                <div key={k.id} className="pick-list__row">
+                  <Checkbox
+                    label={k.name}
+                    hint={
+                      <>
+                        {KNOWLEDGE_KIND_LABEL[k.kind]} <i aria-hidden="true">·</i> {k.passages} sections <i aria-hidden="true">·</i> updated {shortDate(k.refreshedAt)}
+                        {isExpired(k) && <strong className="pick-list__warn"> · Expired {shortDate(k.expiresAt!)}: check it’s still right</strong>}
+                      </>
+                    }
+                    checked={context.knowledgeSourceIds.includes(k.id)}
+                    disabled={readOnly || k.status !== 'ready'}
+                    onChange={(e) => toggle('knowledgeSourceIds', k.id, e.target.checked)}
+                  />
+                </div>
+              ))}
+            </fieldset>
+          )}
+          {errors.knowledge && (
+            <p className="field__error" id={`${id}-kb-err`}>
+              {errors.knowledge}
+            </p>
+          )}
+          <div className="step__stack">
+            <Switch
+              label="Answer only from this knowledge"
+              hint="If the answer isn’t in these sources, the agent says it doesn’t know and offers to hand over, rather than guessing."
+              checked={context.answerOnlyFromKnowledge}
+              disabled={readOnly}
+              onChange={(v) => set({ answerOnlyFromKnowledge: v })}
+            />
+          </div>
+          <div className="step__grid">
+            <SelectField
+              label="Passages per answer"
+              hint="How many pieces of your knowledge the agent reads before answering. More gives fuller answers, but slower replies."
+              value={String(context.topK)}
+              disabled={readOnly}
+              options={[2, 4, 6, 8].map((n) => ({ value: String(n), label: String(n) }))}
+              onChange={(e) => set({ topK: Number(e.target.value) })}
+            />
+            <SelectField
+              label="How close a match must be"
+              hint="How closely a piece of knowledge must match the question before the agent uses it."
+              value={String(context.minScore)}
+              disabled={readOnly}
+              options={MATCH}
+              onChange={(e) => set({ minScore: Number(e.target.value) })}
+            />
+          </div>
+        </section>
+      )}
+
+      {part !== 'knowledge' && (
+        <section className="step__section" aria-labelledby={`${id}-tools`}>
+          <h2 id={`${id}-tools`} className="step__heading">
+            Tools it can use
+          </h2>
+          <fieldset className="pick-list" aria-labelledby={`${id}-tools`} aria-describedby={errors.tools ? `${id}-tools-err` : undefined}>
+            {tools.map((t) => (
+              <div key={t.id} className="pick-list__row">
                 <Checkbox
-                  label={k.name}
+                  label={t.name}
                   hint={
                     <>
-                      {KNOWLEDGE_KIND_LABEL[k.kind]} <i aria-hidden="true">·</i> {k.passages} passages <i aria-hidden="true">·</i> updated {shortDate(k.refreshedAt)}
-                      {isExpired(k) && <strong className="pick-list__warn"> · Expired {shortDate(k.expiresAt!)}: check it’s still right</strong>}
+                      {t.description}{' '}
+                      {t.acts && <span className="flag flag--warn pick-list__flag">Changes things</span>}
+                      {t.kind === 'http' && !t.lastTestedAt && <span className="flag pick-list__flag">Not tested yet</span>}
+                      {!t.enabled && <span className="flag flag--quiet pick-list__flag">Switched off for your organisation</span>}
                     </>
                   }
-                  checked={context.knowledgeSourceIds.includes(k.id)}
-                  disabled={readOnly || k.status !== 'ready'}
-                  onChange={(e) => toggle('knowledgeSourceIds', k.id, e.target.checked)}
+                  checked={context.toolIds.includes(t.id)}
+                  disabled={readOnly || !t.enabled}
+                  onChange={(e) => toggle('toolIds', t.id, e.target.checked)}
                 />
               </div>
             ))}
           </fieldset>
-        )}
-        {errors.knowledge && (
-          <p className="field__error" id={`${id}-kb-err`}>
-            {errors.knowledge}
-          </p>
-        )}
-        <div className="step__stack">
-          <Switch
-            label="Answer only from this knowledge"
-            hint="If the answer isn’t in these sources, the agent says it doesn’t know and offers to hand over, rather than guessing."
-            checked={context.answerOnlyFromKnowledge}
-            disabled={readOnly}
-            onChange={(v) => set({ answerOnlyFromKnowledge: v })}
-          />
-        </div>
-        <div className="step__grid">
-          <SelectField
-            label="Passages per answer"
-            hint="How many pieces of your knowledge the agent reads before answering. More gives fuller answers, but slower replies."
-            value={String(context.topK)}
-            disabled={readOnly}
-            options={[2, 4, 6, 8].map((n) => ({ value: String(n), label: String(n) }))}
-            onChange={(e) => set({ topK: Number(e.target.value) })}
-          />
-          <SelectField
-            label="How close a match must be"
-            hint="How closely a piece of knowledge must match the question before the agent uses it."
-            value={String(context.minScore)}
-            disabled={readOnly}
-            options={MATCH}
-            onChange={(e) => set({ minScore: Number(e.target.value) })}
-          />
-        </div>
-      </section>
-
-      <section className="step__section" aria-labelledby={`${id}-tools`}>
-        <h2 id={`${id}-tools`} className="step__heading">
-          Tools it can use
-        </h2>
-        <fieldset className="pick-list" aria-labelledby={`${id}-tools`} aria-describedby={errors.tools ? `${id}-tools-err` : undefined}>
-          {tools.map((t) => (
-            <div key={t.id} className="pick-list__row">
-              <Checkbox
-                label={t.name}
-                hint={
-                  <>
-                    {t.description}{' '}
-                    {t.acts && <span className="flag flag--warn pick-list__flag">Changes things</span>}
-                    {t.kind === 'http' && !t.lastTestedAt && <span className="flag pick-list__flag">Not tested yet</span>}
-                    {!t.enabled && <span className="flag flag--quiet pick-list__flag">Switched off for your organisation</span>}
-                  </>
-                }
-                checked={context.toolIds.includes(t.id)}
-                disabled={readOnly || !t.enabled}
-                onChange={(e) => toggle('toolIds', t.id, e.target.checked)}
-              />
-            </div>
-          ))}
-        </fieldset>
-        {errors.tools && (
-          <p className="field__error" id={`${id}-tools-err`}>
-            {errors.tools}
-          </p>
-        )}
-        <div className="step__stack">
-          <Switch
-            label="Ask the caller before acting"
-            hint="Before a tool that changes something (booking, sending a message), the agent reads back what it’s about to do and waits for a yes."
-            checked={context.confirmBeforeActions}
-            disabled={readOnly}
-            onChange={(v) => set({ confirmBeforeActions: v })}
-          />
-        </div>
-      </section>
+          {errors.tools && (
+            <p className="field__error" id={`${id}-tools-err`}>
+              {errors.tools}
+            </p>
+          )}
+          <div className="step__stack">
+            <Switch
+              label="Ask the caller before acting"
+              hint="Before a tool that changes something (booking, sending a message), the agent reads back what it’s about to do and waits for a yes."
+              checked={context.confirmBeforeActions}
+              disabled={readOnly}
+              onChange={(v) => set({ confirmBeforeActions: v })}
+            />
+          </div>
+        </section>
+      )}
     </>
   )
 }

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { asAuthError } from '../../../../auth/types'
 import { useConsole } from '../../../../console/ConsoleProvider'
-import type { AgentDraft, FlowNode, SourceCall } from '../../../../console/types'
+import type { AgentDraft, FlowNode } from '../../../../console/types'
 import { Alert } from '../../../../components/ui/Alert'
 import { Button } from '../../../../components/ui/Button'
-import { ConfirmDialog, Modal } from '../../../../components/ui/Dialog'
+import { ConfirmDialog } from '../../../../components/ui/Dialog'
 import { Spinner } from '../../../../components/ui/Spinner'
-import { useAsync } from '../../../../lib/useAsync'
-import { TranscriptDialog } from '../../calls/TranscriptDialog'
 import { FlowEditor } from '../FlowEditor'
+import { SeenInDialog } from '../SeenInDialog'
 import { checkFlow } from '../flowTree'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
 
@@ -56,7 +55,6 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
   const [error, setError] = useState<unknown>(null)
   const [confirmAgain, setConfirmAgain] = useState(false)
   const [seenIn, setSeenIn] = useState<FlowNode | null>(null)
-  const [transcript, setTranscript] = useState<SourceCall | null>(null)
   const started = useRef(false)
   const mounted = useRef(true)
   /** Reading failed and the person chose to write the flow themselves. */
@@ -67,8 +65,6 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
   const [done, setDone] = useState('')
   /** After a requested re-read, focus goes to the flow's summary line. */
   const focusSummary = useRef(false)
-  const loadCalls = useCallback(() => client.listCalls(org.orgSlug), [client, org.orgSlug])
-  const [calls] = useAsync(loadCalls)
 
   const extract = useCallback(async () => {
     setPhase('busy')
@@ -151,8 +147,6 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
     )
   }
 
-  const callName = (id: string) => (calls.state === 'ready' ? calls.data.find((c) => c.id === id) : undefined)
-
   return (
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} hrefFor={(key) => (key === 'flow' ? undefined : `#node-${key}`)} />
@@ -208,36 +202,7 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
         <p>AICA starts the flow, details to collect and global flows afresh from your calls. Changes you made to them here are lost.</p>
       </ConfirmDialog>
 
-      <Modal open={!!seenIn} title={seenIn ? `Where “${seenIn.label}” came from` : 'Calls'} onClose={() => setSeenIn(null)}>
-        {seenIn && (
-          <ul className="seen-in">
-            {seenIn.sourceCallIds.map((id) => {
-              const c = callName(id)
-              return (
-                <li key={id} className="seen-in__row">
-                  <span>
-                    <span className="seen-in__name">{c?.name ?? 'A call no longer in your library'}</span>
-                    {c?.topic && <span className="seen-in__meta">{c.topic}</span>}
-                  </span>
-                  {c?.status === 'ready' && (
-                    <button
-                      type="button"
-                      className="btn-text"
-                      onClick={() => {
-                        setSeenIn(null)
-                        setTranscript(c)
-                      }}
-                    >
-                      Transcript<span className="sr-only">: {c.name}</span>
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </Modal>
-      <TranscriptDialog orgSlug={org.orgSlug} call={transcript} redact={draft.redact} onClose={() => setTranscript(null)} />
+      <SeenInDialog orgSlug={org.orgSlug} node={seenIn} redact={draft.redact} onClose={() => setSeenIn(null)} />
     </div>
   )
 }

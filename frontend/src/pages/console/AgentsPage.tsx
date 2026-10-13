@@ -38,11 +38,14 @@ export default function AgentsPage() {
   // history entry so a reload or Back doesn't show it again.
   const location = useLocation()
   const [notice] = useState(() => (location.state as { notice?: string } | null)?.notice)
+  const [said, setSaid] = useState('')
   useEffect(() => {
     if (!notice) return
+    const t = window.setTimeout(() => setSaid(notice), 400)
     // Without a navigation, which would move focus again.
     const entry = window.history.state as { usr?: unknown } | null
     if (entry?.usr) window.history.replaceState({ ...entry, usr: null }, '')
+    return () => window.clearTimeout(t)
   }, [notice])
 
   const all = agents.state === 'ready' ? [...agents.data].sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.name.localeCompare(b.name)) : []
@@ -81,8 +84,13 @@ export default function AgentsPage() {
         )
       }
     >
+      {/* Present and empty first, then filled: a region that arrives with
+          its text, as focus moves to the title, often isn't read. */}
+      <p className="sr-only" role="status">
+        {said}
+      </p>
       {notice && (
-        <Alert tone="ok" className="ops-section__notice">
+        <Alert tone="ok" live={false} className="ops-section__notice">
           {notice}
         </Alert>
       )}
@@ -188,10 +196,19 @@ function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: str
   return (
     <li className="agent-row">
       <div className="agent-row__main">
-        <h2 className="agent-row__name">{a.name}</h2>
+        <h2 className="agent-row__name">
+          {a.setupStep ? (
+            a.name
+          ) : (
+            <Link className="agent-row__link" to={`${base}/${a.id}`}>
+              {a.name}
+            </Link>
+          )}
+        </h2>
         <span className="row__meta">
           {a.useCase} <i aria-hidden="true">·</i> {a.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}
         </span>
+        {a.hasChanges && <span className="agent-row__setup">Unpublished changes</span>}
         {a.setupStep && (
           <span className="agent-row__setup">
             Setup: step {stepIndex(a.setupStep) + 1} of {BUILDER_STEPS.length}, {STEP_META[a.setupStep].label.toLowerCase()}

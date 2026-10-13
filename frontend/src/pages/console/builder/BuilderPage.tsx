@@ -12,7 +12,8 @@ import { Spinner } from '../../../components/ui/Spinner'
 import { BuilderSteps } from './BuilderSteps'
 import { STEP_META, isStep, later, stepIndex } from './steps'
 import type { StepErrors, StepProps } from './StepShared'
-import { useAutosave, type SaveState } from './useAutosave'
+import { SaveStatus } from './SaveStatus'
+import { useAutosave } from './useAutosave'
 import { StepAttributes } from './steps/StepAttributes'
 import { StepBehaviour } from './steps/StepBehaviour'
 import { StepCalls } from './steps/StepCalls'
@@ -231,46 +232,5 @@ function BuilderPage() {
         <p>Everything you set up for {draft.name.trim() || 'this agent'} is deleted. Your call library isn’t affected.</p>
       </ConfirmDialog>
     </ConsolePage>
-  )
-}
-
-/** Saving, saved, or failed. Only a failure, and the recovery after it,
- * is announced: the always-present status region gets text just then. */
-function SaveStatus({ state, onRetry }: { state: SaveState; onRetry(): void }) {
-  const [recovered, setRecovered] = useState(false)
-  // Error → saving → saved: remember the error across the retry.
-  const hadError = useRef(false)
-  useEffect(() => {
-    if (state === 'error') {
-      hadError.current = true
-      setRecovered(false)
-    } else if (state === 'saved' && hadError.current) {
-      hadError.current = false
-      setRecovered(true)
-    }
-  }, [state])
-
-  return (
-    <div className="save-status-wrap">
-      <p className={`save-status${state === 'error' ? ' save-status--error' : ''}`}>
-        {state === 'error' ? (
-          <>
-            Couldn’t save.{' '}
-            <button type="button" className="btn-text" onClick={onRetry}>
-              Retry
-            </button>
-          </>
-        ) : state === 'saving' ? (
-          'Saving…'
-        ) : state === 'unsaved' ? (
-          'Unsaved changes'
-        ) : (
-          'All changes saved'
-        )}
-      </p>
-      <p className="sr-only" role="status">
-        {state === 'error' ? 'Couldn’t save your changes.' : recovered && state === 'saved' ? 'Your changes are saved now.' : ''}
-      </p>
-    </div>
   )
 }

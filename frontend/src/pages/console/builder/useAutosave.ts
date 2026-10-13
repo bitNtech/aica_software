@@ -81,5 +81,14 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
     [run],
   )
 
-  return { state, changed, flush, cancel, retry: run }
+  /** The value was replaced from the server (discard, rollback): nothing
+   * is pending any more, and a past failure no longer applies. */
+  const reset = useCallback(() => {
+    window.clearTimeout(timer.current)
+    dirty.current = false
+    failed.current = false
+    setState('saved')
+  }, [])
+
+  return { state, changed, flush, cancel, reset, retry: run }
 }

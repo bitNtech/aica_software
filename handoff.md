@@ -17,6 +17,17 @@
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
 
+## Console pages on demo data (started 2026-10-13)
+- **Approved plan:** build every console page in the frontend only, on sample data, phase by phase; each phase gets build, checks, screenshots, two review subagents, fixes and a local commit. Nothing is pushed and no PR is opened until the user asks. Demo pages show in production, labelled "Demo data" (user chose "proceed b").
+- **Assumptions in the plan:** recordings playable by supervisor and above (front desk only for their own calls); Appointments is an AICA page, not a hospital-system booking; one branch per organisation; the flow is an editable outline (no React Flow); the voice test call shows as not available yet; no new dependencies.
+- **Where things are:** `frontend/src/console/` (types, access map, demo client and `demo/` seeds); pages in `frontend/src/pages/console/` (`AgentsPage`, `builder/`, `agent/`). Demo data is kept per browser tab in sessionStorage (`aica.demo.console.v4`) and cleared on sign-out.
+- **Done (local commits on `feat/console-agents`):**
+  - Console frame, Agents list (`8b044ee`, `a2b0ce1`).
+  - Builder steps 0–2 (`a052d98`) and 3–7 with review fixes (`2acea1a`): source calls, type, behaviour, conversation-flow outline, details to collect, global flows, knowledge and tools, review with a simulated test chat, publish.
+  - Phase 3, agent workspace (`/o/:slug/agents/:agentId/:tab`): Flow, Behaviour and voice, Knowledge, Tools, Handoff and guardrails, Test, Versions, Settings, by role. Edits autosave as unpublished changes; publish with a note, discard, compare versions, roll back, rename, move number, pause, delete.
+- **Next phases:** 4 Call uploads, Knowledge library, Tools and integrations, Phone numbers; 5 Operate pages (Home dashboard, Live calls, Handoff queue, Callbacks, Appointments, Call history, Call detail, Reports); 6 Manage pages (Team, Activity, Settings, Billing); 7 rest of Ops and My account.
+- **For the real backend:** flow extraction should be a job (start, poll or stream, cancel) with a draft revision so autosave can't overwrite it; publishing needs an idempotency key; the workspace's working copy needs a revision too, so two editors can't overwrite each other.
+
 ## Master admin: admin@bitntech.in (2026-10-12)
 - **Done:**
   - The user created admin@bitntech.in (with a password) as bitNtech's organisation-wide master admin.

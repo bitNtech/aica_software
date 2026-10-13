@@ -1,7 +1,8 @@
 import type { AgentSummary } from '../types'
 import { ago } from './runtime'
 
-/** Sample agents. Phone numbers are deliberately undialable (+91 00000 …),
+/** Sample published agents (a half-built one is a builder draft: see
+ * demoClient's seedDrafts). Phone numbers are deliberately undialable (+91 00000 …),
  * so nobody takes a sample for a real line. */
 
 const SAMPLE_AGENTS: AgentSummary[] = [
@@ -39,18 +40,6 @@ const SAMPLE_AGENTS: AgentSummary[] = [
     version: 3,
     lastPublishedAt: ago(21),
     updatedAt: ago(9),
-    callsThisWeek: 0,
-  },
-  {
-    id: 'agt_billing',
-    name: 'Billing and insurance',
-    useCase: 'Billing status',
-    status: 'draft',
-    phoneNumber: null,
-    languages: ['english', 'tanglish'],
-    version: null,
-    lastPublishedAt: null,
-    updatedAt: ago(0.5),
     callsThisWeek: 0,
   },
 ]

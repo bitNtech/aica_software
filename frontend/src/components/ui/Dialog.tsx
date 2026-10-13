@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
 import { Button } from './Button'
 
 interface Props {
@@ -14,6 +14,8 @@ interface Props {
   error?: string | null
   onConfirm(): void
   onCancel(): void
+  /** Where focus starts instead of Cancel, e.g. a field to fill in first. */
+  initialFocus?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -21,7 +23,7 @@ interface Props {
  * so the browser traps focus, makes the page inert, closes on Escape and
  * returns focus to the button that opened it.
  */
-export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, busy, danger, error, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, busy, danger, error, onConfirm, onCancel, initialFocus }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -32,7 +34,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, 
     if (open && !d.open) {
       d.showModal()
       // Start on Cancel: the safe choice when Enter is pressed by habit.
-      cancel.current?.focus()
+      ;(initialFocus?.current ?? cancel.current)?.focus()
     }
     if (!open && d.open) d.close()
   }, [open])

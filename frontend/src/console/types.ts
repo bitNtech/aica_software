@@ -28,6 +28,8 @@ export interface AgentSummary {
   callsThisWeek: number
   /** Set while the agent is still being built: the step to continue at. */
   setupStep?: BuilderStep
+  /** Published, with saved edits not published yet. */
+  hasChanges?: boolean
 }
 
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
@@ -68,6 +70,20 @@ export interface ConsoleClient {
   listKnowledge(orgSlug: string): Promise<KnowledgeSource[]>
   listTools(orgSlug: string): Promise<AgentTool[]>
   listNumbers(orgSlug: string): Promise<PhoneNumber[]>
+
+  // ---- agent workspace (a published agent)
+  getAgent(orgSlug: string, agentId: string): Promise<AgentDetail>
+  /** Saves edits as unpublished changes; callers keep answering the live version. */
+  saveAgent(orgSlug: string, agentId: string, working: AgentSpec): Promise<AgentDetail>
+  /** Publishes the saved edits as the next version. */
+  publishAgent(orgSlug: string, agentId: string, note: string): Promise<AgentDetail>
+  /** Throws the unpublished changes away. */
+  discardAgentChanges(orgSlug: string, agentId: string): Promise<AgentDetail>
+  /** Publishes an earlier version's setup again, as the next version. */
+  rollbackAgent(orgSlug: string, agentId: string, version: number): Promise<AgentDetail>
+  /** Name, number and live/paused: they apply at once, outside versions. */
+  updateAgent(orgSlug: string, agentId: string, patch: AgentPatch): Promise<AgentDetail>
+  deleteAgent(orgSlug: string, agentId: string): Promise<void>
 
   /** Forget everything held for the previous user (demo data on sign-out). */
   reset?(): void
@@ -317,4 +333,79 @@ export interface PhoneNumber {
   afterHours: 'agent' | 'voicemail' | 'transfer'
   /** Where handoffs go. */
   transferTo: string | null
+}
+
+/* ---------------------------------------------------------------- workspace
+ * After its first publish an agent is edited in the workspace. Its setup is
+ * versioned: edits are saved as unpublished changes, and publishing makes
+ * them the next version. */
+
+/** How it sounds and listens, beyond the builder's behaviour step. */
+export interface SpeechSettings {
+  /** Words said a particular way, e.g. "Dr. Ramachandran" → "Raa-ma-chan-dran". */
+  pronunciations: { word: string; sayAs: string }[]
+  /** Words to listen out for: doctor names, departments, local places. */
+  hints: string[]
+  /** Callers can talk over the agent to cut it short. */
+  allowInterruptions: boolean
+  /** Seconds of silence before the agent checks the caller is there. */
+  silenceSec: number
+}
+
+/** When and where it hands over, and what it won't do. */
+export interface Guardrails {
+  /** Hand over after this many turns where it couldn't help. */
+  handoffAfterFailures: number
+  /** Where handovers go, in words, e.g. "Front desk, extension 100". */
+  transferTo: string
+  /** Where emergencies go. */
+  emergencyTo: string
+  /** Subjects it declines, e.g. "Diagnosis or medical advice". */
+  refuseTopics: string[]
+  /** Tells callers at the start that the call is recorded. */
+  recordingNotice: boolean
+  recordingNoticeText: string
+  /** Calls longer than this are handed over. */
+  maxCallMinutes: number
+}
+
+/** Everything that decides how an agent behaves: what a version holds. */
+export interface AgentSpec {
+  typeId: string | null
+  subTypeId: string | null
+  /** Personal details hidden in its transcripts. */
+  redact: boolean
+  behaviour: BotBehaviour
+  speech: SpeechSettings
+  flow: FlowNode[]
+  attributes: Attribute[]
+  globalFlows: GlobalFlow[]
+  context: AgentContext
+  guardrails: Guardrails
+}
+
+export interface AgentVersion {
+  version: number
+  /** ISO timestamp. */
+  publishedAt: string
+  /** Who published it, by name. */
+  publishedBy: string
+  /** What changed, in the publisher's words. */
+  note: string
+  spec: AgentSpec
+}
+
+export interface AgentDetail {
+  agent: AgentSummary
+  /** The live version's setup plus any saved edits. */
+  working: AgentSpec
+  /** Newest first. The first is the one callers get. */
+  versions: AgentVersion[]
+}
+
+export interface AgentPatch {
+  name?: string
+  status?: 'live' | 'paused'
+  /** null to free the number. */
+  numberId?: string | null
 }

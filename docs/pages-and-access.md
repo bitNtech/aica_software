@@ -7,6 +7,8 @@ a phone number. The operations pages handle the live calls the agent passes
 to staff.
 
 Status: **agreed page list, not yet built**, except where marked *Built*.
+*Built (demo)* means the page is built in the frontend on sample data
+(`console/demoClient.ts`), labelled "Demo data", with no backend yet.
 Hiding a page or button is not access control: the backend must check the
 same permissions on every request.
 
@@ -62,9 +64,9 @@ Overview, Sign-up requests, People and Audit log are *Built*.
 
 | Page | Route | What it's for | Owner | Admin | Supervisor | Front desk | Viewer |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|
-| Agents | `/o/:slug/agents` | Every agent: status (draft, live, paused), number, last published | E | E | R | – | R |
-| New agent (builder) | `/o/:slug/agents/new` | The 7-step wizard, below | E | E | – | – | – |
-| Agent workspace | `/o/:slug/agents/:agentId` | Editing after the first version, in tabs (below) | E | E | R + test | – | R |
+| Agents | `/o/:slug/agents` | Every agent: status (draft, live, paused), number, last published. *Built (demo)* | E | E | R | – | R |
+| New agent (builder) | `/o/:slug/agents/new` | The 7-step wizard, below. *Built (demo)* | E | E | – | – | – |
+| Agent workspace | `/o/:slug/agents/:agentId` | Editing after the first version, in tabs (below). *Built (demo)* | E | E | R + test | – | R |
 | Call uploads | `/o/:slug/uploads` | Upload past calls, processing status, transcripts, redaction | E | E | R | – | – |
 | Knowledge library | `/o/:slug/knowledge` | Documents, web pages, FAQs and tables (doctor schedules, prices) the agents answer from | E | E | R | – | R |
 | Tools and integrations | `/o/:slug/integrations` | Built-in tools and custom HTTP tools; credentials referenced by name, never shown | E | E | R | – | – |

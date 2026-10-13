@@ -408,7 +408,8 @@
   bottom: -1px;
   height: 3px;
   border-radius: 3px 3px 0 0;
-  background: var(--orange);
+  /* The darker orange: the plain one is under 3:1 on cream. */
+  background: var(--orange-text, var(--orange));
 }
 .tabs__tab:focus-visible, .route-tabs a:focus-visible { outline-offset: -3px; }
 .tabs__panel:focus-visible { outline-offset: 4px; border-radius: 4px; }
@@ -566,6 +567,8 @@
 .agent-row + .agent-row { border-top: 1px solid var(--line); }
 .agent-row__main { display: grid; gap: 0.2rem; min-width: 0; }
 .agent-row__name { font: 700 1rem/1.4 var(--sans); letter-spacing: normal; color: var(--ink); overflow-wrap: anywhere; }
+.agent-row__link { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.agent-row__link:hover { text-decoration-color: currentColor; }
 .agent-row__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
 .agent-row__facts dt { font: 500 0.6rem/1.6 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 .agent-row__facts dd { margin: 0; font-size: 0.9rem; color: var(--ink); overflow-wrap: anywhere; }

@@ -1,0 +1,91 @@
+/* The agent workspace: /o/:slug/agents/:agentId/:tab. Reuses the builder's
+   editors, so Builder.css is loaded with it. */
+
+.ws__crumb { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.ws__crumb:hover { color: var(--ink); }
+
+.ws__notice { margin-bottom: 1.25rem; }
+
+/* Unpublished changes: a band above the tabs. */
+.ws__changes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--warn-ink);
+  border-radius: var(--r-card);
+  background: var(--warn-bg);
+  color: var(--ink);
+}
+.ws__changes-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.ws__tabs { margin-top: 1.25rem; }
+.ws__tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  border-radius: var(--r-pill);
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ws__sections { display: grid; gap: 2.25rem; min-width: 0; }
+.ws__subhead { font-weight: 700; color: var(--ink); }
+
+.ws__publish { display: grid; gap: 1rem; }
+
+/* What changed between two setups. */
+.changes { display: grid; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.changes__area { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 0.35rem 1.25rem; padding: 0.8rem 1.1rem; }
+.changes__area + .changes__area { border-top: 1px solid var(--line); }
+.changes dt { font-weight: 700; color: var(--ink); }
+.changes dd { margin: 0; }
+.changes ul { display: grid; gap: 0.25rem; padding-left: 1.1rem; list-style: disc; color: var(--text); overflow-wrap: anywhere; }
+
+/* Published versions. */
+.versions { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.versions__item { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1.5rem; padding: 0.9rem 1.1rem; }
+.versions__item + .versions__item { border-top: 1px solid var(--line); }
+.versions__main { display: grid; gap: 0.2rem; min-width: 0; }
+.versions__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink); }
+.versions__note { color: var(--text); overflow-wrap: anywhere; }
+.versions__actions { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+
+/* Read-only views. */
+.review__row--two { grid-template-columns: 11rem minmax(0, 1fr); }
+.ws__ro-list { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.ws__ro-list li { display: grid; gap: 0.15rem; padding: 0.8rem 1.1rem; color: var(--ink); }
+.ws__ro-list li + li { border-top: 1px solid var(--line); }
+.globals__ro-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink); }
+.globals__ro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+.globals__ro dt { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.globals__ro dd { margin: 0.15rem 0 0; color: var(--text); overflow-wrap: anywhere; }
+
+.ws__unavailable { display: grid; justify-items: start; gap: 0.6rem; padding: 1.1rem; border: 1px dashed var(--line-strong); border-radius: var(--r-card); color: var(--text); }
+
+/* A field with its button beside it. */
+.ws__inline-form { display: grid; grid-template-columns: minmax(0, 26rem) auto; align-items: start; gap: 0.75rem; }
+.ws__pron-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: start; gap: 0.75rem; }
+
+.ws__ro-note { margin-bottom: 1rem; font-size: 0.9rem; color: var(--muted); }
+.ws__apply-note { margin-top: 0; }
+
+.ws__danger { padding: 1.1rem; border: 1px solid var(--danger-ink); border-radius: var(--r-card); }
+
+@media (max-width: 640px) {
+  /* Every section in view on a phone: the tabs wrap rather than scroll. */
+  .ws__tabs { flex-wrap: wrap; overflow-x: visible; }
+  .ws__tabs a { padding: 0 0.75rem; }
+  .changes__area, .review__row--two { grid-template-columns: minmax(0, 1fr); }
+  .globals__ro { grid-template-columns: minmax(0, 1fr); }
+  .ws__inline-form, .ws__pron-form { grid-template-columns: minmax(0, 1fr); }
+  .ws__inline-form .rules__button, .ws__pron-form .rules__button { margin-top: 0; justify-self: start; }
+}

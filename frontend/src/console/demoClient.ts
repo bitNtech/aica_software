@@ -1,10 +1,23 @@
 import { AuthError } from '../auth/types'
-import type { AgentDraft, AgentSummary, AgentTool, ConsoleClient, KnowledgeSource, PhoneNumber, SourceCall, SourceCallStatus } from './types'
+import type {
+  AgentDetail,
+  AgentDraft,
+  AgentSpec,
+  AgentSummary,
+  AgentTool,
+  AgentVersion,
+  ConsoleClient,
+  KnowledgeSource,
+  PhoneNumber,
+  SourceCall,
+  SourceCallStatus,
+} from './types'
 import { seedAgents } from './demo/agents'
 import { seedCalls, topicFor, transcriptFor } from './demo/calls'
 import { defaultGlobalFlows, extractAttributes, extractFlow } from './demo/extraction'
 import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, makeWait, newId } from './demo/runtime'
+import { seedDetail, specFromDraft } from './demo/specs'
 import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
 
 /**
@@ -16,13 +29,24 @@ import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v3'
+const STORE_KEY = 'aica.demo.console.v4'
+
+/** Versions kept per agent in the demo. */
+const KEEP_VERSIONS = 6
+
+/** A published agent's setup: what callers get, plus saved edits. */
+interface AgentRecord {
+  working: AgentSpec
+  versions: AgentVersion[]
+  /** Saved edits not published yet. */
+  changed: boolean
+}
 
 /** One organisation's sample data. */
 interface OrgData {
   agents: AgentSummary[]
-  /** Each agent's full configuration, in the builder's shape. */
-  configs: Record<string, AgentDraft>
+  /** Each published agent's setup and versions, seeded on first open. */
+  details: Record<string, AgentRecord>
   calls: SourceCall[]
   /** Uploaded calls: when processing started (ms), to derive their status. */
   processing: Record<string, number>
@@ -46,15 +70,39 @@ export interface DemoConsoleOptions {
 function seedOrg(slug: string): OrgData {
   return {
     agents: seedAgents(slug),
-    configs: {},
+    details: {},
     calls: seedCalls(slug),
     processing: {},
-    drafts: [],
+    drafts: seedDrafts(slug),
     knowledge: seedKnowledge(),
     tools: seedTools(),
     numbers: seedNumbers(),
     published: {},
   }
+}
+
+/** A half-built sample agent, so the list shows "Continue setup". */
+function seedDrafts(slug: string): AgentDraft[] {
+  if (seedAgents(slug).length === 0) return []
+  const calls = seedCalls(slug).filter((c) => c.topic === 'Bill and insurance')
+  return [
+    {
+      id: 'draft_billing',
+      reached: 'behaviour',
+      sourceCallIds: calls.map((c) => c.id),
+      consent: true,
+      redact: true,
+      typeId: 'hospital',
+      subTypeId: 'billing',
+      name: 'Billing and insurance',
+      behaviour: { ...defaultBehaviour('Arogya Demo Hospital'), languages: ['english', 'tanglish'], startLanguage: 'english' },
+      flow: [],
+      attributes: [],
+      globalFlows: [],
+      context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: true, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true },
+      updatedAt: new Date(Date.now() - 12 * 36e5).toISOString(),
+    },
+  ]
 }
 
 function readStore(): Record<string, OrgData> {
@@ -119,6 +167,53 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     setupStep: dr.reached,
   })
 
+  const findAgent = (o: string, id: string) => {
+    const a = org(o).agents.find((x) => x.id === id)
+    if (!a) throw notFound('agent')
+    return a
+  }
+
+  /** The agent's record, seeded the first time it's opened. */
+  const recordOf = (o: string, id: string): AgentRecord => {
+    const d = org(o)
+    const a = findAgent(o, id)
+    if (!d.details[id]) {
+      const seeded = seedDetail(o, a, d.calls)
+      if (!seeded) throw notFound('agent')
+      d.details[id] = { ...seeded, changed: false }
+    }
+    return d.details[id]
+  }
+
+  const detail = (o: string, id: string): AgentDetail => {
+    const r = recordOf(o, id)
+    return copy({ agent: { ...findAgent(o, id), hasChanges: r.changed }, working: r.working, versions: r.versions })
+  }
+
+  /** Knowledge sources list the agents whose live version uses them. */
+  const syncUsage = (d: OrgData, agentId: string, spec: AgentSpec | null) => {
+    for (const k of d.knowledge) {
+      const uses = !!spec?.context.knowledgeSourceIds.includes(k.id)
+      k.usedByAgentIds = k.usedByAgentIds.filter((x) => x !== agentId).concat(uses ? [agentId] : [])
+    }
+  }
+
+  /** Publishes `spec` as the agent's next version. */
+  const release = (o: string, id: string, spec: AgentSpec, note: string) => {
+    const d = org(o)
+    const a = findAgent(o, id)
+    const r = recordOf(o, id)
+    const now = new Date().toISOString()
+    a.version = (a.version ?? 0) + 1
+    a.lastPublishedAt = now
+    a.languages = spec.behaviour.languages
+    a.updatedAt = now
+    r.versions = [{ version: a.version, publishedAt: now, publishedBy: 'You', note, spec: copy(spec) }, ...r.versions].slice(0, KEEP_VERSIONS)
+    r.working = copy(spec)
+    r.changed = false
+    syncUsage(d, id, spec)
+  }
+
   const findDraft = (o: string, id: string) => {
     const dr = org(o).drafts.find((x) => x.id === id)
     if (!dr) throw notFound('draft')
@@ -140,7 +235,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listAgents(o) {
       await wait()
       const d = org(o)
-      return copy([...d.agents, ...d.drafts.map(draftSummary)])
+      return copy([...d.agents.map((a) => ({ ...a, hasChanges: !!d.details[a.id]?.changed })), ...d.drafts.map(draftSummary)])
     },
 
     async listCalls(o) {
@@ -289,11 +384,12 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         callsThisWeek: 0,
       }
       d.agents.push(agent)
-      d.configs[agentId] = { ...copy(dr), id: agentId, updatedAt: now }
+      const spec = specFromDraft(copy(dr))
+      d.details[agentId] = { working: copy(spec), versions: [{ version: 1, publishedAt: now, publishedBy: 'You', note: 'First version, from the builder.', spec }], changed: false }
       d.drafts = d.drafts.filter((x) => x.id !== id)
       d.published[id] = agentId
       if (number) number.agentId = agentId
-      for (const k of d.knowledge) if (dr.context.knowledgeSourceIds.includes(k.id)) k.usedByAgentIds.push(agentId)
+      syncUsage(d, agentId, spec)
       keep()
       return copy(agent)
     },
@@ -311,6 +407,91 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listNumbers(o) {
       await wait()
       return copy(org(o).numbers)
+    },
+
+    async getAgent(o, id) {
+      await wait()
+      const out = detail(o, id)
+      keep()
+      return out
+    },
+
+    async saveAgent(o, id, working) {
+      await wait()
+      const r = recordOf(o, id)
+      r.working = copy(working)
+      r.changed = JSON.stringify(working) !== JSON.stringify(r.versions[0]?.spec)
+      findAgent(o, id).updatedAt = new Date().toISOString()
+      keep()
+      return detail(o, id)
+    },
+
+    async publishAgent(o, id, note) {
+      await wait()
+      const r = recordOf(o, id)
+      if (!r.changed) throw new AuthError('invalid_input', 'There are no unpublished changes to publish.')
+      release(o, id, r.working, note.trim() || 'No note.')
+      keep()
+      return detail(o, id)
+    },
+
+    async discardAgentChanges(o, id) {
+      await wait()
+      const r = recordOf(o, id)
+      r.working = copy(r.versions[0].spec)
+      r.changed = false
+      keep()
+      return detail(o, id)
+    },
+
+    async rollbackAgent(o, id, version) {
+      await wait()
+      const v = recordOf(o, id).versions.find((x) => x.version === version)
+      if (!v) throw notFound('version')
+      release(o, id, v.spec, `Went back to version ${version}.`)
+      keep()
+      return detail(o, id)
+    },
+
+    async updateAgent(o, id, patch) {
+      await wait()
+      const d = org(o)
+      const a = findAgent(o, id)
+      // Check everything first: a refused patch changes nothing.
+      const name = patch.name?.trim()
+      if (name !== undefined) {
+        if (name.length < 3 || name.length > 60) throw new AuthError('invalid_input', 'Give the agent a name of 3 to 60 characters.')
+        if (d.agents.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw new AuthError('invalid_input', `Another agent is already called “${name}”.`)
+      }
+      const next = patch.numberId ? d.numbers.find((n) => n.id === patch.numberId) : null
+      if (patch.numberId && !next) throw notFound('phone number')
+      if (next?.agentId && next.agentId !== id) throw new AuthError('invalid_input', `${next.number} already has an agent. Choose a free number.`)
+      const number = patch.numberId !== undefined ? (next?.number ?? null) : a.phoneNumber
+      if (patch.status === 'live' && !number) throw new AuthError('invalid_input', 'Give the agent a phone number before turning it on.')
+
+      if (name !== undefined) a.name = name
+      if (patch.numberId !== undefined) {
+        for (const n of d.numbers) if (n.agentId === id) n.agentId = null
+        if (next) next.agentId = id
+        a.phoneNumber = number
+        // No number, nothing to answer.
+        if (!number) a.status = 'paused'
+      }
+      if (patch.status) a.status = patch.status
+      a.updatedAt = new Date().toISOString()
+      keep()
+      return detail(o, id)
+    },
+
+    async deleteAgent(o, id) {
+      await wait()
+      const d = org(o)
+      findAgent(o, id)
+      d.agents = d.agents.filter((x) => x.id !== id)
+      for (const n of d.numbers) if (n.agentId === id) n.agentId = null
+      syncUsage(d, id, null)
+      delete d.details[id]
+      keep()
     },
   }
 }

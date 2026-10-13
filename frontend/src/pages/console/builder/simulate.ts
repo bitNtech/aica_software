@@ -25,6 +25,9 @@ export interface SimState {
 
 export const SIM_START: SimState = { intentId: null, next: 0 }
 
+/** What the simulator needs: a builder draft or a published agent's setup. */
+export type SimAgent = Pick<AgentDraft, 'behaviour' | 'flow' | 'globalFlows' | 'context'>
+
 const GLOBAL_WORDS: [GlobalFlowKind, RegExp][] = [
   ['emergency', /chest pain|breath|bleed|accident|unconscious|emergency|faint|stroke/i],
   ['handoff', /\b(person|human|staff|someone|operator|reception(ist)?)\b|talk to/i],
@@ -65,7 +68,7 @@ function bestIntent(flow: FlowNode[], message: string): FlowNode | null {
   return best
 }
 
-export function simulate(draft: AgentDraft, tools: AgentTool[], knowledge: KnowledgeSource[], state: SimState, message: string): { reply: SimReply; state: SimState } {
+export function simulate(draft: SimAgent, tools: AgentTool[], knowledge: KnowledgeSource[], state: SimState, message: string): { reply: SimReply; state: SimState } {
   const global = (kind: GlobalFlowKind) => draft.globalFlows.find((g) => g.kind === kind && g.enabled)
 
   const asking = bestIntent(draft.flow, message)
