@@ -13,6 +13,10 @@ export function ConsoleProvider({ client, children }: { client: ConsoleClient; c
   const who = status === 'restoring' ? undefined : (user?.id ?? null)
   const last = useRef<string | null | undefined>(undefined)
 
+  // Who's asking, before any page below fetches (their effects run before
+  // this component's own). Setting it again with the same person is harmless.
+  client.setViewer?.(user ? { id: user.id, name: user.name, roles: Object.fromEntries(user.memberships.map((m) => [m.orgSlug, m.role])) } : null)
+
   useEffect(() => {
     if (who === undefined) return
     if (last.current !== undefined && last.current !== who) client.reset?.()

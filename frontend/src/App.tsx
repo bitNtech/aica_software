@@ -14,6 +14,13 @@ import KnowledgePage from './pages/console/library/KnowledgePage'
 import NumbersPage from './pages/console/library/NumbersPage'
 import ToolsPage from './pages/console/library/ToolsPage'
 import UploadsPage from './pages/console/library/UploadsPage'
+import AppointmentsPage from './pages/console/operate/AppointmentsPage'
+import CallDetailPage from './pages/console/operate/CallDetailPage'
+import CallHistoryPage from './pages/console/operate/CallHistoryPage'
+import ReportsPage from './pages/console/operate/ReportsPage'
+import CallbacksPage from './pages/console/operate/CallbacksPage'
+import HandoffsPage from './pages/console/operate/HandoffsPage'
+import LiveCallsPage from './pages/console/operate/LiveCallsPage'
 import NewAgentPage from './pages/console/builder/NewAgentPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
@@ -76,6 +83,13 @@ export default function App() {
         <Route path="knowledge" element={org('knowledge', <KnowledgePage />)} />
         <Route path="integrations" element={org('integrations', <ToolsPage />)} />
         <Route path="numbers" element={org('numbers', <NumbersPage />)} />
+        <Route path="live" element={org('live', <LiveCallsPage />)} />
+        <Route path="handoffs" element={org('handoffs', <HandoffsPage />)} />
+        <Route path="callbacks" element={org('callbacks', <CallbacksPage />)} />
+        <Route path="appointments" element={org('appointments', <AppointmentsPage />)} />
+        <Route path="calls" element={org('calls', <CallHistoryPage />)} />
+        <Route path="calls/:callId" element={org('calls', <CallDetailPage />)} />
+        <Route path="reports" element={org('reports', <ReportsPage />)} />
       </Route>
 
       {/* bitNtech: master admin and staff */}

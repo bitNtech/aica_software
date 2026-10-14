@@ -14,6 +14,8 @@ interface Props {
   error?: string | null
   onConfirm(): void
   onCancel(): void
+  /** The dismiss button, when "Cancel" would clash, e.g. "Keep it" beside "Cancel appointment". */
+  cancelLabel?: string
   /** Where focus starts instead of Cancel, e.g. a field to fill in first. */
   initialFocus?: RefObject<HTMLElement | null>
 }
@@ -23,7 +25,7 @@ interface Props {
  * so the browser traps focus, makes the page inert, closes on Escape and
  * returns focus to the button that opened it.
  */
-export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, busy, danger, error, onConfirm, onCancel, initialFocus }: Props) {
+export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, busy, danger, error, onConfirm, onCancel, initialFocus, cancelLabel = 'Cancel' }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -73,7 +75,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busyLabel, 
           {confirmLabel}
         </Button>
         <Button ref={cancel} variant="line" size="sm" onClick={onCancel} disabled={busy}>
-          Cancel
+          {cancelLabel}
         </Button>
       </div>
     </dialog>

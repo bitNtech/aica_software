@@ -8,7 +8,8 @@ export function SegFilter<K extends string>({
   onChange,
 }: {
   legend: string
-  options: { value: K; label: string; count: number }[]
+  /** `count` shows how many each option would show, when that helps. */
+  options: { value: K; label: string; count?: number }[]
   value: K
   onChange(next: K): void
 }) {
@@ -21,7 +22,8 @@ export function SegFilter<K extends string>({
           <label key={o.value} className="seg__opt">
             <input type="radio" name={name} value={o.value} checked={value === o.value} onChange={() => onChange(o.value)} />
             <span>
-              {o.label} <span className="seg__n">{o.count}</span>
+              {o.label}
+              {o.count !== undefined && <span className="seg__n"> {o.count}</span>}
             </span>
           </label>
         ))}

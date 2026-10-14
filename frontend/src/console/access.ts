@@ -182,6 +182,17 @@ export const NAV: NavSection[] = [
       { page: 'numbers', label: 'Phone numbers', path: 'numbers', description: 'Your lines, the agent on each, and its hours.' },
     ],
   },
+  {
+    heading: 'Operate',
+    items: [
+      { page: 'live', label: 'Live calls', path: 'live', description: 'Calls the agents are on now.' },
+      { page: 'handoffs', label: 'Handoff queue', path: 'handoffs', description: 'Callers waiting for a person.' },
+      { page: 'callbacks', label: 'Callbacks', path: 'callbacks', description: 'Missed calls and people to call back.' },
+      { page: 'appointments', label: 'Appointments', path: 'appointments', description: 'Bookings made on calls, to check.' },
+      { page: 'calls', label: 'Call history', path: 'calls', description: 'Every call, with its transcript and what happened.' },
+      { page: 'reports', label: 'Reports', path: 'reports', description: 'Calls, answers and handovers over time.' },
+    ],
+  },
 ]
 
 export function navFor(role: Role): NavSection[] {

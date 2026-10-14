@@ -1,0 +1,96 @@
+/* Charts. Series colours: the first three slots of the reference
+   categorical palette, validated (scripts/validate_palette.js) against this
+   app's card colours: light #fbf8f2 passes every check, with slot 3 under
+   3:1 contrast, so every chart also has labels or a table; dark #1c1918
+   passes every check. Fixed order: slot = identity, never rank. */
+
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --chart-grid: rgba(43, 18, 51, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-grid: rgba(247, 243, 237, 0.1);
+  }
+}
+
+.chart { display: grid; gap: 0.6rem; margin: 0; min-width: 0; }
+.chart__box { position: relative; min-width: 0; }
+.chart__svg { display: block; overflow: visible; border-radius: 6px; }
+.chart__svg:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 4px; }
+.chart__grid { stroke: var(--chart-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.chart__tick { fill: var(--muted); font: 500 11px/1 var(--sans); font-variant-numeric: tabular-nums; }
+.chart__mark--1 { fill: var(--series-1); }
+.chart__mark--2 { fill: var(--series-2); }
+.chart__mark--3 { fill: var(--series-3); }
+.chart__col { transition: opacity 0.15s var(--ease); }
+.chart__col.is-dim { opacity: 0.45; }
+.chart__cross { stroke: var(--muted); stroke-width: 1; shape-rendering: crispEdges; }
+
+.chart__tip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: grid;
+  gap: 0.15rem;
+  min-width: 9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.chart__tip-title { font-weight: 700; color: var(--ink); }
+.chart__tip-row { display: flex; align-items: center; gap: 0.4rem; }
+.chart__tip-row strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.chart__key { width: 12px; height: 2px; border-radius: 2px; }
+.chart__key--1 { background: var(--series-1); }
+.chart__key--2 { background: var(--series-2); }
+.chart__key--3 { background: var(--series-3); }
+
+.chart__legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; font-size: 0.85rem; color: var(--text); }
+.chart__legend li { display: inline-flex; align-items: center; gap: 0.45rem; }
+.chart__swatch { width: 12px; height: 12px; border-radius: 3px; }
+.chart__swatch--1 { background: var(--series-1); }
+.chart__swatch--2 { background: var(--series-2); }
+.chart__swatch--3 { background: var(--series-3); }
+
+.chart__foot { display: grid; gap: 0.6rem; }
+.chart__foot > .btn-text { justify-self: start; }
+.chart__scroll { overflow-x: auto; }
+.chart__scroll:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 2px; }
+.chart__table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+.chart__table th, .chart__table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); text-align: right; }
+.chart__table th:first-child { text-align: left; }
+.chart__table thead th { font-weight: 600; color: var(--muted); }
+.chart__table tbody th { font-weight: 500; color: var(--ink); }
+
+/* Labelled bars: one series, the value at each bar's tip. */
+.barlist { display: grid; gap: 0.55rem; }
+.barlist__row { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) 3.5rem; align-items: center; gap: 0.75rem; }
+.barlist__label { color: var(--ink); font-size: 0.9rem; overflow-wrap: anywhere; }
+.barlist__track { height: 14px; }
+.barlist__bar { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.barlist__value { font: 600 0.9rem/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+
+@media (forced-colors: active) {
+  .chart__mark--1, .chart__mark--2, .chart__mark--3 { fill: CanvasText; }
+  .chart__mark--2 { fill: GrayText; }
+  .chart__mark--3 { fill: Highlight; }
+  .barlist__bar, .chart__swatch, .chart__key { forced-color-adjust: none; background: CanvasText; }
+  /* The key matches the marks above. */
+  .chart__swatch--2, .chart__key--2 { background: GrayText; }
+  .chart__swatch--3, .chart__key--3 { background: Highlight; }
+}
+@media (max-width: 640px) {
+  .barlist__row { grid-template-columns: minmax(0, 1fr) 3rem; }
+  .barlist__track { grid-column: 1 / -1; grid-row: 2; }
+}

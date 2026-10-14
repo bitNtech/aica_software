@@ -102,14 +102,14 @@ Overview, Sign-up requests, People and Audit log are *Built*.
 
 | Page | Route | What it's for | Owner | Admin | Supervisor | Front desk | Viewer |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|
-| Home | `/o/:slug` | Today at a glance; front desk sees the handoff queue first | R | R | R | R | R |
-| Live calls | `/o/:slug/live` | Calls in progress, live transcript, intent; listen or take over | E | E | E | E | – |
-| Handoff queue | `/o/:slug/handoffs` | Calls the agent passed to a person, waiting now, with the agent's summary | E | E | E | E | – |
-| Callbacks | `/o/:slug/callbacks` | Missed calls and callback requests: assign, mark done or not reachable | E | E | E | O | – |
-| Appointments | `/o/:slug/appointments` | Bookings and reschedules made on calls, to confirm or correct | E | E | E | E | R |
-| Call history | `/o/:slug/calls` | Search and filter every call | R | R | R | O | R |
-| Call detail | `/o/:slug/calls/:callId` | Transcript, path through the flow, tool calls, attributes collected, outcome, notes | R + notes | R + notes | R + notes | O + notes | R |
-| Reports | `/o/:slug/reports` | Volume, share handled by the agent, handoffs, peak hours, languages, top intents, drop-off by node; CSV export | R + export | R + export | R + export | – | R |
+| Home | `/o/:slug` | Today at a glance; front desk sees the handoff queue first. *Built (demo)* | R | R | R | R | R |
+| Live calls | `/o/:slug/live` | Calls in progress, live transcript, intent; listen or take over. *Built (demo)* | E | E | E | E | – |
+| Handoff queue | `/o/:slug/handoffs` | Calls the agent passed to a person, waiting now, with the agent's summary. *Built (demo)* | E | E | E | E | – |
+| Callbacks | `/o/:slug/callbacks` | Missed calls and callback requests: assign, mark done or not reachable. *Built (demo)* | E | E | E | O | – |
+| Appointments | `/o/:slug/appointments` | Bookings and reschedules made on calls, to confirm or correct. *Built (demo)* | E | E | E | E | R |
+| Call history | `/o/:slug/calls` | Search and filter every call. *Built (demo)* | R | R | R | O | R |
+| Call detail | `/o/:slug/calls/:callId` | Transcript, path through the flow, tool calls, attributes collected, outcome, notes. *Built (demo)* | R + notes | R + notes | R + notes | O + notes | R |
+| Reports | `/o/:slug/reports` | Volume, share handled by the agent, handoffs, peak hours, languages, top intents, drop-off by node; CSV export. *Built (demo)* | R + export | R + export | R + export | – | R |
 
 ### 3.3 Manage
 

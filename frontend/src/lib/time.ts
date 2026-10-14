@@ -21,3 +21,9 @@ export function timeAgo(iso: string, now = Date.now()): string {
   const d = Math.floor(h / 24)
   return d < 30 ? `${d} day${d === 1 ? '' : 's'} ago` : `on ${shortDate(iso)}`
 }
+
+/** yyyy-mm-dd for a day from today, in local time (0 today, 1 tomorrow). */
+export function localDay(offset = 0, now = Date.now()): string {
+  const d = new Date(now + offset * 864e5)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

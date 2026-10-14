@@ -1,4 +1,4 @@
-import type { Language } from '../auth/types'
+import type { Language, Role } from '../auth/types'
 
 /**
  * The organisation console's data, as the pages expect it. Provisional: the
@@ -118,8 +118,42 @@ export interface ConsoleClient {
   updateAgent(orgSlug: string, agentId: string, patch: AgentPatch): Promise<AgentDetail>
   deleteAgent(orgSlug: string, agentId: string): Promise<void>
 
+  // ---- operate: calls as they happen, and after
+  listLiveCalls(orgSlug: string): Promise<LiveCall[]>
+  /** Puts the caller through to the person asking (their desk phone). */
+  takeOverCall(orgSlug: string, callId: string): Promise<LiveCall>
+  listHandoffs(orgSlug: string): Promise<Handoff[]>
+  /** The person asking takes the waiting caller. */
+  takeHandoff(orgSlug: string, id: string): Promise<Handoff>
+  /** The caller hung up before anyone answered: turn it into a callback. */
+  handoffToCallback(orgSlug: string, id: string): Promise<Callback>
+  /** Front desk see their own and unassigned ones; others see all. */
+  listCallbacks(orgSlug: string): Promise<Callback[]>
+  updateCallback(orgSlug: string, id: string, patch: CallbackPatch): Promise<Callback>
+  listAppointments(orgSlug: string, from: string, to: string): Promise<Appointment[]>
+  updateAppointment(orgSlug: string, id: string, patch: AppointmentPatch): Promise<Appointment>
+  /** Front desk see only calls they handled. */
+  listCallLog(orgSlug: string, query: CallQuery): Promise<CallLogPage>
+  getCallRecord(orgSlug: string, id: string): Promise<CallRecord>
+  addCallNote(orgSlug: string, callId: string, text: string): Promise<CallNote>
+  getReport(orgSlug: string, query: ReportQuery): Promise<Report>
+
+  // ---- people
+  /** The organisation's team, for assigning work (and the Team page). */
+  listMembers(orgSlug: string): Promise<Member[]>
+
+  /** Who is using the console, for "by" fields and what front desk see.
+   * A real server knows this from the session. */
+  setViewer?(viewer: Viewer | null): void
   /** Forget everything held for the previous user (demo data on sign-out). */
   reset?(): void
+}
+
+export interface Viewer {
+  id: string
+  name: string
+  /** Their role in each organisation, by slug. */
+  roles: Record<string, Role>
 }
 
 /* ---------------------------------------------------------------- builder
@@ -508,4 +542,217 @@ export interface AgentPatch {
   status?: 'live' | 'paused'
   /** null to free the number. */
   numberId?: string | null
+}
+
+/* ---------------------------------------------------------------- operate
+ * Calls as they happen and after: live calls, the handoff queue, callbacks,
+ * appointments booked on calls, the call log and reports. */
+
+export type CallOutcome = 'resolved' | 'booked' | 'handed_over' | 'callback' | 'dropped' | 'emergency'
+
+export interface Member {
+  id: string
+  name: string
+  email: string
+  role: Role
+  /** ISO timestamp, or null if they've never signed in. */
+  lastActiveAt: string | null
+  status: 'active' | 'invited' | 'disabled'
+}
+
+export interface LiveCall {
+  id: string
+  agentId: string
+  agentName: string
+  /** The line it came in on, formatted. */
+  line: string
+  /** Masked, e.g. "+91 ••••• 43210". */
+  callerPhone: string
+  startedAt: string
+  language: Language | 'mixed'
+  /** What the caller wants, once the agent knows. */
+  intent: string | null
+  /** Where in the flow the agent is now. */
+  step: string | null
+  /** The conversation so far. */
+  turns: TranscriptTurn[]
+  /** The caller sounds upset or stuck: worth a person's ear. */
+  flagged: boolean
+  /** Who took it over, by name, once someone has. */
+  takenBy: string | null
+}
+
+export interface CollectedDetail {
+  label: string
+  value: string
+  personal: boolean
+}
+
+export interface Handoff {
+  id: string
+  callId: string
+  agentName: string
+  line: string
+  callerPhone: string
+  /** Why the agent handed over, in words. */
+  reason: string
+  /** The agent's summary of the call so far. */
+  summary: string
+  details: CollectedDetail[]
+  language: Language | 'mixed'
+  waitingSince: string
+  status: 'waiting' | 'taken' | 'missed'
+  takenBy: string | null
+  takenAt: string | null
+  emergency: boolean
+}
+
+export interface Callback {
+  id: string
+  callerName: string | null
+  /** In full: whoever calls back needs it. */
+  callerPhone: string
+  reason: string
+  requestedAt: string
+  /** When to call back by. */
+  dueBy: string
+  assignedTo: { id: string; name: string } | null
+  status: 'open' | 'done' | 'unreachable'
+  /** Times tried without reaching them. */
+  attempts: number
+  notes: CallNote[]
+  /** The call it came from, if any. */
+  callId: string | null
+}
+
+export interface CallbackPatch {
+  /** A member's id, or null to unassign. */
+  assignedTo?: string | null
+  /** A try: reached them (done), or no answer (three of those: unreachable). */
+  attempt?: 'reached' | 'no_answer'
+  /** Back to open, e.g. after "done" by mistake. */
+  reopen?: boolean
+  note?: string
+}
+
+export type AppointmentStatus = 'needs_check' | 'booked' | 'confirmed' | 'cancelled'
+
+export interface Appointment {
+  id: string
+  patientName: string
+  phone: string
+  department: string
+  doctor: string
+  /** yyyy-mm-dd and HH:mm, local to the hospital. */
+  date: string
+  time: string
+  status: AppointmentStatus
+  /** Why it needs a check, e.g. "The caller wasn't sure of the date." */
+  checkReason?: string
+  bookedBy: 'agent' | 'staff'
+  agentName: string | null
+  callId: string | null
+  createdAt: string
+  note?: string
+}
+
+export interface AppointmentPatch {
+  status?: AppointmentStatus
+  date?: string
+  time?: string
+  department?: string
+  doctor?: string
+  note?: string
+}
+
+export interface CallNote {
+  id: string
+  by: string
+  at: string
+  text: string
+}
+
+export interface CallQuery {
+  /** Last this many days (1 = today). */
+  days: 1 | 7 | 30 | 90
+  agentId?: string
+  outcome?: CallOutcome
+  /** Matches the caller's number, name, intent or agent. */
+  q?: string
+  /** Up to this many, newest first. */
+  limit?: number
+}
+
+export interface CallSummary {
+  id: string
+  agentId: string
+  agentName: string
+  line: string
+  callerPhone: string
+  callerName: string | null
+  startedAt: string
+  durationSec: number
+  language: Language | 'mixed'
+  intent: string
+  outcome: CallOutcome
+  /** The person who took it over, if anyone. */
+  handledBy: string | null
+}
+
+export interface CallLogPage {
+  calls: CallSummary[]
+  /** All matches, of which `calls` is the newest. */
+  total: number
+}
+
+export interface ToolCallRecord {
+  name: string
+  ok: boolean
+  /** What it did or returned, in words. */
+  summary: string
+  /** Seconds from the start of the call. */
+  at: number
+}
+
+export interface CallRecord extends CallSummary {
+  /** The agent's summary. */
+  summary: string
+  /** The flow steps it went through, in order. */
+  path: string[]
+  details: CollectedDetail[]
+  toolCalls: ToolCallRecord[]
+  knowledgeUsed: string[]
+  transcript: TranscriptTurn[]
+  notes: CallNote[]
+  /** The recording can be played (the demo has none). */
+  hasRecording: boolean
+  /** Id of the person who took it over, for "own" access. */
+  handledById: string | null
+}
+
+export interface ReportQuery {
+  days: 1 | 7 | 30 | 90
+  agentId?: string
+}
+
+export interface ReportDay {
+  /** yyyy-mm-dd */
+  date: string
+  resolved: number
+  handedOver: number
+  dropped: number
+}
+
+export interface Report {
+  days: number
+  totals: { calls: number; byAgent: number; handedOver: number; dropped: number; avgDurationSec: number }
+  /** The same, for the period before, to compare. */
+  previous: { calls: number; byAgent: number; handedOver: number; dropped: number; avgDurationSec: number }
+  byDay: ReportDay[]
+  /** Calls per hour of the day, 0–23. */
+  byHour: number[]
+  languages: { language: Language | 'mixed'; calls: number }[]
+  intents: { label: string; calls: number; byAgent: number }[]
+  /** Where callers hung up or were handed over, by flow step. */
+  dropOff: { step: string; calls: number }[]
 }

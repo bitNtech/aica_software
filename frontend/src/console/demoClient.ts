@@ -6,8 +6,14 @@ import type {
   AgentSummary,
   AgentTool,
   AgentVersion,
+  Appointment,
+  Callback,
+  CallNote,
   ConsoleClient,
   Credential,
+  Handoff,
+  Member,
+  Viewer,
   FlowNode,
   KnowledgeSource,
   PhoneNumber,
@@ -18,9 +24,10 @@ import { seedAgents } from './demo/agents'
 import { seedCalls, topicFor, transcriptFor } from './demo/calls'
 import { defaultGlobalFlows, extractAttributes, extractFlow } from './demo/extraction'
 import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
-import { copy, makeWait, newId } from './demo/runtime'
+import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
 import { passagesOf, search, seedCredentials } from './demo/passages'
+import { callLog, callRecord, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LogContext, type Pauses } from './demo/operations'
 import { checkTool } from './toolRules'
 import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
 
@@ -33,7 +40,7 @@ import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v5'
+const STORE_KEY = 'aica.demo.console.v7'
 
 /** Versions kept per agent in the demo. */
 const KEEP_VERSIONS = 6
@@ -63,6 +70,16 @@ interface OrgData {
   /** Knowledge being (re)indexed: when it started (ms). */
   indexing: Record<string, number>
   credentials: Credential[]
+  members: Member[]
+  handoffs: Handoff[]
+  callbacks: Callback[]
+  appointments: Appointment[]
+  /** Notes people added to past calls, by call id. */
+  callNotes: Record<string, CallNote[]>
+  /** Live calls someone took over: id → their name. */
+  liveTaken: Record<string, string>
+  /** When each agent was paused, so the call log has no calls then. */
+  pauses: Pauses
 }
 
 export interface DemoConsoleOptions {
@@ -87,6 +104,14 @@ function seedOrg(slug: string): OrgData {
     published: {},
     indexing: {},
     credentials: seedCredentials(),
+    members: seedMembers(slug),
+    handoffs: seedHandoffs(slug),
+    callbacks: seedCallbacks(slug),
+    appointments: seedAppointments(slug),
+    callNotes: {},
+    liveTaken: {},
+    // The sample lab agent was paused 9 days ago.
+    pauses: Object.fromEntries(seedAgents(slug).filter((a) => a.status === 'paused').map((a) => [a.id, [{ from: Date.now() - 9 * DAY, to: null }]])),
   }
 }
 
@@ -112,6 +137,12 @@ function seedDrafts(slug: string): AgentDraft[] {
       updatedAt: new Date(Date.now() - 12 * 36e5).toISOString(),
     },
   ]
+}
+
+const startPause = (d: OrgData, id: string) => (d.pauses[id] ??= []).push({ from: Date.now(), to: null })
+const endPause = (d: OrgData, id: string) => {
+  const open = d.pauses[id]?.find((p) => p.to === null)
+  if (open) open.to = Date.now()
 }
 
 function readStore(): Record<string, OrgData> {
@@ -264,7 +295,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     a.lastPublishedAt = now
     a.languages = spec.behaviour.languages
     a.updatedAt = now
-    r.versions = [{ version: a.version, publishedAt: now, publishedBy: 'You', note, spec: copy(spec) }, ...r.versions].slice(0, KEEP_VERSIONS)
+    r.versions = [{ version: a.version, publishedAt: now, publishedBy: by(), note, spec: copy(spec) }, ...r.versions].slice(0, KEEP_VERSIONS)
     r.working = copy(spec)
     r.changed = false
     syncUsage(d, id, spec)
@@ -276,8 +307,49 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     return dr
   }
 
+  /** Who's using the console (a real server knows this from the session). */
+  let viewer: Viewer | null = null
+  const by = () => viewer?.name ?? 'You'
+  const roleIn = (o: string) => viewer?.roles[o]
+
+  /** The roles that handle calls (Live calls, Handoffs, Callbacks, Appointments). */
+  const HANDLERS = ['owner', 'admin', 'supervisor', 'front_desk']
+  /** Refuses roles not in `roles`, as the server will. (No viewer set, as in
+   * some tests: allowed.) */
+  const allow = (o: string, roles: string[], what: string) => {
+    const role = roleIn(o)
+    if (viewer && (!role || !roles.includes(role))) throw new AuthError('forbidden', `Your role can’t ${what}.`)
+  }
+  /** A logged call by id, if it exists. */
+  const findCall = (o: string, id: string) => {
+    const m = /^call_(\d+)_\d+$/.exec(id)
+    const day = m ? Number(m[1]) : NaN
+    // Call ids carry their IST day number (see operations.ts).
+    const days = Math.floor((Date.now() + 5.5 * 36e5) / DAY) - day + 1
+    return Number.isFinite(day) && days >= 1 && days <= 400 ? callLog(logContext(o), days).find((c) => c.id === id) : undefined
+  }
+
+  const logContext = (o: string): LogContext => {
+    const d = org(o)
+    return { orgSlug: o, paused: new Set(d.agents.filter((a) => a.status === 'paused').map((a) => a.id)), pauses: d.pauses }
+  }
+  const findCallback = (o: string, id: string) => {
+    const c = org(o).callbacks.find((x) => x.id === id)
+    if (!c) throw notFound('callback')
+    return c
+  }
+  const findHandoff = (o: string, id: string) => {
+    const h = org(o).handoffs.find((x) => x.id === id)
+    if (!h) throw notFound('handover')
+    return h
+  }
+
   return {
     isDemo: true,
+
+    setViewer(v) {
+      viewer = v
+    },
 
     reset() {
       orgs = {}
@@ -291,7 +363,10 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listAgents(o) {
       await wait()
       const d = org(o)
-      return copy([...d.agents.map((a) => ({ ...a, hasChanges: !!d.details[a.id]?.changed })), ...d.drafts.map(draftSummary)])
+      // This week's calls, from the same call log the Operate pages show.
+      const week = callLog(logContext(o), 7)
+      const calls = (id: string) => week.filter((c) => c.agentId === id).length
+      return copy([...d.agents.map((a) => ({ ...a, callsThisWeek: calls(a.id), hasChanges: !!d.details[a.id]?.changed })), ...d.drafts.map(draftSummary)])
     },
 
     async listCalls(o) {
@@ -452,7 +527,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       }
       d.agents.push(agent)
       const spec = specFromDraft(copy(dr))
-      d.details[agentId] = { working: copy(spec), versions: [{ version: 1, publishedAt: now, publishedBy: 'You', note: 'First version, from the builder.', spec }], changed: false }
+      d.details[agentId] = { working: copy(spec), versions: [{ version: 1, publishedAt: now, publishedBy: by(), note: 'First version, from the builder.', spec }], changed: false }
       d.drafts = d.drafts.filter((x) => x.id !== id)
       d.published[id] = agentId
       if (number) number.agentId = agentId
@@ -637,7 +712,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (!/^[A-Z][A-Z0-9_]{2,39}$/.test(key)) throw new AuthError('invalid_input', 'Use 3 to 40 capital letters, digits and underscores, starting with a letter, e.g. HIS_API_KEY.')
       if (!value.trim()) throw new AuthError('invalid_input', 'Paste the secret’s value.')
       // The demo keeps only that it was set, never the value.
-      const c: Credential = { name: key, setAt: new Date().toISOString(), setBy: 'You' }
+      const c: Credential = { name: key, setAt: new Date().toISOString(), setBy: by() }
       d.credentials = [...d.credentials.filter((x) => x.name !== key), c].sort((a, b) => a.name.localeCompare(b.name))
       keep()
       return copy(c)
@@ -766,8 +841,13 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         if (next) next.agentId = id
         a.phoneNumber = number
         // No number, nothing to answer.
-        if (!number) a.status = 'paused'
+        if (!number) {
+          if (a.status !== 'paused') startPause(d, id)
+          a.status = 'paused'
+        }
       }
+      if (patch.status === 'paused' && a.status !== 'paused') startPause(d, id)
+      if (patch.status === 'live' && a.status === 'paused') endPause(d, id)
       if (patch.status) a.status = patch.status
       a.updatedAt = new Date().toISOString()
       keep()
@@ -783,6 +863,187 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       syncUsage(d, id, null)
       delete d.details[id]
       keep()
+    },
+
+    async listMembers(o) {
+      await wait()
+      return copy(org(o).members)
+    },
+
+    async listLiveCalls(o) {
+      await wait()
+      allow(o, HANDLERS, 'see live calls')
+      const d = org(o)
+      return copy(liveCalls(o, d.liveTaken, logContext(o).paused))
+    },
+
+    async takeOverCall(o, id) {
+      await wait()
+      allow(o, HANDLERS, 'take calls')
+      const d = org(o)
+      const call = liveCalls(o, d.liveTaken, logContext(o).paused).find((c) => c.id === id)
+      if (!call) throw new AuthError('invalid_input', 'That call has ended.')
+      if (call.takenBy && call.takenBy !== by()) throw new AuthError('invalid_input', `${call.takenBy} has already taken this call.`)
+      d.liveTaken[id] = by()
+      keep()
+      return copy({ ...call, takenBy: by() })
+    },
+
+    async listHandoffs(o) {
+      await wait()
+      allow(o, HANDLERS, 'see the handoff queue')
+      return copy([...org(o).handoffs].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince)))
+    },
+
+    async takeHandoff(o, id) {
+      await wait()
+      allow(o, HANDLERS, 'take calls')
+      const h = findHandoff(o, id)
+      if (h.status === 'taken') throw new AuthError('invalid_input', `${h.takenBy} has already taken this call.`)
+      if (h.status === 'missed') throw new AuthError('invalid_input', 'The caller hung up. Make it a callback instead.')
+      h.status = 'taken'
+      h.takenBy = by()
+      h.takenAt = new Date().toISOString()
+      keep()
+      return copy(h)
+    },
+
+    async handoffToCallback(o, id) {
+      await wait()
+      allow(o, HANDLERS, 'make callbacks')
+      const d = org(o)
+      const h = findHandoff(o, id)
+      if (h.status === 'taken') throw new AuthError('invalid_input', `${h.takenBy} has already taken this call.`)
+      if (h.status === 'missed') throw new AuthError('invalid_input', 'This caller already has a callback. It’s on the Callbacks page.')
+      h.status = 'missed'
+      const name = h.details.find((x) => x.label === 'Patient name')?.value ?? null
+      const now = new Date().toISOString()
+      const cb: Callback = {
+        id: newId('cb'),
+        callerName: name,
+        // The full number: whoever calls back needs it. (The queue shows it
+        // masked; a real server has it. The demo makes the hidden part up.)
+        callerPhone: `+91 9${h.callerPhone.slice(-5, -1)} ${h.callerPhone.slice(-5)}`,
+        reason: h.summary,
+        requestedAt: now,
+        dueBy: new Date(Date.now() + 2 * 36e5).toISOString(),
+        assignedTo: viewer && roleIn(o) ? { id: viewer.id, name: viewer.name } : null,
+        status: 'open',
+        attempts: 0,
+        notes: [],
+        callId: h.callId,
+      }
+      d.callbacks.unshift(cb)
+      keep()
+      return copy(cb)
+    },
+
+    async listCallbacks(o) {
+      await wait()
+      const d = org(o)
+      // Front desk see theirs, and ones nobody has yet.
+      const own = roleIn(o) === 'front_desk'
+      return copy(d.callbacks.filter((c) => !own || !c.assignedTo || c.assignedTo.id === viewer?.id))
+    },
+
+    async updateCallback(o, id, patch) {
+      await wait()
+      allow(o, HANDLERS, 'change callbacks')
+      const d = org(o)
+      const c = findCallback(o, id)
+      // Front desk change only their own, or take one nobody has.
+      if (roleIn(o) === 'front_desk' && c.assignedTo && c.assignedTo.id !== viewer?.id)
+        throw new AuthError('forbidden', `This callback is ${c.assignedTo.name}’s. Ask a supervisor to move it.`)
+      const member = patch.assignedTo ? d.members.find((m) => m.id === patch.assignedTo && m.status === 'active') : null
+      if (patch.assignedTo && !member) throw notFound('team member')
+      if (member && member.role === 'viewer') throw new AuthError('invalid_input', `${member.name} is a viewer and can’t make calls for the team.`)
+      if (roleIn(o) === 'front_desk' && patch.assignedTo !== undefined && patch.assignedTo !== viewer?.id)
+        throw new AuthError('forbidden', 'Front desk can take callbacks for themselves, not assign them to others.')
+      if (patch.note !== undefined && !patch.note.trim() && !patch.attempt) throw new AuthError('invalid_input', 'Write the note first.')
+
+      if (patch.assignedTo !== undefined) c.assignedTo = member ? { id: member.id, name: member.name } : null
+      if (patch.reopen) c.status = 'open'
+      if (patch.attempt === 'reached') c.status = 'done'
+      if (patch.attempt === 'no_answer') {
+        c.attempts += 1
+        if (c.attempts >= 3) c.status = 'unreachable'
+      }
+      const text = patch.note?.trim()
+      if (text) c.notes.push({ id: newId('note'), by: by(), at: new Date().toISOString(), text })
+      keep()
+      return copy(c)
+    },
+
+    async listAppointments(o, from, to) {
+      await wait()
+      return copy(org(o).appointments.filter((a) => a.date >= from && a.date <= to).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
+    },
+
+    async updateAppointment(o, id, patch) {
+      await wait()
+      allow(o, HANDLERS, 'change appointments')
+      const a = org(o).appointments.find((x) => x.id === id)
+      if (!a) throw notFound('appointment')
+      // A real date, not just the right shape (no 31 February).
+      if (patch.date !== undefined && new Date(`${patch.date}T12:00:00`).toISOString().slice(0, 10) !== patch.date) throw new AuthError('invalid_input', 'Choose a real date.')
+      if (patch.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) throw new AuthError('invalid_input', 'Choose a date.')
+      if (patch.time !== undefined && !/^\d{2}:\d{2}$/.test(patch.time)) throw new AuthError('invalid_input', 'Choose a time.')
+      if (a.status === 'cancelled' && patch.status && patch.status !== 'booked') throw new AuthError('invalid_input', 'This appointment was cancelled. Book it again first.')
+      Object.assign(a, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)))
+      // An empty note clears it.
+      if (a.note === '') delete a.note
+      if (patch.status && patch.status !== 'needs_check') delete a.checkReason
+      keep()
+      return copy(a)
+    },
+
+    async listCallLog(o, q) {
+      await wait()
+      const all = callLog(logContext(o), q.days)
+      const own = roleIn(o) === 'front_desk'
+      const text = q.q?.trim().toLowerCase()
+      const digits = text?.replace(/\D/g, '')
+      const hits = all.filter(
+        (c) =>
+          (!own || c.handledBy === viewer?.name) &&
+          (!q.agentId || c.agentId === q.agentId) &&
+          (!q.outcome || c.outcome === q.outcome) &&
+          (!text ||
+            // Viewers can't search by the caller's name: they don't see it.
+            [c.intent, c.agentName, roleIn(o) === 'viewer' ? '' : (c.callerName ?? '')].some((v) => v.toLowerCase().includes(text)) ||
+            (digits && digits.length >= 3 && c.callerPhone.replace(/\D/g, '').includes(digits))),
+      )
+      return copy({ calls: hits.slice(0, q.limit ?? 50), total: hits.length })
+    },
+
+    async getCallRecord(o, id) {
+      await wait()
+      const s = findCall(o, id)
+      if (!s) throw notFound('call')
+      const rec = callRecord(s)
+      if (roleIn(o) === 'front_desk' && rec.handledById !== viewer?.id) throw new AuthError('forbidden', 'Front desk can open the calls they handled.')
+      return copy({ ...rec, notes: org(o).callNotes[id] ?? [] })
+    },
+
+    async addCallNote(o, callId, text) {
+      await wait()
+      const t = text.trim()
+      if (!t) throw new AuthError('invalid_input', 'Write the note first.')
+      if (t.length > 1000) throw new AuthError('invalid_input', 'Keep notes under 1,000 characters.')
+      if (roleIn(o) === 'viewer') throw new AuthError('forbidden', 'Viewers can read notes, not add them.')
+      const call = findCall(o, callId)
+      if (!call) throw notFound('call')
+      if (roleIn(o) === 'front_desk' && callRecord(call).handledById !== viewer?.id) throw new AuthError('forbidden', 'Front desk can add notes to the calls they handled.')
+      const d = org(o)
+      const note: CallNote = { id: newId('note'), by: by(), at: new Date().toISOString(), text: t }
+      ;(d.callNotes[callId] ??= []).push(note)
+      keep()
+      return copy(note)
+    },
+
+    async getReport(o, q) {
+      await wait()
+      return copy(report(logContext(o), q.days, q.agentId))
     },
   }
 }
