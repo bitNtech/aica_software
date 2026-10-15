@@ -141,7 +141,10 @@ export function ConsoleShell() {
 
         <div className="console__me">
           <span className="console__me-text">
-            <span className="console__me-name">{user.name}</span>
+            <Link to="/account" className="console__me-name">
+              {user.name}
+              <span className="sr-only">: your account</span>
+            </Link>
             <span className="console__me-role">{ROLE_LABEL[org.role]}</span>
           </span>
           <button

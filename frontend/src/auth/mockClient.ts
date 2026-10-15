@@ -4,9 +4,11 @@ import {
   type AuditEntry,
   type AuthClient,
   type BusinessType,
+  type Device,
   type Invite,
   type Language,
   type Membership,
+  type NotificationPrefs,
   type OrgStatus,
   type OrgSummary,
   type Person,
@@ -44,6 +46,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
   { email: 'frontdesk@example.com', label: 'Front desk', note: 'One hospital, goes straight in' },
   { email: 'supervisor@example.com', label: 'Supervisor', note: 'Reviews calls and agents, read-only builder' },
   { email: 'viewer@example.com', label: 'Viewer', note: 'Reads everything, changes nothing' },
+  { email: 'owner@example.com', label: 'Owner', note: 'Full control, including team and billing' },
   { email: 'admin@example.com', label: 'Admin', note: 'Two hospitals, picks one' },
   { email: 'pending@example.com', label: 'Sign-up in review', note: 'Waiting for bitNtech' },
   { email: 'suspended@example.com', label: 'Suspended org', note: 'Access paused by bitNtech' },
@@ -80,7 +83,7 @@ interface DbInvite extends Invite {
 }
 
 interface Db {
-  v: 2
+  v: 3
   orgs: DbOrg[]
   users: DbUser[]
   invites: Record<string, DbInvite>
@@ -89,6 +92,9 @@ interface Db {
   verifyTokens: Record<string, string>
   /** Added after v1 shipped; older saved demos lack it. */
   audit?: AuditEntry[]
+  /** My account: browsers signed in, and email choices, by user id. */
+  devices?: Record<string, Device[]>
+  prefs?: Record<string, NotificationPrefs>
 }
 
 /** A master admin acting as a client user. */
@@ -115,7 +121,7 @@ function seed(): Db {
     ...extra,
   })
   return {
-    v: 2,
+    v: 3,
     orgs: [
       { slug: 'arogya-demo', name: 'Arogya Demo Hospital', city: 'Coimbatore', type: 'hospital', languages: ['tamil', 'english', 'tanglish'], status: 'active', createdAt: ago(120) },
       { slug: 'nila-eye-demo', name: 'Nila Eye Clinic (demo)', city: 'Madurai', type: 'clinic', languages: ['tamil', 'tanglish'], status: 'active', createdAt: ago(60) },
@@ -126,6 +132,7 @@ function seed(): Db {
     users: [
       user('u_master', 'Vikram S', 'master@example.com', { platformRole: 'master_admin' }),
       user('u_ops', 'Divya K', 'ops@example.com', { platformRole: 'staff' }),
+      user('u_owner', 'Lakshmi K', 'owner@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'owner' }] }),
       user('u_frontdesk', 'Meena S', 'frontdesk@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'front_desk' }] }),
       user('u_supervisor', 'Priya N', 'supervisor@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'supervisor' }] }),
       user('u_viewer', 'Arun V', 'viewer@example.com', { memberships: [{ orgSlug: 'arogya-demo', role: 'viewer' }] }),
@@ -163,7 +170,7 @@ function loadDb(): Db {
     const raw = window.localStorage.getItem(DB_KEY)
     if (raw) {
       const db = JSON.parse(raw) as Db
-      if (db.v === 2) return db
+      if (db.v === 3) return db
     }
   } catch {
     /* storage blocked or corrupt: start fresh */
@@ -370,8 +377,86 @@ export function createMockAuthClient({ latency = 750 }: MockOptions = {}): AuthC
   const contactOf = (slug: string) =>
     ownerOf(slug) ?? db.users.find((u) => u.memberships.some((m) => m.orgSlug === slug && m.role === 'admin'))
 
+  /** The person signed in, for My account; never while acting as someone. */
+  const self = (): DbUser => {
+    const u = me()
+    if (!u) throw new AuthError('invalid_input', 'Sign in to continue.')
+    const live = liveActing()
+    if (live) throw new AuthError('forbidden', `You're acting as ${live.target.name}. Their account settings can't be changed while you act as them.`)
+    return u
+  }
+  const devicesOf = (u: DbUser): Device[] =>
+    ((db.devices ??= {})[u.id] ??= [
+      { id: 'dev_this', label: 'This browser', place: 'Coimbatore, India', lastActiveAt: new Date().toISOString(), current: true },
+      { id: 'dev_phone', label: 'Chrome on Android', place: 'Coimbatore, India', lastActiveAt: new Date(Date.now() - 0.3 * DAY).toISOString(), current: false },
+      { id: 'dev_office', label: 'Edge on Windows', place: 'Chennai, India', lastActiveAt: new Date(Date.now() - 3 * DAY).toISOString(), current: false },
+    ])
+  const DEFAULT_PREFS: NotificationPrefs = {
+    handoff_missed: true,
+    callback_assigned: true,
+    daily_summary: false,
+    weekly_report: true,
+    agent_published: true,
+    team_changes: true,
+    billing: true,
+    signup_requests: true,
+    service_alerts: true,
+  }
+
   return {
     isDemo: true,
+
+    async updateProfile({ name }) {
+      await wait()
+      const u = self()
+      const clean = name.trim().replace(/\s+/g, ' ')
+      if (clean.length < 2 || clean.length > 60) throw new AuthError('invalid_input', 'Enter your name, 2 to 60 characters.')
+      u.name = clean
+      save()
+      return session(u, readSaved()?.remember ?? false)
+    },
+
+    async listDevices() {
+      await wait()
+      const list = devicesOf(self())
+      save()
+      return structuredClone(list)
+    },
+
+    async signOutDevice(id) {
+      await wait()
+      const u = self()
+      const list = devicesOf(u)
+      const d = list.find((x) => x.id === id)
+      if (!d) throw new AuthError('invalid_input', 'That browser is already signed out.')
+      if (d.current) throw new AuthError('invalid_input', 'To sign out of this browser, use Sign out.')
+      db.devices![u.id] = list.filter((x) => x.id !== id)
+      save()
+    },
+
+    async signOutOtherDevices() {
+      await wait()
+      const u = self()
+      const list = devicesOf(u)
+      db.devices![u.id] = list.filter((x) => x.current)
+      save()
+      return list.length - 1
+    },
+
+    async getNotificationPrefs() {
+      await wait()
+      const u = self()
+      return { ...DEFAULT_PREFS, ...db.prefs?.[u.id] }
+    },
+
+    async setNotificationPrefs(prefs) {
+      await wait()
+      const u = self()
+      const clean = Object.fromEntries(Object.keys(DEFAULT_PREFS).map((k) => [k, prefs[k as keyof NotificationPrefs] !== false])) as NotificationPrefs
+      ;(db.prefs ??= {})[u.id] = clean
+      save()
+      return { ...clean }
+    },
 
     async restore() {
       const saved = readSaved()

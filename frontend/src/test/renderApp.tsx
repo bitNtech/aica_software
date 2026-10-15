@@ -7,6 +7,8 @@ import { createMockAuthClient, DEMO_PASSWORD } from '../auth/mockClient'
 import { ConsoleProvider } from '../console/ConsoleProvider'
 import { createDemoConsoleClient } from '../console/demoClient'
 import type { ConsoleClient } from '../console/types'
+import { createDemoOpsClient } from '../ops/demoOpsClient'
+import { OpsDataProvider } from '../ops/OpsDataProvider'
 
 export function renderApp(
   path = '/login',
@@ -18,7 +20,9 @@ export function renderApp(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider client={client} idleMs={idleMs}>
         <ConsoleProvider client={consoleClient}>
-          <App />
+          <OpsDataProvider client={createDemoOpsClient({ latency: 0 })}>
+            <App />
+          </OpsDataProvider>
         </ConsoleProvider>
       </AuthProvider>
     </MemoryRouter>,

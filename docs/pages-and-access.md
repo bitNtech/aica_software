@@ -40,7 +40,7 @@ console, a master admin **acts as** one of its users (audited, 30 minutes).
 | Accept invitation | `/invite/:token` | *Built* |
 | Status pages | `/pending`, `/suspended`, `/signed-out`, `/session-expired`, `/403` | *Built* |
 | Choose organisation | `/choose` | *Built*. For people in more than one organisation |
-| My account | `/account` | Name, password, devices signed in (sign out others), notification settings. Every signed-in user |
+| My account | `/account` | Name, password, devices signed in (sign out others), notification settings. Every signed-in user. *Built (demo)*: password is a reset email (real API); the rest needs the account API |
 
 ## 2. bitNtech Ops (`/ops`)
 
@@ -56,7 +56,7 @@ console, a master admin **acts as** one of its users (audited, 30 minutes).
 | Platform settings | `/ops/platform` | Default models and providers, voice catalogue, limits per plan | E | – |
 | Service status | `/ops/status` | Health of the speech, voice and LLM services and the processing queue, recent failures | R | R |
 
-Overview, Sign-up requests, People and Audit log are *Built*.
+Overview, Sign-up requests, People and Audit log are *Built*. Organisation detail, Template library, Usage, Platform settings and Service status are *Built (demo)*.
 
 ## 3. Organisation console (`/o/:slug`)
 
@@ -115,10 +115,10 @@ Overview, Sign-up requests, People and Audit log are *Built*.
 
 | Page | Route | What it's for | Owner | Admin | Supervisor | Front desk | Viewer |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|
-| Team | `/o/:slug/team` | Invite, change roles, remove; nobody changes their own role | E | E (not owners) | – | – | – |
-| Organisation activity | `/o/:slug/activity` | This organisation's audit log | R | R | – | – | – |
-| Organisation settings | `/o/:slug/settings` | Name, city, languages, business hours | E | E | – | – | – |
-| Billing and plan | `/o/:slug/billing` | Plan, usage, invoices, payment method | E | – | – | – | – |
+| Team | `/o/:slug/team` | Invite, change roles, remove; nobody changes their own role. *Built (demo)* | E | E (not owners) | – | – | – |
+| Organisation activity | `/o/:slug/activity` | This organisation's audit log. *Built (demo)* | R | R | – | – | – |
+| Organisation settings | `/o/:slug/settings` | Name, city, languages, business hours. *Built (demo)* | E | E | – | – | – |
+| Billing and plan | `/o/:slug/billing` | Plan, usage, invoices, payment method. *Built (demo)* | E | – | – | – | – |
 
 ## 4. Actions that need a specific role
 

@@ -232,6 +232,18 @@ export interface AuthClient {
 
   /** Mock only: the links a real backend would have emailed. */
   lastResetToken?(): string | null
+
+  // ---- My account. Optional: the backend doesn't have these yet, so the
+  // page says they aren't available when a client lacks them.
+  /** Changes the signed-in person's name; returns the updated session. */
+  updateProfile?(input: { name: string }): Promise<Session>
+  /** Browsers signed in to this account, this one first. */
+  listDevices?(): Promise<Device[]>
+  signOutDevice?(id: string): Promise<void>
+  /** Signs out every browser but this one; returns how many. */
+  signOutOtherDevices?(): Promise<number>
+  getNotificationPrefs?(): Promise<NotificationPrefs>
+  setNotificationPrefs?(prefs: NotificationPrefs): Promise<NotificationPrefs>
   lastVerifyToken?(): string | null
 }
 
@@ -239,3 +251,28 @@ export function asAuthError(err: unknown): AuthError {
   if (err instanceof AuthError) return err
   return new AuthError('unknown', 'Something went wrong on our side. Try again in a moment.')
 }
+
+/** A browser signed in to the account. */
+export interface Device {
+  id: string
+  /** e.g. "Chrome on Windows". */
+  label: string
+  /** Approximate, from the network, e.g. "Coimbatore, India". */
+  place: string
+  lastActiveAt: string
+  current: boolean
+}
+
+/** Emails the person gets. Which apply depends on their roles. */
+export type NotificationKey =
+  | 'handoff_missed'
+  | 'callback_assigned'
+  | 'daily_summary'
+  | 'weekly_report'
+  | 'agent_published'
+  | 'team_changes'
+  | 'billing'
+  | 'signup_requests'
+  | 'service_alerts'
+
+export type NotificationPrefs = Record<NotificationKey, boolean>

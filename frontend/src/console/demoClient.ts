@@ -6,13 +6,16 @@ import type {
   AgentSummary,
   AgentTool,
   AgentVersion,
+  ActivityEntry,
   Appointment,
+  Billing,
   Callback,
   CallNote,
   ConsoleClient,
   Credential,
   Handoff,
   Member,
+  OrgSettings,
   Viewer,
   FlowNode,
   KnowledgeSource,
@@ -28,8 +31,12 @@ import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
 import { passagesOf, search, seedCredentials } from './demo/passages'
 import { callLog, callRecord, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LogContext, type Pauses } from './demo/operations'
+import { billingPeriod, seedActivity, seedBilling, seedSettings } from './demo/manage'
 import { checkTool } from './toolRules'
-import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
+import { LANGUAGE_LABEL, ROLE_LABEL } from '../auth/roles'
+import type { Role } from '../auth/types'
+import { defaultBehaviour } from './demo/templates'
+import { currentPlans, enabledVoices, findSubType, publishedTypes } from './demo/platform'
 
 /**
  * Sample data for the organisation console until the real API exists. No
@@ -40,7 +47,7 @@ import { AGENT_TYPES, defaultBehaviour, VOICES } from './demo/templates'
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v7'
+const STORE_KEY = 'aica.demo.console.v8'
 
 /** Versions kept per agent in the demo. */
 const KEEP_VERSIONS = 6
@@ -80,6 +87,10 @@ interface OrgData {
   liveTaken: Record<string, string>
   /** When each agent was paused, so the call log has no calls then. */
   pauses: Pauses
+  settings: OrgSettings
+  /** Newest first. */
+  activity: ActivityEntry[]
+  billing: Omit<Billing, 'plans' | 'usage'>
 }
 
 export interface DemoConsoleOptions {
@@ -112,6 +123,9 @@ function seedOrg(slug: string): OrgData {
     liveTaken: {},
     // The sample lab agent was paused 9 days ago.
     pauses: Object.fromEntries(seedAgents(slug).filter((a) => a.status === 'paused').map((a) => [a.id, [{ from: Date.now() - 9 * DAY, to: null }]])),
+    settings: seedSettings(slug),
+    activity: seedActivity(slug),
+    billing: seedBilling(slug),
   }
 }
 
@@ -191,7 +205,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     }
   }
 
-  const subTypeOf = (dr: AgentDraft) => AGENT_TYPES.find((t) => t.id === dr.typeId)?.subTypes.find((s) => s.id === dr.subTypeId)
+  const subTypeOf = (dr: AgentDraft) => findSubType(dr.typeId, dr.subTypeId)
 
   const draftSummary = (dr: AgentDraft): AgentSummary => ({
     id: dr.id,
@@ -333,6 +347,43 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     const d = org(o)
     return { orgSlug: o, paused: new Set(d.agents.filter((a) => a.status === 'paused').map((a) => a.id)), pauses: d.pauses }
   }
+  /** Writes to the organisation's activity log, as the server would. */
+  const log = (o: string, area: ActivityEntry['area'], text: string, detail?: string) => {
+    org(o).activity.unshift({
+      id: newId('act'),
+      at: new Date().toISOString(),
+      actor: by(),
+      actorKind: 'member',
+      ...(viewer ? { actorId: viewer.id } : {}),
+      area,
+      text,
+      ...(detail ? { detail } : {}),
+    })
+  }
+  const MANAGERS = ['owner', 'admin']
+  const findMember = (o: string, id: string) => {
+    const m = org(o).members.find((x) => x.id === id)
+    if (!m) throw notFound('person')
+    return m
+  }
+  /** Owners left if `without` went. */
+  const ownersBut = (o: string, without: string) => org(o).members.filter((m) => m.role === 'owner' && m.status === 'active' && m.id !== without).length
+  /** Callbacks given to someone who can no longer take them go back to nobody. */
+  const freeCallbacks = (o: string, memberId: string) => {
+    for (const c of org(o).callbacks) if (c.status === 'open' && c.assignedTo?.id === memberId) c.assignedTo = null
+  }
+  const billingOf = (o: string): Billing => {
+    const d = org(o)
+    const p = billingPeriod()
+    const calls = callLog(logContext(o), p.daysSoFar).filter((c) => Date.parse(c.startedAt) >= p.start)
+    const uploaded = d.calls.filter((c) => Date.parse(c.addedAt) >= p.start).reduce((s, c) => s + c.durationSec, 0)
+    return copy({
+      ...d.billing,
+      plans: currentPlans(),
+      usage: { minutes: Math.round(calls.reduce((s, c) => s + c.durationSec, 0) / 60), calls: calls.length, uploadHours: Math.round((uploaded / 3600) * 10) / 10 },
+    })
+  }
+
   const findCallback = (o: string, id: string) => {
     const c = org(o).callbacks.find((x) => x.id === id)
     if (!c) throw notFound('callback')
@@ -425,12 +476,12 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listAgentTypes() {
       await wait()
-      return copy(AGENT_TYPES)
+      return copy(publishedTypes())
     },
 
     async listVoices() {
       await wait()
-      return copy(VOICES)
+      return copy(enabledVoices())
     },
 
     async createDraft(o, orgName) {
@@ -532,6 +583,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       d.published[id] = agentId
       if (number) number.agentId = agentId
       syncUsage(d, agentId, spec)
+      log(o, 'agents', `Published ${agent.name}, version 1`, number ? `Answering ${number.number}.` : 'Paused: no number yet.')
       keep()
       return copy(agent)
     },
@@ -572,6 +624,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       } else d.indexing[k.id] = Date.now()
       d.knowledge.push(k)
       refreshKnowledgeStatus(d)
+      log(o, 'library', `Added the knowledge source “${k.name}”`)
       keep()
       return copy(k)
     },
@@ -627,6 +680,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (users.length) throw new AuthError('invalid_input', `${users.join(', ')} ${users.length === 1 ? 'uses' : 'use'} “${k.name}”. Take it out of ${users.length === 1 ? 'that agent' : 'those agents'} first.`)
       d.knowledge = d.knowledge.filter((x) => x.id !== id)
       delete d.indexing[id]
+      log(o, 'library', `Deleted the knowledge source “${k.name}”`)
       keep()
     },
 
@@ -668,6 +722,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       delete next.usedBy
       if (existing) d.tools[d.tools.indexOf(existing)] = next
       else d.tools.push(next)
+      log(o, 'library', `${existing ? 'Changed' : 'Added'} the tool “${name}”`)
       keep()
       return copy({ ...next, usedBy: toolUsers(o, next.id) })
     },
@@ -680,6 +735,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const users = toolUsers(o, id)
       if (users.length) throw new AuthError('invalid_input', `${users.join(', ')} ${users.length === 1 ? 'uses' : 'use'} “${t.name}”. Take it out of ${users.length === 1 ? 'that agent' : 'those agents'} first.`)
       d.tools = d.tools.filter((x) => x.id !== id)
+      log(o, 'library', `Deleted the tool “${t.name}”`)
       keep()
     },
 
@@ -713,7 +769,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (!value.trim()) throw new AuthError('invalid_input', 'Paste the secret’s value.')
       // The demo keeps only that it was set, never the value.
       const c: Credential = { name: key, setAt: new Date().toISOString(), setBy: by() }
+      const had = d.credentials.some((x) => x.name === key)
       d.credentials = [...d.credentials.filter((x) => x.name !== key), c].sort((a, b) => a.name.localeCompare(b.name))
+      log(o, 'library', `${had ? 'Changed' : 'Set'} the secret ${key}`, 'The value isn’t shown here or anywhere else.')
       keep()
       return copy(c)
     },
@@ -723,7 +781,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const d = org(o)
       const users = d.tools.filter((t) => t.credentialName === name)
       if (users.length) throw new AuthError('invalid_input', `${users.map((t) => `“${t.name}”`).join(', ')} ${users.length === 1 ? 'uses' : 'use'} ${name}. Change ${users.length === 1 ? 'that tool' : 'those tools'} first.`)
+      if (!d.credentials.some((c) => c.name === name)) throw notFound('secret')
       d.credentials = d.credentials.filter((c) => c.name !== name)
+      log(o, 'library', `Deleted the secret ${name}`)
       keep()
     },
 
@@ -797,6 +857,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const r = recordOf(o, id)
       if (!r.changed) throw new AuthError('invalid_input', 'There are no unpublished changes to publish.')
       release(o, id, r.working, note.trim() || 'No note.')
+      const a = findAgent(o, id)
+      log(o, 'agents', `Published ${a.name}, version ${a.version}`, note.trim() || undefined)
       keep()
       return detail(o, id)
     },
@@ -815,6 +877,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const v = recordOf(o, id).versions.find((x) => x.version === version)
       if (!v) throw notFound('version')
       release(o, id, v.spec, `Went back to version ${version}.`)
+      const a = findAgent(o, id)
+      log(o, 'agents', `Rolled ${a.name} back to version ${version}`, `Published as version ${a.version}.`)
       keep()
       return detail(o, id)
     },
@@ -835,6 +899,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const number = patch.numberId !== undefined ? (next?.number ?? null) : a.phoneNumber
       if (patch.status === 'live' && !number) throw new AuthError('invalid_input', 'Give the agent a phone number before turning it on.')
 
+      const was = { name: a.name, status: a.status }
       if (name !== undefined) a.name = name
       if (patch.numberId !== undefined) {
         for (const n of d.numbers) if (n.agentId === id) n.agentId = null
@@ -850,6 +915,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (patch.status === 'live' && a.status === 'paused') endPause(d, id)
       if (patch.status) a.status = patch.status
       a.updatedAt = new Date().toISOString()
+      if (a.name !== was.name) log(o, 'agents', `Renamed ${was.name} to ${a.name}`)
+      if (a.status !== was.status) log(o, 'agents', `${a.status === 'paused' ? 'Paused' : 'Turned on'} ${a.name}`)
       keep()
       return detail(o, id)
     },
@@ -857,8 +924,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async deleteAgent(o, id) {
       await wait()
       const d = org(o)
-      findAgent(o, id)
+      const gone = findAgent(o, id)
       d.agents = d.agents.filter((x) => x.id !== id)
+      log(o, 'agents', `Deleted the agent ${gone.name}`)
       for (const n of d.numbers) if (n.agentId === id) n.agentId = null
       syncUsage(d, id, null)
       delete d.details[id]
@@ -868,6 +936,190 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listMembers(o) {
       await wait()
       return copy(org(o).members)
+    },
+
+    async inviteMember(o, invite) {
+      await wait()
+      allow(o, MANAGERS, 'manage the team')
+      const d = org(o)
+      const email = invite.email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new AuthError('invalid_input', 'Enter an email address like name@hospital.in.')
+      if (!(invite.role in ROLE_LABEL)) throw new AuthError('invalid_input', 'Choose a role.')
+      if (invite.role === 'owner' && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can invite another owner.')
+      const there = d.members.find((m) => m.email.toLowerCase() === email)
+      if (there) throw new AuthError('invalid_input', there.status === 'invited' ? `${email} is already invited. Send the invitation again from their row.` : `${there.name} is already in the team.`)
+      const m: Member = { id: newId('inv'), name: email, email, role: invite.role, lastActiveAt: null, status: 'invited', invitedAt: new Date().toISOString(), invitedBy: by() }
+      d.members.push(m)
+      log(o, 'team', `Invited ${email} as ${ROLE_LABEL[invite.role]}`)
+      keep()
+      return copy(m)
+    },
+
+    async resendInvite(o, id) {
+      await wait()
+      allow(o, MANAGERS, 'manage the team')
+      const m = findMember(o, id)
+      if (m.status !== 'invited') throw new AuthError('invalid_input', `${m.name} has already joined.`)
+      if (m.role === 'owner' && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can send an owner’s invitation.')
+      m.invitedAt = new Date().toISOString()
+      m.invitedBy = by()
+      log(o, 'team', `Sent the invitation to ${m.email} again`)
+      keep()
+      return copy(m)
+    },
+
+    async changeRole(o, id, role) {
+      await wait()
+      allow(o, MANAGERS, 'manage the team')
+      const m = findMember(o, id)
+      if (!(role in ROLE_LABEL)) throw new AuthError('invalid_input', 'Choose a role.')
+      if (viewer && m.id === viewer.id) throw new AuthError('forbidden', 'You can’t change your own role. Ask another owner.')
+      if ((m.role === 'owner' || role === 'owner') && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can change an owner, or make someone an owner.')
+      if (m.role === role) return copy(m)
+      if (m.role === 'owner' && m.status === 'active' && ownersBut(o, m.id) === 0) throw new AuthError('invalid_input', 'The organisation needs at least one owner. Make someone else an owner first.')
+      const was = m.role
+      m.role = role as Role
+      if (role === 'viewer') freeCallbacks(o, m.id)
+      log(o, 'team', m.status === 'invited' ? `Changed ${m.email}’s invitation from ${ROLE_LABEL[was]} to ${ROLE_LABEL[role]}` : `Changed ${m.name}’s role from ${ROLE_LABEL[was]} to ${ROLE_LABEL[role]}`)
+      keep()
+      return copy(m)
+    },
+
+    async removeMember(o, id) {
+      await wait()
+      allow(o, MANAGERS, 'manage the team')
+      const d = org(o)
+      const m = findMember(o, id)
+      if (viewer && m.id === viewer.id) throw new AuthError('forbidden', 'You can’t remove yourself. Ask another owner.')
+      if (m.role === 'owner' && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can remove an owner.')
+      if (m.role === 'owner' && m.status === 'active' && ownersBut(o, m.id) === 0) throw new AuthError('invalid_input', 'The organisation needs at least one owner.')
+      d.members = d.members.filter((x) => x.id !== id)
+      freeCallbacks(o, id)
+      log(o, 'team', m.status === 'invited' ? `Cancelled the invitation for ${m.email}` : `Removed ${m.name} (${ROLE_LABEL[m.role]})`)
+      keep()
+    },
+
+    async listActivity(o, q) {
+      await wait()
+      allow(o, MANAGERS, 'read the organisation’s activity')
+      // Billing is the owners' business.
+      const owner = !viewer || roleIn(o) === 'owner'
+      const rows = org(o).activity.filter(
+        (e) => (owner || e.area !== 'billing') && (!q.area || e.area === q.area) && (!q.actorId || e.actorId === q.actorId) && (!q.before || e.at < q.before),
+      )
+      const page = rows.slice(0, 25)
+      return copy({ entries: page, nextBefore: rows.length > page.length ? page[page.length - 1].at : null })
+    },
+
+    async getOrgSettings(o) {
+      await wait()
+      allow(o, MANAGERS, 'see the organisation’s settings')
+      return copy(org(o).settings)
+    },
+
+    async updateOrgSettings(o, input) {
+      await wait()
+      allow(o, MANAGERS, 'change the organisation’s settings')
+      const d = org(o)
+      // Check everything first: a refused change changes nothing.
+      const name = input.name.trim()
+      const city = input.city.trim()
+      if (name.length < 2 || name.length > 80) throw new AuthError('invalid_input', 'Give the organisation a name of 2 to 80 characters.')
+      if (city.length < 2 || city.length > 60) throw new AuthError('invalid_input', 'Give the city, e.g. Coimbatore.')
+      const languages = [...new Set(input.languages)].filter((l) => l in LANGUAGE_LABEL)
+      if (languages.length === 0) throw new AuthError('invalid_input', 'Choose at least one language callers use.')
+      if (input.hours.length !== 7) throw new AuthError('invalid_input', 'Give hours for each day of the week.')
+      const time = /^([01]\d|2[0-3]):[0-5]\d$/
+      for (const h of input.hours) {
+        if (h.open && (!time.test(h.from) || !time.test(h.to) || h.from >= h.to)) throw new AuthError('invalid_input', 'Each open day needs an opening time before its closing time.')
+      }
+      const closed = input.closed.map((c) => ({ date: c.date, label: c.label.trim() }))
+      for (const c of closed) {
+        const t = Date.parse(`${c.date}T00:00:00Z`)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(c.date) || Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== c.date) throw new AuthError('invalid_input', 'Each closed day needs a real date.')
+        if (!c.label || c.label.length > 40) throw new AuthError('invalid_input', 'Name each closed day in up to 40 characters, e.g. Pongal.')
+      }
+      if (new Set(closed.map((c) => c.date)).size !== closed.length) throw new AuthError('invalid_input', 'A date is listed twice.')
+      if (closed.length > 60) throw new AuthError('invalid_input', 'List up to 60 closed days.')
+
+      const was = d.settings
+      const said: string[] = []
+      if (name !== was.name) said.push(`Renamed the organisation to ${name}`)
+      if (city !== was.city) said.push(`Changed the city to ${city}`)
+      if (languages.slice().sort().join() !== was.languages.slice().sort().join()) said.push(`Changed the languages to ${languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}`)
+      if (JSON.stringify(input.hours) !== JSON.stringify(was.hours)) said.push('Changed the business hours')
+      for (const c of closed) if (!was.closed.some((x) => x.date === c.date)) said.push(`Added the closed day ${c.label}`)
+      for (const c of was.closed) if (!closed.some((x) => x.date === c.date)) said.push(`Removed the closed day ${c.label}`)
+      d.settings = {
+        name,
+        city,
+        languages,
+        hours: input.hours.map((h) => ({ open: h.open, from: h.from, to: h.to })),
+        closed: closed.sort((a, b) => a.date.localeCompare(b.date)),
+        updatedAt: said.length ? new Date().toISOString() : was.updatedAt,
+        updatedBy: said.length ? by() : was.updatedBy,
+      }
+      for (const t of said) log(o, 'settings', t)
+      keep()
+      return copy(d.settings)
+    },
+
+    async getBilling(o) {
+      await wait()
+      allow(o, ['owner'], 'see billing')
+      return billingOf(o)
+    },
+
+    async changePlan(o, planId) {
+      await wait()
+      allow(o, ['owner'], 'change the plan')
+      const d = org(o)
+      const b = d.billing
+      if (planId === null) {
+        if (!b.pendingPlan) return billingOf(o)
+        log(o, 'billing', `Cancelled the move to ${currentPlans().find((p) => p.id === b.pendingPlan)!.name}`)
+        b.pendingPlan = null
+        keep()
+        return billingOf(o)
+      }
+      const next = currentPlans().find((p) => p.id === planId)
+      if (!next) throw new AuthError('invalid_input', 'Choose a plan.')
+      const now = currentPlans().find((p) => p.id === b.plan)!
+      if (next.id === now.id) {
+        b.pendingPlan = null
+        keep()
+        return billingOf(o)
+      }
+      if (next.price > now.price) {
+        b.plan = next.id
+        b.pendingPlan = null
+        log(o, 'billing', `Changed the plan from ${now.name} to ${next.name}`)
+      } else {
+        const agents = d.agents.length
+        const numbers = d.numbers.length
+        if (agents > next.agents) throw new AuthError('invalid_input', `${next.name} allows ${next.agents} ${next.agents === 1 ? 'agent' : 'agents'} and you have ${agents}. Delete some first.`)
+        if (numbers > next.numbers) throw new AuthError('invalid_input', `${next.name} allows ${next.numbers} ${next.numbers === 1 ? 'number' : 'numbers'} and you have ${numbers}. Ask bitNtech to release some first.`)
+        b.pendingPlan = next.id
+        log(o, 'billing', `Chose to move from ${now.name} to ${next.name} at renewal`)
+      }
+      keep()
+      return billingOf(o)
+    },
+
+    async updateBillingDetails(o, input) {
+      await wait()
+      allow(o, ['owner'], 'change billing details')
+      const legalName = input.legalName.trim()
+      const email = input.email.trim().toLowerCase()
+      const gstin = input.gstin.trim().toUpperCase()
+      if (legalName.length < 2 || legalName.length > 120) throw new AuthError('invalid_input', 'Give the name invoices are made out to.')
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new AuthError('invalid_input', 'Enter the email invoices go to, like accounts@hospital.in.')
+      if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) throw new AuthError('invalid_input', 'A GST number has 15 characters, like 33AABCA1234F1Z5. Leave it empty if you don’t have one.')
+      const d = org(o)
+      d.billing.details = { legalName, email, gstin }
+      log(o, 'billing', 'Changed the billing details')
+      keep()
+      return billingOf(o)
     },
 
     async listLiveCalls(o) {

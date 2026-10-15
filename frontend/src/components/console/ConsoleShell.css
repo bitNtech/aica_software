@@ -235,3 +235,5 @@
     transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), visibility 0s;
   }
 }
+a.console__me-name { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; border-radius: 4px; }
+a.console__me-name:hover { text-decoration-color: currentColor; }

@@ -1,5 +1,5 @@
 import type { Attribute, FlowNode, GlobalFlow, SourceCall } from '../types'
-import { AGENT_TYPES } from './templates'
+import { findSubType } from './platform'
 
 /**
  * Stands in for AICA's extraction: from the chosen calls and the agent's
@@ -112,7 +112,7 @@ export function extractFlow(subTypeId: string | null, typeId: string | null, cal
   if (specific) return specific.map((s) => build('intent', s, forTopic(s.topic), s.confidence))
 
   // Other jobs: one intent per thing the template covers.
-  const sub = AGENT_TYPES.find((t) => t.id === typeId)?.subTypes.find((s) => s.id === subTypeId)
+  const sub = findSubType(typeId, subTypeId)
   const covers = sub?.covers ?? ['General question']
   return covers.map((c, i) =>
     build(

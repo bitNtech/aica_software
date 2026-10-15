@@ -193,6 +193,15 @@ export const NAV: NavSection[] = [
       { page: 'reports', label: 'Reports', path: 'reports', description: 'Calls, answers and handovers over time.' },
     ],
   },
+  {
+    heading: 'Manage',
+    items: [
+      { page: 'team', label: 'Team', path: 'team', description: 'Who can sign in, and their roles.' },
+      { page: 'activity', label: 'Activity', path: 'activity', description: 'What changed, and who changed it.' },
+      { page: 'settings', label: 'Settings', path: 'settings', description: 'Name, languages and business hours.' },
+      { page: 'billing', label: 'Billing and plan', path: 'billing', description: 'Plan, usage, invoices and payment.' },
+    ],
+  },
 ]
 
 export function navFor(role: Role): NavSection[] {

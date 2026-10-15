@@ -27,7 +27,7 @@ import { ago, ahead, DAY } from './runtime'
 // ---------------------------------------------------------------- random
 
 /** A small seeded generator (mulberry32): the same seed, the same numbers. */
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) >>> 0
@@ -38,7 +38,7 @@ function rng(seed: number) {
   }
 }
 
-const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7)
+export const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7)
 
 function pick<T>(r: () => number, items: readonly T[], weights?: readonly number[]): T {
   if (!weights) return items[Math.floor(r() * items.length)]
@@ -57,13 +57,13 @@ export function seedMembers(orgSlug: string): Member[] {
   if (orgSlug !== 'arogya-demo')
     return [{ id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'owner', lastActiveAt: ago(0.1), status: 'active' }]
   return [
-    { id: 'u_owner', name: 'Lakshmi K', email: 'lakshmi@example.com', role: 'owner', lastActiveAt: ago(1), status: 'active' },
+    { id: 'u_owner', name: 'Lakshmi K', email: 'owner@example.com', role: 'owner', lastActiveAt: ago(1), status: 'active' },
     { id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'admin', lastActiveAt: ago(0.05), status: 'active' },
     { id: 'u_supervisor', name: 'Priya N', email: 'supervisor@example.com', role: 'supervisor', lastActiveAt: ago(0.2), status: 'active' },
     { id: 'u_frontdesk', name: 'Meena S', email: 'frontdesk@example.com', role: 'front_desk', lastActiveAt: ago(0.02), status: 'active' },
     { id: 'u_frontdesk2', name: 'Suresh B', email: 'suresh@example.com', role: 'front_desk', lastActiveAt: ago(0.4), status: 'active' },
     { id: 'u_viewer', name: 'Arun V', email: 'viewer@example.com', role: 'viewer', lastActiveAt: ago(6), status: 'active' },
-    { id: 'inv_newstaff', name: 'newstaff@example.com', email: 'newstaff@example.com', role: 'supervisor', lastActiveAt: null, status: 'invited' },
+    { id: 'inv_newstaff', name: 'newstaff@example.com', email: 'newstaff@example.com', role: 'supervisor', lastActiveAt: null, status: 'invited', invitedAt: ago(1), invitedBy: 'Karthik R' },
   ]
 }
 

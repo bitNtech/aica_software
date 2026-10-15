@@ -244,8 +244,8 @@ function CallbackCard({
           </form>
         )}
         {c.status === 'open' ? (
-          <Button variant="plum" size="sm" onClick={onLog}>
-            Log a call<span className="sr-only"> to {c.callerName ?? c.callerPhone}</span>
+          <Button variant="plum" size="sm" onClick={onLog} aria-label={`Log a call to ${c.callerName ?? c.callerPhone}`}>
+            Log a call
           </Button>
         ) : (
           <Button variant="line" size="sm" busy={busy} busyLabel="Opening…" onClick={() => void update({ reopen: true }, 'Back on the list to call.')}>

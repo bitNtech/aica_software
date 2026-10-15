@@ -130,7 +130,9 @@ export default function OpsOverviewPage() {
                       {initials(o.name)}
                     </span>
                     <div className="row__text">
-                      <span className="row__name">{o.name}</span>
+                      <Link className="row__name row__link" to={`/ops/orgs/${o.slug}`}>
+                        {o.name}
+                      </Link>
                       <span className="row__meta">
                         {BUSINESS_LABEL[o.businessType]} <i aria-hidden="true">·</i> {o.city} <i aria-hidden="true">·</i>{' '}
                         {o.ownerEmail}

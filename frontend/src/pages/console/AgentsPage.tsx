@@ -215,8 +215,8 @@ function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: str
             {canBuild && (
               <>
                 {' '}
-                <Link className="link" to={`${base}/drafts/${a.id}/${a.setupStep}`}>
-                  Continue setup<span className="sr-only"> of {a.name}</span>
+                <Link className="link" to={`${base}/drafts/${a.id}/${a.setupStep}`} aria-label={`Continue setup of ${a.name}`}>
+                  Continue setup
                 </Link>
               </>
             )}

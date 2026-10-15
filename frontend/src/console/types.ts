@@ -142,6 +142,25 @@ export interface ConsoleClient {
   /** The organisation's team, for assigning work (and the Team page). */
   listMembers(orgSlug: string): Promise<Member[]>
 
+  // ---- manage (owners and admins; billing owners only)
+  /** Sends an invitation email; they appear as invited until they accept. */
+  inviteMember(orgSlug: string, invite: NewInvite): Promise<Member>
+  /** Sends the invitation email again, with a fresh 7-day link. */
+  resendInvite(orgSlug: string, memberId: string): Promise<Member>
+  /** Nobody changes their own role; only owners make or change owners. */
+  changeRole(orgSlug: string, memberId: string, role: Role): Promise<Member>
+  /** Removes a member, or cancels an invitation. Their open callbacks go
+   * back to nobody. */
+  removeMember(orgSlug: string, memberId: string): Promise<void>
+  /** This organisation's audit log, newest first. */
+  listActivity(orgSlug: string, query: ActivityQuery): Promise<ActivityPage>
+  getOrgSettings(orgSlug: string): Promise<OrgSettings>
+  updateOrgSettings(orgSlug: string, settings: OrgSettingsInput): Promise<OrgSettings>
+  getBilling(orgSlug: string): Promise<Billing>
+  /** Upgrades apply now; downgrades at renewal. `null` cancels a pending change. */
+  changePlan(orgSlug: string, planId: PlanId | null): Promise<Billing>
+  updateBillingDetails(orgSlug: string, details: BillingDetails): Promise<Billing>
+
   /** Who is using the console, for "by" fields and what front desk see.
    * A real server knows this from the session. */
   setViewer?(viewer: Viewer | null): void
@@ -558,6 +577,9 @@ export interface Member {
   /** ISO timestamp, or null if they've never signed in. */
   lastActiveAt: string | null
   status: 'active' | 'invited' | 'disabled'
+  /** Invitations: when it was (last) sent, and by whom. The link lasts 7 days. */
+  invitedAt?: string
+  invitedBy?: string
 }
 
 export interface LiveCall {
@@ -755,4 +777,120 @@ export interface Report {
   intents: { label: string; calls: number; byAgent: number }[]
   /** Where callers hung up or were handed over, by flow step. */
   dropOff: { step: string; calls: number }[]
+}
+
+/* ---------------------------------------------------------------- manage
+ * The team, the organisation's audit log, its settings and billing. */
+
+export interface NewInvite {
+  email: string
+  role: Role
+}
+
+/** What an activity entry is about, for filtering. */
+export type ActivityArea = 'team' | 'agents' | 'library' | 'settings' | 'billing' | 'access'
+
+export interface ActivityEntry {
+  id: string
+  /** ISO timestamp. */
+  at: string
+  /** Who did it, by name. */
+  actor: string
+  /** member: someone in the organisation · bitntech: bitNtech staff
+   * (always says so) · aica: AICA itself, e.g. a failed import. */
+  actorKind: 'member' | 'bitntech' | 'aica'
+  /** The member's id, to filter by person; absent for bitNtech and AICA. */
+  actorId?: string
+  area: ActivityArea
+  /** What happened, in a sentence, e.g. "Published OPD appointments, version 4". */
+  text: string
+  /** More, e.g. the publish note or a reason. Never a secret's value. */
+  detail?: string
+}
+
+export interface ActivityQuery {
+  area?: ActivityArea
+  actorId?: string
+  /** The `nextBefore` of the previous page. */
+  before?: string
+}
+
+export interface ActivityPage {
+  entries: ActivityEntry[]
+  nextBefore: string | null
+}
+
+/** One weekday's hours, Monday first. Times are "HH:MM", 24-hour, IST. */
+export interface DayHours {
+  open: boolean
+  from: string
+  to: string
+}
+
+export interface ClosedDay {
+  /** "YYYY-MM-DD". */
+  date: string
+  label: string
+}
+
+export interface OrgSettings {
+  name: string
+  city: string
+  /** Languages callers may use; agents choose from these. */
+  languages: Language[]
+  /** Seven entries, Monday to Sunday: when people are in to take handovers. */
+  hours: DayHours[]
+  /** Holidays and other days the whole organisation is closed. */
+  closed: ClosedDay[]
+  updatedAt: string
+  updatedBy: string
+}
+
+export type OrgSettingsInput = Omit<OrgSettings, 'updatedAt' | 'updatedBy'>
+
+export type PlanId = 'starter' | 'growth' | 'scale'
+
+export interface Plan {
+  id: PlanId
+  name: string
+  /** Rupees a month, before GST. */
+  price: number
+  minutes: number
+  agents: number
+  numbers: number
+  /** Rupees for each minute over the plan's minutes. */
+  extraMinute: number
+}
+
+export interface Invoice {
+  id: string
+  number: string
+  /** ISO date issued. */
+  issuedAt: string
+  period: string
+  /** Rupees, GST included. */
+  amount: number
+  status: 'paid' | 'due' | 'failed'
+}
+
+export interface BillingDetails {
+  legalName: string
+  email: string
+  /** GST number, or empty. */
+  gstin: string
+}
+
+export interface Billing {
+  plan: PlanId
+  /** A downgrade waiting for the renewal date. */
+  pendingPlan: PlanId | null
+  plans: Plan[]
+  /** ISO date the current period ends and the next charge is made. */
+  renewsOn: string
+  /** This period so far. */
+  usage: { minutes: number; calls: number; uploadHours: number }
+  /** How they pay, as shown by the payment provider, e.g. "Visa ending 4242". */
+  paymentMethod: string | null
+  details: BillingDetails
+  invoices: Invoice[]
 }

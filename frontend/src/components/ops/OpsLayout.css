@@ -99,5 +99,9 @@
 @media (max-width: 860px) {
   .ops__bar { flex-wrap: wrap; gap: 0.6rem 1rem; }
   .ops__nav { order: 3; width: 100%; overflow-x: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
-  .ops__who, .ops__me .demo-chip { display: none; }
+  .ops__role, .ops__me .demo-chip { display: none; }
 }
+
+.ops__demo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.75rem; font-size: 0.85rem; color: var(--muted); }
+a.ops__name { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; border-radius: 4px; }
+a.ops__name:hover { text-decoration-color: currentColor; }

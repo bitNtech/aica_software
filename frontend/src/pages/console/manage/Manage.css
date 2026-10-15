@@ -1,0 +1,96 @@
+/* Manage: team, organisation activity, settings, billing. */
+
+/* Team */
+.team-role { background: var(--bg-2); color: var(--muted); }
+.team-role--owner { background: var(--info-bg); color: var(--info-ink); }
+.team-role--admin { background: var(--ok-bg); color: var(--ok-ink); }
+.team-why { font-size: 0.85rem; color: var(--muted); }
+.team-roles { margin-top: -1rem; padding: 0.9rem 1.1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.team-roles summary { font-weight: 600; color: var(--ink); cursor: pointer; }
+.team-roles dl { display: grid; gap: 0.6rem; margin: 0.9rem 0 0; }
+.team-roles dl > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 0.25rem 1rem; }
+.team-roles dt { font-weight: 600; color: var(--ink); }
+.team-roles dd { margin: 0; color: var(--text); }
+
+/* Organisation activity */
+.act-day { display: grid; gap: 0.5rem; margin-bottom: 1.75rem; }
+.act-day__title { font: 700 0.9rem/1.3 var(--sans); letter-spacing: normal; color: var(--muted); }
+.act-list { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.act-entry { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto; align-items: baseline; gap: 0.25rem 1rem; padding: 0.75rem 1.1rem; }
+.act-entry + .act-entry { border-top: 1px solid var(--line); }
+.act-entry--staff { box-shadow: inset 3px 0 0 var(--orange); }
+.act-entry__time { font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+.act-entry__main { display: grid; gap: 0.15rem; min-width: 0; overflow-wrap: anywhere; }
+.act-entry__text { color: var(--text); }
+.act-entry__who { font-weight: 700; color: var(--ink); }
+.act-entry__badge { margin: 0 0 0 0.35rem; background: var(--warn-bg); color: var(--warn-ink); }
+.act-entry__area { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
+/* Settings */
+.set-form { display: grid; gap: 1.5rem; max-width: 52rem; }
+.set-card { display: grid; gap: 1rem; min-width: 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.set-card .lib__sub { margin-top: -0.6rem; }
+.set-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.set-hours { display: grid; margin: 0; padding: 0; list-style: none; }
+.set-hours__day { display: grid; grid-template-columns: 13rem minmax(0, 1fr); align-items: center; gap: 0.5rem 1rem; padding: 0.6rem 0; }
+.set-hours__day + .set-hours__day { border-top: 1px solid var(--line); }
+.set-hours__times { display: grid; grid-template-columns: repeat(2, minmax(0, 9.5rem)); gap: 0.75rem; }
+.set-hours__closed { color: var(--muted); font-size: 0.92rem; }
+.set-add { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto; align-items: end; gap: 0.75rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.set-add > legend { margin-bottom: 0.5rem; padding: 0; }
+.set-add .btn { margin-bottom: 0.15rem; }
+.set-bar { display: grid; gap: 0.5rem; }
+.set-bar__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 1.1rem; }
+.set-bar__state { font-size: 0.9rem; color: var(--muted); }
+
+/* Billing */
+.bill-now { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.5rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.bill-now__plan { display: grid; align-content: start; gap: 0.35rem; }
+.bill-now__name { font: 800 1.6rem/1.1 var(--display); letter-spacing: -0.02em; color: var(--ink); }
+.bill-now__price, .bill-plan__price { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.bill-now__price span, .bill-plan__price span, .bill-use__value span { font-weight: 400; color: var(--muted); }
+.bill-now__pending { display: grid; justify-items: start; gap: 0.5rem; margin-top: 0.6rem; padding: 0.75rem; border-radius: var(--r-field); background: var(--warn-bg); color: var(--warn-ink); }
+.bill-now__use { display: grid; align-content: start; gap: 0.45rem; }
+.bill-use__label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.bill-use__value { font: 800 1.5rem/1.1 var(--display); font-variant-numeric: tabular-nums; color: var(--ink); }
+.bill-meter { height: 0.6rem; border-radius: var(--r-pill); background: var(--bg-2); overflow: hidden; }
+.bill-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--ok); }
+.bill-meter--near > span { background: var(--warn); }
+.bill-meter--over > span { background: var(--danger); }
+.bill-facts { margin-top: 0.5rem; }
+.bill-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+.bill-plan { display: grid; align-content: start; justify-items: start; gap: 0.6rem; padding: 1.1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.bill-plan--mine { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+.bill-plan__name { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font: 700 1.1rem/1.3 var(--sans); letter-spacing: normal; color: var(--ink); }
+.bill-plan__badge { margin: 0; background: var(--ok-bg); color: var(--ok-ink); }
+.bill-plan__list { display: grid; gap: 0.25rem; margin: 0; padding-left: 1.1rem; color: var(--text); font-size: 0.92rem; }
+.bill-pay { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.5rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.bill-pay__method { display: grid; align-content: start; justify-items: start; gap: 0.4rem; }
+.bill-pay__card { font-weight: 700; color: var(--ink); }
+.bill-pay__form { display: grid; gap: 0.9rem; min-width: 0; }
+.bill-table { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.bill-table:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
+.bill-table .op-table th, .bill-table .op-table td { padding: 0.65rem 1rem; white-space: nowrap; }
+.bill-table tbody tr:last-child > * { border-bottom: 0; }
+/* Words left, amounts right. */
+.bill-invoices th:nth-child(-n + 3), .bill-invoices td:nth-child(-n + 3) { text-align: left; }
+.bill-invoices th:last-child, .bill-invoices td:last-child { text-align: left; }
+.status-chip--inv-paid { background: var(--ok-bg); color: var(--ok-ink); }
+.status-chip--inv-due { background: var(--warn-bg); color: var(--warn-ink); }
+.status-chip--inv-failed { background: var(--danger-bg); color: var(--danger-ink); }
+
+@media (max-width: 720px) {
+  .act-entry { grid-template-columns: minmax(0, 1fr); }
+  .act-entry__area { white-space: normal; }
+  .set-hours__day { grid-template-columns: minmax(0, 1fr); }
+  .set-add { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .set-add .btn { justify-self: start; }
+  .bill-now, .bill-pay { grid-template-columns: minmax(0, 1fr); }
+  .team-roles dl > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (forced-colors: active) {
+  .bill-meter { border: 1px solid CanvasText; }
+  .bill-meter > span { background: Highlight; }
+  .act-entry--staff { border-left: 3px solid CanvasText; }
+}
