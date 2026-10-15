@@ -67,15 +67,6 @@
 }
 
 .ops__me { display: flex; align-items: center; gap: 1rem; margin-left: auto; }
-.ops__demo {
-  padding: 0.3rem 0.55rem;
-  border: 1px dashed var(--line-strong);
-  border-radius: 6px;
-  font: 500 0.62rem/1 var(--mono);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 .ops__who { display: grid; justify-items: end; line-height: 1.2; }
 .ops__name { color: var(--ink); font-weight: 600; font-size: 0.9rem; }
 .ops__role { font: 500 0.62rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
@@ -108,5 +99,9 @@
 @media (max-width: 860px) {
   .ops__bar { flex-wrap: wrap; gap: 0.6rem 1rem; }
   .ops__nav { order: 3; width: 100%; overflow-x: auto; margin: 0 -0.5rem; padding: 0 0.5rem; }
-  .ops__who, .ops__demo { display: none; }
+  .ops__role, .ops__me .demo-chip { display: none; }
 }
+
+.ops__demo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 0.75rem; font-size: 0.85rem; color: var(--muted); }
+a.ops__name { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; border-radius: 4px; }
+a.ops__name:hover { text-decoration-color: currentColor; }

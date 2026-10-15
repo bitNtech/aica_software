@@ -9,6 +9,9 @@ interface Props {
   /** Pass a ref to move focus here, e.g. when a submit fails. */
   ref?: Ref<HTMLDivElement>
   className?: string
+  /** False for an alert that takes focus instead (e.g. an error summary):
+   * focus already reads it, and a live region would read it again. */
+  live?: boolean
 }
 
 const ICON: Record<Tone, ReactNode> = {
@@ -19,12 +22,12 @@ const ICON: Record<Tone, ReactNode> = {
 }
 
 /** Errors interrupt (role=alert); everything else is announced politely. */
-export function Alert({ tone, title, children, ref, className }: Props) {
+export function Alert({ tone, title, children, ref, className, live = true }: Props) {
   return (
     <div
       ref={ref}
       tabIndex={ref ? -1 : undefined}
-      role={tone === 'error' ? 'alert' : 'status'}
+      role={live ? (tone === 'error' ? 'alert' : 'status') : undefined}
       className={['alert', `alert--${tone}`, className].filter(Boolean).join(' ')}
     >
       <svg className="alert__icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">

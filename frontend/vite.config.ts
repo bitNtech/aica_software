@@ -44,5 +44,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Whole-journey UI tests (sign in, build, publish) take 3–5 s on a quiet
+    // machine; the 5 s default fails them on a busy one or a slow CI runner.
+    testTimeout: 15000,
   },
 })

@@ -1,0 +1,178 @@
+import type { AgentTool, KnowledgeSource, PhoneNumber } from '../types'
+import { ago, ahead } from './runtime'
+
+/** The organisation's shared library: knowledge sources, tools and phone
+ * numbers, which agents pick from. Sample data. */
+
+export function seedKnowledge(): KnowledgeSource[] {
+  return [
+    {
+      id: 'kb_doctors',
+      name: 'Doctor schedule, October 2026',
+      kind: 'table',
+      origin: 'doctor-schedule-oct-2026.xlsx',
+      description: 'Which doctor sits in which OPD, on which days and hours.',
+      status: 'ready',
+      passages: 84,
+      refreshedAt: ago(9),
+      expiresAt: ahead(18),
+      refreshEvery: 'never',
+      usedByAgentIds: ['agt_reception', 'agt_appointments'],
+    },
+    {
+      id: 'kb_prices',
+      name: 'OPD and lab price list',
+      kind: 'document',
+      origin: 'price-list-2026.pdf',
+      description: 'Consultation fees, common lab tests and packages.',
+      status: 'ready',
+      passages: 212,
+      refreshedAt: ago(40),
+      expiresAt: null,
+      refreshEvery: 'never',
+      usedByAgentIds: ['agt_reception'],
+    },
+    {
+      id: 'kb_faq',
+      name: 'Visiting hours and directions',
+      kind: 'faq',
+      origin: '6 questions',
+      description: 'Timings, parking, departments, what to bring.',
+      faq: [
+        { q: 'What are the OPD timings?', a: 'Monday to Saturday, 8 AM to 8 PM. Sunday, emergency only.' },
+        { q: 'Where can I park?', a: 'Free parking in the basement, entrance from Gandhipuram Main Road.' },
+        { q: 'What are the visiting hours?', a: '4 PM to 7 PM daily. One visitor per patient at a time.' },
+        { q: 'What should I bring to my first visit?', a: 'A photo ID, old prescriptions and reports, and your insurance card if you have one.' },
+        { q: 'Where is the lab?', a: 'Ground floor, next to the pharmacy. Reports can be collected from 8 AM to 8 PM.' },
+        { q: 'Is there a pharmacy?', a: 'Yes, open 24 hours, on the ground floor.' },
+      ],
+      status: 'ready',
+      passages: 6,
+      refreshedAt: ago(3),
+      expiresAt: null,
+      refreshEvery: 'never',
+      usedByAgentIds: ['agt_reception', 'agt_appointments', 'agt_reports'],
+    },
+    {
+      id: 'kb_insurance',
+      name: 'Insurance partners',
+      kind: 'web',
+      origin: 'https://example.com/insurance-partners',
+      description: 'Insurers and TPAs the hospital works with for cashless claims.',
+      status: 'ready',
+      passages: 26,
+      refreshedAt: ago(35),
+      expiresAt: ago(5),
+      refreshEvery: 'weekly',
+      usedByAgentIds: [],
+    },
+  ]
+}
+
+export function seedTools(): AgentTool[] {
+  return [
+    {
+      id: 'tool_transfer',
+      name: 'Transfer to a person',
+      kind: 'builtin',
+      builtin: 'transfer',
+      description: 'Puts the caller through to the front desk, with a summary of the call so far.',
+      acts: false,
+      params: [],
+      enabled: true,
+    },
+    {
+      id: 'tool_end',
+      name: 'End the call',
+      kind: 'builtin',
+      builtin: 'end_call',
+      description: 'Says the closing line and hangs up.',
+      acts: false,
+      params: [],
+      enabled: true,
+    },
+    {
+      id: 'tool_sms',
+      name: 'Send an SMS',
+      kind: 'builtin',
+      builtin: 'sms',
+      description: 'Texts the caller a confirmation, directions or a link.',
+      acts: true,
+      params: [{ name: 'message', type: 'string', required: true, description: 'The text to send.' }],
+      enabled: true,
+    },
+    {
+      id: 'tool_whatsapp',
+      name: 'Send a WhatsApp message',
+      kind: 'builtin',
+      builtin: 'whatsapp',
+      description: 'Sends the caller a WhatsApp message from the hospital’s business number.',
+      acts: true,
+      params: [{ name: 'message', type: 'string', required: true, description: 'The message to send.' }],
+      enabled: false,
+    },
+    {
+      id: 'tool_book',
+      name: 'Book an appointment',
+      kind: 'http',
+      description: 'Books an OPD slot in the hospital information system.',
+      acts: true,
+      method: 'POST',
+      url: 'https://his.example.com/api/appointments',
+      credentialName: 'HIS_API_KEY',
+      timeoutMs: 8000,
+      retries: 0,
+      params: [
+        { name: 'patient_name', type: 'string', required: true, description: 'Full name.' },
+        { name: 'phone', type: 'string', required: true, description: 'Registered mobile number.' },
+        { name: 'department', type: 'string', required: true, description: 'OPD department.' },
+        { name: 'date', type: 'date', required: true, description: 'Appointment date.' },
+      ],
+      enabled: true,
+      lastTestedAt: ago(2),
+    },
+    {
+      id: 'tool_slots',
+      name: 'Find free slots',
+      kind: 'http',
+      description: 'Lists a doctor’s free slots for a day.',
+      acts: false,
+      method: 'GET',
+      url: 'https://his.example.com/api/slots',
+      credentialName: 'HIS_API_KEY',
+      timeoutMs: 5000,
+      retries: 1,
+      params: [
+        { name: 'department', type: 'string', required: true, description: 'OPD department.' },
+        { name: 'date', type: 'date', required: true, description: 'The day to check.' },
+      ],
+      enabled: true,
+      lastTestedAt: ago(2),
+    },
+    {
+      id: 'tool_report',
+      name: 'Look up report status',
+      kind: 'http',
+      description: 'Checks the lab system for a patient’s reports.',
+      acts: false,
+      method: 'GET',
+      url: 'https://lis.example.com/api/reports',
+      credentialName: 'LIS_TOKEN',
+      timeoutMs: 5000,
+      retries: 1,
+      params: [{ name: 'patient_id', type: 'string', required: true, description: 'Patient ID from the bill.' }],
+      enabled: true,
+      lastTestedAt: null,
+    },
+  ]
+}
+
+export function seedNumbers(): PhoneNumber[] {
+  return [
+    { id: 'num_1200', number: '+91 00000 01200', label: 'Main reception', agentId: 'agt_reception', hours: '24 hours', afterHours: 'agent', transferTo: 'Front desk' },
+    { id: 'num_1210', number: '+91 00000 01210', label: 'OPD appointments', agentId: 'agt_appointments', hours: '8 AM to 8 PM', afterHours: 'voicemail', transferTo: 'OPD desk' },
+    { id: 'num_1220', number: '+91 00000 01220', label: 'Lab', agentId: 'agt_reports', hours: '7 AM to 9 PM', afterHours: 'voicemail', transferTo: 'Lab counter' },
+    { id: 'num_1230', number: '+91 00000 01230', label: 'Spare line', agentId: null, hours: '24 hours', afterHours: 'agent', transferTo: null },
+    { id: 'num_1240', number: '+91 00000 01240', label: 'Spare line 2', agentId: null, hours: '24 hours', afterHours: 'agent', transferTo: null },
+  ]
+}

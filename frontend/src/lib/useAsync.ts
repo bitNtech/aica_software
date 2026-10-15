@@ -6,7 +6,8 @@ export type Async<T> =
   | { state: 'error'; error: unknown }
 
 /** Runs `load` on mount (and on reload()), ignoring results that arrive
- * after unmount. Keeps the last data on screen while reloading. */
+ * after unmount. Keeps the last data on screen while reloading; after an
+ * error, reload() shows loading again, so a retry is visibly happening. */
 export function useAsync<T>(load: () => Promise<T>) {
   const [result, setResult] = useState<Async<T>>({ state: 'loading' })
   const [tick, setTick] = useState(0)
@@ -23,6 +24,9 @@ export function useAsync<T>(load: () => Promise<T>) {
     // `load` is expected to be stable (useCallback); tick forces a re-run.
   }, [load, tick])
 
-  const reload = useCallback(() => setTick((t) => t + 1), [])
+  const reload = useCallback(() => {
+    setResult((r) => (r.state === 'error' ? { state: 'loading' } : r))
+    setTick((t) => t + 1)
+  }, [])
   return [result, reload, setResult] as const
 }

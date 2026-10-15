@@ -1,7 +1,7 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { Spinner } from './Spinner'
 
-type Variant = 'orange' | 'plum' | 'line'
+type Variant = 'orange' | 'plum' | 'line' | 'danger'
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
@@ -13,6 +13,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   busyLabel?: string
   arrow?: boolean
   children: ReactNode
+  ref?: Ref<HTMLButtonElement>
 }
 
 export function Button({
@@ -26,13 +27,14 @@ export function Button({
   disabled,
   type = 'button',
   children,
+  ref,
   ...rest
 }: Props) {
   const cls = ['btn', `btn--${variant}`, size === 'sm' && 'btn--sm', block && 'btn--block', className]
     .filter(Boolean)
     .join(' ')
   return (
-    <button {...rest} type={type} className={cls} disabled={disabled || busy} aria-busy={busy || undefined}>
+    <button {...rest} ref={ref} type={type} className={cls} disabled={disabled || busy} aria-busy={busy || undefined}>
       {busy ? (
         <>
           <Spinner />

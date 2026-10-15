@@ -12,6 +12,8 @@ interface Props {
   docTitle: string
   /** Shown as a count on the "Sign-up requests" tab. */
   pendingCount?: number
+  /** The page runs on sample data (no API yet): says so under the title. */
+  demoData?: boolean
   children: ReactNode
 }
 
@@ -20,7 +22,7 @@ interface Props {
  * "you are looking at every client's data" on every page, as the layout spec
  * asks. The bar is the landing page's night; the work sits on paper.
  */
-export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, children }: Props) {
+export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, demoData, children }: Props) {
   const { user, signOut, client } = useAuth()
   const [leaving, setLeaving] = useState(false)
 
@@ -55,8 +57,20 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, childre
               </span>
             ) : null}
           </NavLink>
+          <NavLink to="/ops/usage" className="ops__link">
+            Usage
+          </NavLink>
+          <NavLink to="/ops/status" className="ops__link">
+            Service status
+          </NavLink>
+          <NavLink to="/ops/templates" className="ops__link">
+            Templates
+          </NavLink>
           {user.platformRole === 'master_admin' && (
             <>
+              <NavLink to="/ops/platform" className="ops__link">
+                Platform
+              </NavLink>
               <NavLink to="/ops/people" className="ops__link">
                 People
               </NavLink>
@@ -68,9 +82,12 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, childre
         </nav>
 
         <div className="ops__me">
-          {client.isDemo && <span className="ops__demo">Demo</span>}
+          {client.isDemo && <span className="demo-chip">Demo</span>}
           <span className="ops__who">
-            <span className="ops__name">{user.name}</span>
+            <Link to="/account" className="ops__name">
+              {user.name}
+              <span className="sr-only">: your account</span>
+            </Link>
             <span className={`ops__role ops__role--${user.platformRole}`}>{ROLE_LABEL[user.platformRole]}</span>
           </span>
           <button
@@ -94,6 +111,12 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, childre
           </p>
           <h1 className="display ops__title">{title}</h1>
           {lede && <div className="ops__lede">{lede}</div>}
+          {demoData && (
+            <p className="ops__demo">
+              <span className="demo-chip">Demo data</span>
+              <span>Sample data: this page has no live connection yet. Changes stay in this browser tab until you close it.</span>
+            </p>
+          )}
         </header>
         {children}
       </main>

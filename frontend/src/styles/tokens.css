@@ -72,11 +72,16 @@
   --orange-text: #b8400f;
   --line: var(--line-p);
   --line-strong: #c9bda7;
+  /* The edge of an unchecked checkbox, radio or switch: 3:1 or more on
+     paper and fields (WCAG 1.4.11). */
+  --control-border: #857a6b;
   --danger-ink: var(--danger);
   --danger-bg: #fbe9e7;
-  --ok-ink: var(--ok);
+  /* Darker than the brand green and amber, so small text on their tints
+     reaches 4.5:1. */
+  --ok-ink: #146c47;
   --ok-bg: #e5f4ec;
-  --warn-ink: var(--warn);
+  --warn-ink: #8a5200;
   --warn-bg: #fbf0dc;
   --info-bg: #e8edff;
   --info-ink: var(--aica-deep);
@@ -96,6 +101,7 @@
     --orange-text: var(--orange);
     --line: rgba(247, 243, 237, 0.13);
     --line-strong: rgba(247, 243, 237, 0.28);
+    --control-border: rgba(247, 243, 237, 0.45);
     --danger-ink: #ff8a8f;
     --danger-bg: rgba(255, 77, 94, 0.12);
     --ok-ink: #5fe0a8;
