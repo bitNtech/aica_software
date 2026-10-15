@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
+import { Analytics } from '@vercel/analytics/react'
 import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } from './auth/guards'
 import { ConsoleShell } from './components/console/ConsoleShell'
 import type { PageKey } from './console/access'
@@ -121,6 +122,7 @@ export default function App() {
       <Route path="/403" element={<ForbiddenPage />} />
       <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
     </>
   )
 }
