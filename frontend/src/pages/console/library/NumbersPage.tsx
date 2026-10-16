@@ -23,10 +23,10 @@ const AFTER_LABEL: Record<PhoneNumber['afterHours'], string> = {
 
 /** /o/:slug/numbers: which agent answers which line, and when. */
 export default function NumbersPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
-  const canEdit = pageAccess(org.role, 'numbers') === 'edit'
+  const canEdit = pageAccess(access, 'numbers') === 'edit'
   const load = useCallback(async () => {
     const [numbers, agents] = await Promise.all([client.listNumbers(org.orgSlug), client.listAgents(org.orgSlug)])
     // Only published agents can answer a line.
@@ -41,7 +41,7 @@ export default function NumbersPage() {
 
   return (
     <ConsolePage
-      kicker="Build"
+      kicker="Agents"
       title="Phone numbers"
       docTitle="Phone numbers"
       lede={<p>Your lines, the agent that answers each, its hours, and where calls go when your team is needed.</p>}

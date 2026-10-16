@@ -7,8 +7,8 @@ import { renderApp, signIn, signOutToLogin } from './renderApp'
 
 /** Signs in as an admin and opens a new agent at step 0. */
 async function startBuilder(opts: { processingMs?: number } = {}) {
-  const view = renderApp('/o/arogya-demo/agents', { consoleClient: createDemoConsoleClient({ latency: 0, ...opts }) })
-  await signIn(view.user, 'admin@example.com')
+  const view = renderApp('/ops/orgs/arogya-demo/agents', { consoleClient: createDemoConsoleClient({ latency: 0, ...opts }) })
+  await signIn(view.user, 'master@example.com')
   await view.user.click(await screen.findByRole('link', { name: /new agent/i }))
   await screen.findByRole('heading', { level: 1, name: /learn from past calls/i })
   await screen.findByRole('checkbox', { name: /choose all ready calls/i })
@@ -211,14 +211,14 @@ describe('builder robustness', () => {
         return demo.createDraft(o, n)
       },
     }
-    const { user } = renderApp('/o/arogya-demo/agents', { consoleClient: slow })
-    await signIn(user, 'admin@example.com')
+    const { user } = renderApp('/ops/orgs/arogya-demo/agents', { consoleClient: slow })
+    await signIn(user, 'master@example.com')
     await user.click(await screen.findByRole('link', { name: /new agent/i }))
     expect(await screen.findByText(/starting a new agent/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: /^home$/i }))
-    await screen.findByRole('heading', { level: 1, name: /you're in/i })
+    await user.click(screen.getByRole('link', { name: /^overview$/i }))
+    await screen.findByRole('heading', { level: 1, name: /every client/i })
     await act(async () => release())
-    expect(screen.getByRole('heading', { level: 1, name: /you're in/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /every client/i })).toBeInTheDocument()
   })
 
   it('says when a save fails, and recovers with Retry', async () => {
@@ -231,8 +231,8 @@ describe('builder robustness', () => {
         return demo.saveDraft(o, d)
       },
     }
-    const { user } = renderApp('/o/arogya-demo/agents', { consoleClient: flaky })
-    await signIn(user, 'admin@example.com')
+    const { user } = renderApp('/ops/orgs/arogya-demo/agents', { consoleClient: flaky })
+    await signIn(user, 'master@example.com')
     await user.click(await screen.findByRole('link', { name: /new agent/i }))
     await user.click(await screen.findByRole('checkbox', { name: /callers agreed/i }))
     expect(await screen.findByText(/couldn’t save your changes/i, {}, { timeout: 3000 })).toBeInTheDocument()
@@ -248,9 +248,9 @@ describe('builder robustness', () => {
     await user.click(screen.getByRole('button', { name: /save and exit/i }))
     await screen.findByRole('list', { name: /agents/i })
     await signOutToLogin(user)
-    await signIn(user, 'admin@example.com')
-    await user.click(await screen.findByRole('button', { name: /arogya/i }))
-    await user.click(await screen.findByRole('link', { name: /^agents$/i }))
+    await signIn(user, 'master@example.com')
+    await user.click((await screen.findAllByRole('link', { name: /arogya demo hospital/i }))[0])
+    await user.click(await screen.findByRole('link', { name: /build and change agents/i }))
     const list = await screen.findByRole('list', { name: /agents/i })
     // Only the sample draft is left; the one started here is gone.
     expect(within(list).getAllByText(/setup: step/i)).toHaveLength(1)

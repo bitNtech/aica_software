@@ -5,6 +5,7 @@ import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } fr
 import { ConsoleShell } from './components/console/ConsoleShell'
 import type { PageKey } from './console/access'
 import { ActingAsBanner } from './components/ops/ActingAsBanner'
+import { OpsOrgPage, OpsOrgShell } from './components/ops/OpsOrgShell'
 import { PendingPage, SessionExpiredPage, SignedOutPage, SuspendedPage } from './pages/AccountStatusPages'
 import AccountPage from './pages/AccountPage'
 import ChooseOrgPage from './pages/ChooseOrgPage'
@@ -27,6 +28,9 @@ import BillingPage from './pages/console/manage/BillingPage'
 import CallbacksPage from './pages/console/operate/CallbacksPage'
 import HandoffsPage from './pages/console/operate/HandoffsPage'
 import LiveCallsPage from './pages/console/operate/LiveCallsPage'
+import BotDeskPage from './pages/console/operate/BotDeskPage'
+import RequestsPage from './pages/console/RequestsPage'
+import OpsChangesPage from './pages/ops/OpsChangesPage'
 import NewAgentPage from './pages/console/builder/NewAgentPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import InvitePage from './pages/InvitePage'
@@ -49,6 +53,7 @@ const guest = (page: ReactNode) => <RedirectIfSignedIn>{page}</RedirectIfSignedI
 const member = (page: ReactNode) => <RequireAuth>{page}</RequireAuth>
 const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
 const org = (page: PageKey, element: ReactNode) => <OrgPage page={page}>{element}</OrgPage>
+const opsOrg = (page: PageKey, element: ReactNode) => <OpsOrgPage page={page}>{element}</OpsOrgPage>
 
 export default function App() {
   return (
@@ -88,9 +93,12 @@ export default function App() {
       >
         <Route index element={org('home', <ConsoleHomePage />)} />
         <Route path="agents" element={org('agents', <AgentsPage />)} />
+        {/* Only bitNtech builds agents (from Ops); these explain that to anyone with an old link. */}
         <Route path="agents/new" element={org('agentBuilder', <NewAgentPage />)} />
         <Route path="agents/drafts/:draftId/:step?" element={org('agentBuilder', <BuilderRoute />)} />
         <Route path="agents/:agentId/:tab?" element={org('agentWorkspace', <AgentWorkspaceRoute />)} />
+        <Route path="requests" element={org('requests', <RequestsPage />)} />
+        <Route path="desk" element={org('desk', <BotDeskPage />)} />
         <Route path="uploads" element={org('uploads', <UploadsPage />)} />
         <Route path="knowledge" element={org('knowledge', <KnowledgePage />)} />
         <Route path="integrations" element={org('integrations', <ToolsPage />)} />
@@ -114,6 +122,17 @@ export default function App() {
       <Route path="/ops/people" element={staff(<OpsPeoplePage />)} />
       <Route path="/ops/audit" element={staff(<OpsAuditPage />)} />
       <Route path="/ops/orgs/:slug" element={staff(<OpsOrgDetailPage />)} />
+      <Route path="/ops/changes" element={staff(<OpsChangesPage />)} />
+      {/* One organisation's agents, worked on by bitNtech: the console's agent pages in an Ops frame. */}
+      <Route element={staff(<OpsOrgShell />)}>
+        <Route path="/ops/orgs/:slug/agents" element={opsOrg('agents', <AgentsPage />)} />
+        <Route path="/ops/orgs/:slug/agents/new" element={opsOrg('agentBuilder', <NewAgentPage />)} />
+        <Route path="/ops/orgs/:slug/agents/drafts/:draftId/:step?" element={opsOrg('agentBuilder', <BuilderRoute />)} />
+        <Route path="/ops/orgs/:slug/agents/:agentId/:tab?" element={opsOrg('agentWorkspace', <AgentWorkspaceRoute />)} />
+        <Route path="/ops/orgs/:slug/integrations" element={opsOrg('integrations', <ToolsPage />)} />
+        <Route path="/ops/orgs/:slug/uploads" element={opsOrg('uploads', <UploadsPage />)} />
+        <Route path="/ops/orgs/:slug/requests" element={<RequestsPage />} />
+      </Route>
       <Route path="/ops/templates" element={staff(<OpsTemplatesPage />)} />
       <Route path="/ops/usage" element={staff(<OpsUsagePage />)} />
       <Route path="/ops/platform" element={staff(<OpsPlatformPage />)} />

@@ -18,7 +18,11 @@ export function clock(sec: number): string {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 }
 
-/** One call's transcript, turn by turn. */
+/** 820 → "0.8 s". */
+export const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`
+
+/** One call's transcript, turn by turn. Agent turns show how long the
+ * caller waited for them, when the call has timings. */
 export function TranscriptView({ transcript, redact }: { transcript: Transcript; redact: boolean }) {
   return (
     <ol className="transcript">
@@ -26,6 +30,8 @@ export function TranscriptView({ transcript, redact }: { transcript: Transcript;
         <li key={i} className={`transcript__turn transcript__turn--${t.speaker}`}>
           <span className="transcript__who">
             {SPEAKER[t.speaker]} <time className="transcript__at">{clock(t.at)}</time>
+            {t.latencyMs !== undefined && <> <span className="transcript__at">· replied in {seconds(t.latencyMs)}</span></>}
+            {t.interrupted && <> <span className="transcript__cut">· caller cut in</span></>}
           </span>
           <p className="transcript__text">{renderTurnText(t.text, redact)}</p>
         </li>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { asAuthError } from '../../../auth/types'
-import { can, tabAccess, type AgentTab } from '../../../console/access'
+import { can, isMaster, tabAccess, type AgentTab } from '../../../console/access'
 import { useConsole } from '../../../console/ConsoleProvider'
 import type { AgentDetail, AgentPatch, AgentSpec } from '../../../console/types'
 import { useOrg } from '../../../console/useOrg'
@@ -18,7 +18,9 @@ import { useAutosave } from '../builder/useAutosave'
 import { AGENT_STATUS_LABEL } from '../AgentsPage'
 import { specProblems } from './checks'
 import { diffSpecs, type NameLookup } from './diff'
-import { TAB_LABEL, TAB_ORDER, type Library, type TabProps } from './shared'
+import { STRUCTURE_TABS, TAB_LABEL, TAB_ORDER, type Library, type TabProps } from './shared'
+import { AnalysisTab } from './tabs/AnalysisTab'
+import { PipelineTab } from './tabs/PipelineTab'
 import { BehaviourTab } from './tabs/BehaviourTab'
 import { ContextTab } from './tabs/ContextTab'
 import { FlowTab } from './tabs/FlowTab'
@@ -30,14 +32,15 @@ import { ChangeList } from './ChangeList'
 import '../builder/Builder.css'
 import './Workspace.css'
 
-/** /o/:slug/agents/:agentId/:tab — keyed by agent, so another agent starts fresh. */
+/** /o/:slug/agents/:agentId/:tab, and /ops/orgs/:slug/agents/:agentId/:tab
+ * for bitNtech — keyed by agent, so another agent starts fresh. */
 export default function AgentWorkspaceRoute() {
   const { agentId = '' } = useParams()
   return <AgentWorkspace key={agentId} agentId={agentId} />
 }
 
 function AgentWorkspace({ agentId }: { agentId: string }) {
-  const { org } = useOrg()
+  const { org, access, base: orgBase } = useOrg()
   const client = useConsole()
   const navigate = useNavigate()
   const { tab: tabParam } = useParams()
@@ -57,8 +60,14 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
   const problemsRef = useRef<HTMLDivElement>(null)
 
   const loadLib = useCallback(async (): Promise<Library> => {
-    const [voices, tools, knowledge, numbers] = await Promise.all([client.listVoices(), client.listTools(org.orgSlug), client.listKnowledge(org.orgSlug), client.listNumbers(org.orgSlug)])
-    return { voices, tools, knowledge, numbers }
+    const [voices, tools, knowledge, numbers, models] = await Promise.all([
+      client.listVoices(),
+      client.listTools(org.orgSlug),
+      client.listKnowledge(org.orgSlug),
+      client.listNumbers(org.orgSlug),
+      client.listModels(),
+    ])
+    return { voices, tools, knowledge, numbers, models }
   }, [client, org.orgSlug])
   const [lib, reloadLib, setLib] = useAsync(loadLib)
 
@@ -113,7 +122,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
             <button type="button" className="btn-text" onClick={load}>
               Try again
             </button>
-            <Link className="link" to={`/o/${org.orgSlug}/agents`}>
+            <Link className="link" to={`${orgBase}/agents`}>
               Back to agents
             </Link>
           </p>
@@ -141,21 +150,23 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
     )
   }
 
-  const base = `/o/${org.orgSlug}/agents/${agentId}`
-  const tabs = TAB_ORDER.filter((t) => tabAccess(org.role, t))
+  const base = `${orgBase}/agents/${agentId}`
+  const tabs = TAB_ORDER.filter((t) => tabAccess(access, t))
   const tab = tabs.find((t) => t === tabParam)
   // No tab, or one this role can't see: the first it can.
   if (!tab) return <Navigate to={`${base}/${tabs[0]}`} replace />
 
   const a = detail.agent
-  const canEdit = tabAccess(org.role, 'flow') === 'edit'
-  const canPublish = can(org.role, 'agent.publish')
+  // Can change some part of the setup (the save status shows then).
+  const canEdit = tabs.some((t) => t !== 'test' && t !== 'versions' && t !== 'settings' && tabAccess(access, t) === 'edit')
+  const canPublish = can(access, 'agent.publish')
+  const canRequest = can(access, 'request.create')
   const problems = specProblems(spec, lib.data.voices, lib.data.tools)
   const problemTabs = (Object.keys(problems) as AgentTab[]).filter((t) => tabs.includes(t))
   const names: NameLookup = {
     knowledge: (k) => lib.data.knowledge.find((x) => x.id === k)?.name ?? 'a removed source',
     // Roles without the Tools tab don't learn the tools' names here either.
-    tool: (t) => (tabAccess(org.role, 'tools') ? (lib.data.tools.find((x) => x.id === t)?.name ?? 'a removed tool') : 'a tool'),
+    tool: (t) => (tabAccess(access, 'tools') ? (lib.data.tools.find((x) => x.id === t)?.name ?? 'a removed tool') : 'a tool'),
     voice: (v) => lib.data.voices.find((x) => x.id === v)?.name ?? v,
   }
 
@@ -249,15 +260,17 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
     await autosave.flush().catch(() => {})
     await client.deleteAgent(org.orgSlug, agentId)
     autosave.cancel()
-    navigate(`/o/${org.orgSlug}/agents`, { replace: true, state: { notice: `${a.name} is deleted.` } })
+    navigate(`${orgBase}/agents`, { replace: true, state: { notice: `${a.name} is deleted.` } })
   }
 
   const props: TabProps = {
     org,
+    access,
+    base: orgBase,
     detail,
     spec,
     update,
-    readOnly: tabAccess(org.role, tab) !== 'edit',
+    readOnly: tabAccess(access, tab) !== 'edit',
     errors: showErrors ? (problems[tab] ?? {}) : {},
     lib: lib.data,
   }
@@ -267,7 +280,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
     <ConsolePage
       kicker={
         <>
-          <Link className="ws__crumb" to={`/o/${org.orgSlug}/agents`}>
+          <Link className="ws__crumb" to={`${orgBase}/agents`}>
             Agents
           </Link>{' '}
           <i aria-hidden="true">/</i> {a.useCase}
@@ -297,7 +310,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
         <div className="ws__changes" role="region" aria-labelledby={`${id}-changes`}>
           <p id={`${id}-changes`}>
             <strong>Draft changes, not live yet.</strong> Callers still get version {a.version}
-            {canPublish ? '. Publish to make them the next version.' : ' until an owner or admin publishes them.'}
+            {canPublish ? '. Publish to make them the next version.' : ' until someone who can publish does.'}
           </p>
           {canPublish && (
             <div className="ws__changes-actions">
@@ -352,19 +365,42 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
         <>
           {/* The read-only views are lists without a heading of their own. */}
           {tab !== 'flow' && tab !== 'versions' && <h2 className="sr-only">{TAB_LABEL[tab]}</h2>}
-          <p className="ws__ro-note">You can view this agent. Owners and admins can change it.</p>
+          {STRUCTURE_TABS.has(tab) && !isMaster(access) ? (
+            <div className="ws__ask">
+              <p>bitNtech sets up the {tab === 'flow' ? 'conversation flow' : tab === 'tools' ? 'tools' : 'voice pipeline'}, so every change is built and tested before it goes live.</p>
+              {canRequest && (
+                <Link className="btn btn--line btn--sm" to={`${orgBase}/requests?new=${tab === 'tools' ? 'integration' : 'flow_change'}&agent=${agentId}`}>
+                  <span>Ask for a change</span>
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="ws__ro-note">You can view this agent. Owners and admins can change it.</p>
+          )}
         </>
       )}
 
       <div className="ws__panel">
         {tab === 'flow' && <FlowTab {...props} />}
         {tab === 'behaviour' && <BehaviourTab {...props} />}
+        {tab === 'pipeline' && <PipelineTab {...props} />}
         {tab === 'knowledge' && <ContextTab {...props} part="knowledge" />}
         {tab === 'tools' && <ContextTab {...props} part="tools" />}
         {tab === 'rules' && <RulesTab {...props} />}
-        {tab === 'test' && <TestTab {...props} hasChanges={hasChanges} />}
+        {tab === 'analysis' && <AnalysisTab {...props} />}
+        {tab === 'test' && <TestTab {...props} hasChanges={hasChanges} onBeforeRun={() => autosave.flush()} />}
         {tab === 'versions' && <VersionsTab {...props} hasChanges={hasChanges} names={names} canRollback={canPublish} onRollback={rollback} />}
-        {tab === 'settings' && <SettingsTab {...props} canDelete={can(org.role, 'agent.delete')} onUpdate={updateAgent} onDelete={deleteAgent} />}
+        {tab === 'settings' && (
+          <SettingsTab
+            {...props}
+            canDelete={can(access, 'agent.delete')}
+            canRename={can(access, 'agent.configure')}
+            canNumber={isMaster(access) || access.perms.has('library.numbers')}
+            canPause={canPublish}
+            onUpdate={updateAgent}
+            onDelete={deleteAgent}
+          />
+        )}
       </div>
 
       <Modal open={publish !== 'closed'} title={`Publish version ${(a.version ?? 0) + 1}?`} onClose={() => publish !== 'busy' && setPublish('closed')} wide>

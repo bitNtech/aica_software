@@ -76,7 +76,7 @@ function placeholders(nodes: FlowNode[]): string[] {
 }
 
 /** Step 7: check everything, try it, then publish. */
-export function StepReview({ draft, org, validator, save, done }: StepProps) {
+export function StepReview({ draft, org, base: orgBase, validator, save, done }: StepProps) {
   const id = useId()
   const client = useConsole()
   const navigate = useNavigate()
@@ -130,7 +130,7 @@ export function StepReview({ draft, org, validator, save, done }: StepProps) {
   const where = choice ?? (free.length ? 'number' : 'paused')
   const chosenNumber = free.find((n) => n.id === numberId)?.id ?? free[0]?.id ?? ''
   const blocked = blocking.length > 0 || (where === 'number' && !free.length)
-  const base = `/o/${org.orgSlug}/agents/drafts/${draft.id}`
+  const base = `${orgBase}/agents/drafts/${draft.id}`
   const voice = data.voices.find((v) => v.id === draft.behaviour.voiceId)
   const steps = countNodes(draft.flow) - draft.flow.length
   const reason = blocking.length
@@ -157,7 +157,7 @@ export function StepReview({ draft, org, validator, save, done }: StepProps) {
       const agent = await client.publishDraft(org.orgSlug, draft.id, target)
       // The draft is now an agent: nothing more to save to it.
       done()
-      navigate(`/o/${org.orgSlug}/agents`, {
+      navigate(`${orgBase}/agents`, {
         replace: true,
         state: { notice: agent.phoneNumber ? `${agent.name} is live on ${agent.phoneNumber}.` : `${agent.name} is published and paused. Give it a number to go live.` },
       })

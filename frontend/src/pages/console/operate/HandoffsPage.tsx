@@ -15,7 +15,7 @@ import './Operate.css'
 
 /** /o/:slug/handoffs: callers the agents passed to a person, waiting now. */
 export default function HandoffsPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
   const load = useCallback(() => client.listHandoffs(org.orgSlug), [client, org.orgSlug])
@@ -124,7 +124,7 @@ export default function HandoffsPage() {
                     </div>
                     <p className="op-row__state">
                       {h.status === 'taken' ? `Taken by ${h.takenBy} at ${timeOfDay(h.takenAt!)}` : 'Caller hung up before anyone answered'}
-                      {h.status === 'missed' && canOpen(org.role, 'callbacks') && (
+                      {h.status === 'missed' && canOpen(access, 'callbacks') && (
                         <>
                           {' '}
                           <Link className="link" to={`/o/${org.orgSlug}/callbacks`}>

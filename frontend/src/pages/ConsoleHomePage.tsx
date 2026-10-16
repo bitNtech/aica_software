@@ -2,7 +2,7 @@ import { useCallback, useId } from 'react'
 import { Link, useLocation } from 'react-router'
 import { ROLE_LABEL } from '../auth/roles'
 import { asAuthError } from '../auth/types'
-import { canOpen, navFor, PAGE_LABEL, type PageKey } from '../console/access'
+import { canOpen, navFor, PAGE_LABEL, pageAccess, type PageKey } from '../console/access'
 import { useConsole } from '../console/ConsoleProvider'
 import type { Appointment, Callback, Handoff, LiveCall, Report } from '../console/types'
 import { useOrg } from '../console/useOrg'
@@ -26,15 +26,15 @@ interface Today {
 /** /o/:slug: today at a glance. What shows depends on the role: the front
  * desk see the work waiting for them first; managers see today's numbers. */
 export default function ConsoleHomePage() {
-  const { user, org } = useOrg()
+  const { user, org, access, base } = useOrg()
   const client = useConsole()
   const id = useId()
   // Set by RequireOrgPage when this role can't open the page asked for.
   const denied = (useLocation().state as { deniedPage?: PageKey } | null)?.deniedPage
-  const pages = navFor(org.role)
+  const pages = navFor(access)
     .flatMap((s) => s.items)
     .filter((i) => i.page !== 'home')
-  const may = (p: PageKey) => canOpen(org.role, p)
+  const may = (p: PageKey) => canOpen(access, p)
 
   const load = useCallback(async (): Promise<Today> => {
     const today = localDay(0)
@@ -46,16 +46,16 @@ export default function ConsoleHomePage() {
       may('appointments') ? client.listAppointments(org.orgSlug, today, today) : null,
     ])
     return { report, live, handoffs, callbacks, appointments }
-    // `may` reads only org.role.
-  }, [client, org.orgSlug, org.role])
+    // `may` reads only `access`.
+  }, [client, org.orgSlug, access])
   const today = useLiveData(load, 15000)
   const now = useNow(15000)
   const t = today.data
   const waiting = t?.handoffs?.filter((h) => h.status === 'waiting') ?? []
-  const openCallbacks = t?.callbacks?.filter((c) => c.status === 'open' && (org.role !== 'front_desk' || c.assignedTo?.id === user.id || !c.assignedTo)) ?? []
+  const ownCallbacks = pageAccess(access, 'callbacks') === 'own'
+  const openCallbacks = t?.callbacks?.filter((c) => c.status === 'open' && (!ownCallbacks || c.assignedTo?.id === user.id || !c.assignedTo)) ?? []
   const overdue = openCallbacks.filter((c) => Date.parse(c.dueBy) < now)
   const toCheck = t?.appointments?.filter((a) => a.status === 'needs_check') ?? []
-  const base = `/o/${org.orgSlug}`
 
   return (
     <ConsolePage
@@ -114,7 +114,7 @@ export default function ConsoleHomePage() {
             {t.callbacks && (
               <AttnCard
                 to={`${base}/callbacks`}
-                label={org.role === 'front_desk' ? 'Callbacks for you or nobody yet' : 'Callbacks to make'}
+                label={ownCallbacks ? 'Callbacks for you or nobody yet' : 'Callbacks to make'}
                 count={openCallbacks.length}
                 urgent={overdue.length > 0}
                 detail={overdue.length ? `${overdue.length} overdue` : 'None overdue'}

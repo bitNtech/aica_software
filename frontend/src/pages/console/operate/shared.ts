@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LANGUAGE_LABEL } from '../../../auth/roles'
 import type { Language } from '../../../auth/types'
-import type { CallOutcome } from '../../../console/types'
+import type { CallOutcome, Sentiment } from '../../../console/types'
 
 export const OUTCOME_LABEL: Record<CallOutcome, string> = {
   resolved: 'Answered by the agent',
@@ -10,6 +10,12 @@ export const OUTCOME_LABEL: Record<CallOutcome, string> = {
   callback: 'Callback asked for',
   dropped: 'Caller hung up',
   emergency: 'Emergency',
+}
+
+export const SENTIMENT_LABEL: Record<Sentiment, string> = {
+  positive: 'Pleased',
+  neutral: 'Neutral',
+  negative: 'Unhappy',
 }
 
 export const languageName = (l: Language | 'mixed') => (l === 'mixed' ? 'Mixed' : LANGUAGE_LABEL[l])

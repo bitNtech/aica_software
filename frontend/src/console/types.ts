@@ -1,4 +1,4 @@
-import type { Language, Role } from '../auth/types'
+import type { Language, Permission, PlatformRole, Role } from '../auth/types'
 
 /**
  * The organisation console's data, as the pages expect it. Provisional: the
@@ -30,6 +30,8 @@ export interface AgentSummary {
   setupStep?: BuilderStep
   /** Published, with saved edits not published yet. */
   hasChanges?: boolean
+  /** Who set it up, e.g. "bitNtech (Vikram S)". */
+  builtBy?: string
 }
 
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
@@ -51,6 +53,9 @@ export interface ConsoleClient {
   // ---- builder
   listAgentTypes(): Promise<AgentType[]>
   listVoices(): Promise<Voice[]>
+  /** The platform's model catalogue, for an agent's voice pipeline. Names
+   * only: service addresses and keys never reach the browser. */
+  listModels(): Promise<ModelCatalogue>
   /** `orgName` personalises the starting greeting. */
   createDraft(orgSlug: string, orgName: string): Promise<AgentDraft>
   getDraft(orgSlug: string, draftId: string): Promise<AgentDraft>
@@ -101,8 +106,32 @@ export interface ConsoleClient {
 
   // ---- phone numbers
   updateNumber(orgSlug: string, id: string, patch: NumberPatch): Promise<PhoneNumber>
-  /** Asks bitNtech for another number; they set it up and it appears here. */
+  /** Asks bitNtech for another number: a change request of kind "number". */
   requestNumber(orgSlug: string, note: string): Promise<void>
+
+  // ---- requests to bitNtech (a hospital asks; the master admin does it)
+  /** Newest first. */
+  listChangeRequests(orgSlug: string): Promise<ChangeRequest[]>
+  createChangeRequest(orgSlug: string, input: NewChangeRequest): Promise<ChangeRequest>
+  /** A reply in the request's thread, from either side. */
+  replyChangeRequest(orgSlug: string, id: string, text: string): Promise<ChangeRequest>
+  /** The person who asked withdraws an open request. */
+  withdrawChangeRequest(orgSlug: string, id: string): Promise<ChangeRequest>
+  /** Master admin: moves a request on, with a note to the hospital. */
+  updateChangeRequest(orgSlug: string, id: string, patch: ChangeRequestPatch): Promise<ChangeRequest>
+
+  // ---- bot desk (front desk run the agents day to day)
+  getDesk(orgSlug: string): Promise<Desk>
+  /** Sends a line's calls to staff instead of the agent, or back. */
+  setLineMode(orgSlug: string, numberId: string, change: LineModeChange): Promise<Desk>
+  /** Creates (no id) or changes a notice. */
+  saveNotice(orgSlug: string, notice: NoticeInput): Promise<Desk>
+  removeNotice(orgSlug: string, id: string): Promise<Desk>
+  saveDoctorChange(orgSlug: string, change: DoctorChangeInput): Promise<Desk>
+  removeDoctorChange(orgSlug: string, id: string): Promise<Desk>
+  /** Reports an answer the agent got wrong, for whoever looks after it. */
+  flagAnswer(orgSlug: string, input: NewAnswerFlag): Promise<AnswerFlag>
+  resolveFlag(orgSlug: string, id: string, resolution: { status: 'fixed' | 'dismissed'; note: string }): Promise<Desk>
 
   // ---- agent workspace (a published agent)
   getAgent(orgSlug: string, agentId: string): Promise<AgentDetail>
@@ -116,12 +145,25 @@ export interface ConsoleClient {
   rollbackAgent(orgSlug: string, agentId: string, version: number): Promise<AgentDetail>
   /** Name, number and live/paused: they apply at once, outside versions. */
   updateAgent(orgSlug: string, agentId: string, patch: AgentPatch): Promise<AgentDetail>
+  /** Master admin only. */
   deleteAgent(orgSlug: string, agentId: string): Promise<void>
+
+  // ---- test scenarios (scripted callers, run against the agent's setup)
+  listScenarios(orgSlug: string, agentId: string): Promise<Scenario[]>
+  /** Creates (no id) or changes a scenario. */
+  saveScenario(orgSlug: string, agentId: string, scenario: ScenarioInput): Promise<Scenario>
+  deleteScenario(orgSlug: string, agentId: string, id: string): Promise<void>
+  /** Runs every scenario against the saved setup (draft changes included). */
+  runScenarios(orgSlug: string, agentId: string): Promise<Scenario[]>
 
   // ---- operate: calls as they happen, and after
   listLiveCalls(orgSlug: string): Promise<LiveCall[]>
   /** Puts the caller through to the person asking (their desk phone). */
   takeOverCall(orgSlug: string, callId: string): Promise<LiveCall>
+  /** A note only the agent hears, e.g. "Offer Saturday with Dr. Arvind". */
+  whisperToAgent(orgSlug: string, callId: string, text: string): Promise<LiveCall>
+  /** Hands the call to a colleague. Warm: the agent tells them about it first. */
+  transferCall(orgSlug: string, callId: string, to: string, warm: boolean): Promise<LiveCall>
   listHandoffs(orgSlug: string): Promise<Handoff[]>
   /** The person asking takes the waiting caller. */
   takeHandoff(orgSlug: string, id: string): Promise<Handoff>
@@ -147,8 +189,12 @@ export interface ConsoleClient {
   inviteMember(orgSlug: string, invite: NewInvite): Promise<Member>
   /** Sends the invitation email again, with a fresh 7-day link. */
   resendInvite(orgSlug: string, memberId: string): Promise<Member>
-  /** Nobody changes their own role; only owners make or change owners. */
+  /** Nobody changes their own role; only owners make or change owners.
+   * A new role starts from its default permissions. */
   changeRole(orgSlug: string, memberId: string, role: Role): Promise<Member>
+  /** What one person may do. `null`: their role's defaults. Nobody changes
+   * their own; only owners change an owner's. */
+  setPermissions(orgSlug: string, memberId: string, permissions: Permission[] | null): Promise<Member>
   /** Removes a member, or cancels an invitation. Their open callbacks go
    * back to nobody. */
   removeMember(orgSlug: string, memberId: string): Promise<void>
@@ -173,6 +219,10 @@ export interface Viewer {
   name: string
   /** Their role in each organisation, by slug. */
   roles: Record<string, Role>
+  /** Their permissions in each organisation, by slug. */
+  permissions?: Record<string, Permission[]>
+  /** bitNtech accounts, working on organisations from Ops. */
+  platformRole?: PlatformRole | null
 }
 
 /* ---------------------------------------------------------------- builder
@@ -212,6 +262,10 @@ export interface TranscriptTurn {
   /** Seconds from the start of the call. */
   at: number
   text: string
+  /** Agent turns: ms from the caller stopping to the agent starting to speak. */
+  latencyMs?: number
+  /** The caller talked over this turn. */
+  interrupted?: boolean
 }
 
 export interface Transcript {
@@ -238,6 +292,14 @@ export interface Voice {
   name: string
   description: string
   languages: Language[]
+}
+
+export interface ModelCatalogue {
+  speech: { id: string; label: string; note: string }[]
+  language: { id: string; label: string; note: string }[]
+  voice: { id: string; label: string; note: string }[]
+  /** What "default" means today, by id. */
+  defaults: { speech: string; language: string; voice: string }
 }
 
 export type Tone = 'warm' | 'formal' | 'brisk'
@@ -344,6 +406,8 @@ export interface AgentDraft {
   attributes: Attribute[]
   globalFlows: GlobalFlow[]
   context: AgentContext
+  /** How it listens and replies (set in step 3, with its voice). */
+  pipeline: PipelineSettings
   /** ISO timestamp of the last save. */
   updatedAt: string
 }
@@ -522,6 +586,66 @@ export interface Guardrails {
   maxCallMinutes: number
 }
 
+/**
+ * How the agent listens and replies: the speech, language and voice models,
+ * turn-taking and interruptions. The master admin's. Models are named from
+ * the platform catalogue (Ops → Platform); "default" follows it. The voice
+ * servers apply these; their contract is still to be agreed, so the shape
+ * may change.
+ */
+export interface PipelineSettings {
+  /** Model ids, or "default". */
+  speechModel: string
+  languageModel: string
+  voiceModel: string
+  /** vad: replies after a pause · semantic: also listens for whether the
+   * caller sounds finished, so it waits through "umm…". */
+  turnDetection: 'vad' | 'semantic'
+  /** Waits at least this long after the caller stops, and at most this long. */
+  minEndpointMs: number
+  maxEndpointMs: number
+  /** Words the caller must say before the agent stops for them. */
+  interruptMinWords: number
+  /** Speech shorter than this doesn't count as an interruption. */
+  interruptMinMs: number
+  /** If an interruption turns out to be noise, carry on where it stopped. */
+  resumeAfterFalseInterruption: boolean
+  /** Small sounds while listening ("mm", "sari"). */
+  backchannel: boolean
+  /** Said while a tool runs, so the line isn't silent. */
+  fillerPhrases: string[]
+  /** Starts working on a reply before the caller has quite finished. */
+  preemptiveReplies: boolean
+  noiseCancellation: 'off' | 'standard' | 'strong'
+  /** Quiet sound behind the agent, so silence doesn't sound like a drop. */
+  ambience: 'none' | 'office' | 'reception'
+  /** Callers can press keys, e.g. for a patient ID. */
+  keypadInput: boolean
+  /** Times it checks the caller is there before ending the call. */
+  silenceReprompts: number
+  /** 0–1: higher varies the wording more. */
+  temperature: number
+}
+
+/** What AICA notes about each call once it ends. The fields are set up by
+ * bitNtech; a hospital words what counts as a successful call. */
+export interface AnalysisSettings {
+  summary: boolean
+  sentiment: boolean
+  /** In words, e.g. "The caller booked, or got their answer without a person." */
+  successCriteria: string
+  fields: AnalysisField[]
+}
+
+export interface AnalysisField {
+  id: string
+  label: string
+  type: 'text' | 'yes_no' | 'number' | 'choice'
+  /** What to look for, in words. */
+  description: string
+  options?: string[]
+}
+
 /** Everything that decides how an agent behaves: what a version holds. */
 export interface AgentSpec {
   typeId: string | null
@@ -535,6 +659,8 @@ export interface AgentSpec {
   globalFlows: GlobalFlow[]
   context: AgentContext
   guardrails: Guardrails
+  pipeline: PipelineSettings
+  analysis: AnalysisSettings
 }
 
 export interface AgentVersion {
@@ -574,6 +700,8 @@ export interface Member {
   name: string
   email: string
   role: Role
+  /** Changed from the role's defaults; null when it has them. */
+  permissions: Permission[] | null
   /** ISO timestamp, or null if they've never signed in. */
   lastActiveAt: string | null
   status: 'active' | 'invited' | 'disabled'
@@ -602,6 +730,10 @@ export interface LiveCall {
   flagged: boolean
   /** Who took it over, by name, once someone has. */
   takenBy: string | null
+  /** Notes staff gave the agent during the call; the caller doesn't hear them. */
+  whispers: { by: string; at: string; text: string }[]
+  /** Handed to a colleague: who, and whether the agent briefed them first. */
+  transferredTo?: { name: string; warm: boolean } | null
 }
 
 export interface CollectedDetail {
@@ -750,6 +882,34 @@ export interface CallRecord extends CallSummary {
   hasRecording: boolean
   /** Id of the person who took it over, for "own" access. */
   handledById: string | null
+  analysis: CallAnalysis
+  metrics: CallMetrics
+}
+
+/** What AICA noted once the call ended (AnalysisSettings). */
+export interface CallAnalysis {
+  sentiment: Sentiment
+  /** Against the agent's success criteria. */
+  success: boolean
+  /** Why, in a line. */
+  successReason: string
+  fields: { label: string; value: string }[]
+}
+
+export type Sentiment = 'positive' | 'neutral' | 'negative'
+
+/** How quickly it answered, from the voice servers' timings. */
+export interface CallMetrics {
+  /** From answering to the greeting starting. */
+  firstWordMs: number
+  /** Caller stops → agent starts, across the call. */
+  replyP50Ms: number
+  replyP95Ms: number
+  /** The average share of a reply's wait, by service. */
+  speechMs: number
+  languageMs: number
+  voiceMs: number
+  interruptions: number
 }
 
 export interface ReportQuery {
@@ -777,6 +937,23 @@ export interface Report {
   intents: { label: string; calls: number; byAgent: number }[]
   /** Where callers hung up or were handed over, by flow step. */
   dropOff: { step: string; calls: number }[]
+  quality: ReportQuality
+  /** One row per agent, busiest first. */
+  agents: { agentId: string; name: string; calls: number; byAgent: number; success: number; replyP50Ms: number }[]
+}
+
+export interface ReportQuality {
+  /** Calls that met their agent's success criteria. */
+  success: number
+  sentiment: Record<Sentiment, number>
+  /** Medians across calls, ms. */
+  firstWordMs: number
+  replyP50Ms: number
+  replyP95Ms: number
+  speechMs: number
+  languageMs: number
+  voiceMs: number
+  interruptionsPerCall: number
 }
 
 /* ---------------------------------------------------------------- manage
@@ -786,6 +963,177 @@ export interface NewInvite {
   email: string
   role: Role
 }
+
+/* ---------------------------------------------------------------- requests
+ * What a hospital asks bitNtech for: new agents and structural changes it
+ * can't make itself. The master admin does the work and replies. */
+
+export type ChangeKind = 'new_agent' | 'flow_change' | 'integration' | 'number' | 'other'
+export type ChangeStatus = 'open' | 'in_progress' | 'done' | 'declined' | 'withdrawn'
+
+export interface ChangeReply {
+  id: string
+  by: string
+  /** member: the hospital · bitntech: bitNtech (always says so). */
+  byKind: 'member' | 'bitntech'
+  at: string
+  text: string
+}
+
+export interface ChangeRequest {
+  id: string
+  orgSlug: string
+  kind: ChangeKind
+  /** The agent it's about, if any. */
+  agentId: string | null
+  agentName: string | null
+  title: string
+  detail: string
+  urgency: 'normal' | 'soon' | 'urgent'
+  status: ChangeStatus
+  createdAt: string
+  createdBy: string
+  createdById: string | null
+  updatedAt: string
+  replies: ChangeReply[]
+}
+
+export interface NewChangeRequest {
+  kind: ChangeKind
+  agentId: string | null
+  title: string
+  detail: string
+  urgency: ChangeRequest['urgency']
+}
+
+export interface ChangeRequestPatch {
+  status?: Exclude<ChangeStatus, 'withdrawn'>
+  /** Shown to the hospital in the thread. */
+  reply?: string
+}
+
+/* ---------------------------------------------------------------- bot desk
+ * The front desk's controls over the agents: send a line to staff, post a
+ * notice, mark a doctor away, flag a wrong answer. */
+
+export interface DeskLine {
+  numberId: string
+  number: string
+  label: string
+  agentId: string | null
+  agentName: string | null
+  agentStatus: AgentStatus | null
+  /** agent: the agent answers · staff: calls ring at the desk instead. */
+  mode: 'agent' | 'staff'
+  /** While on staff: until when (ISO; null until switched back), why, and who. */
+  staffUntil: string | null
+  staffReason: string | null
+  staffBy: string | null
+  /** Calls on the line now. */
+  liveCalls: number
+}
+
+export interface LineModeChange {
+  mode: 'agent' | 'staff'
+  /** ISO; null: until someone switches it back. */
+  until?: string | null
+  reason?: string
+}
+
+export interface Notice {
+  id: string
+  /** What the agent tells callers, in plain words. */
+  text: string
+  /** null: every agent. */
+  agentId: string | null
+  /** ISO. Notices stop by themselves at `until`. */
+  from: string
+  until: string
+  createdBy: string
+  createdAt: string
+}
+
+export type NoticeInput = Omit<Notice, 'id' | 'createdBy' | 'createdAt'> & { id?: string }
+
+export interface DoctorChange {
+  id: string
+  doctor: string
+  department: string
+  /** yyyy-mm-dd, IST. */
+  date: string
+  kind: 'away' | 'late' | 'moved'
+  /** E.g. "Seeing patients from 11 AM" or "In OPD room 4 today". */
+  detail: string
+  createdBy: string
+  createdAt: string
+}
+
+export type DoctorChangeInput = Omit<DoctorChange, 'id' | 'createdBy' | 'createdAt'> & { id?: string }
+
+export interface AnswerFlag {
+  id: string
+  callId: string | null
+  agentName: string | null
+  /** What the agent said, or did, wrong. */
+  text: string
+  /** What it should have said. */
+  correction: string
+  by: string
+  at: string
+  status: 'open' | 'fixed' | 'dismissed'
+  resolution?: { by: string; at: string; note: string }
+}
+
+export interface NewAnswerFlag {
+  callId: string | null
+  agentName: string | null
+  text: string
+  correction: string
+}
+
+export interface Desk {
+  lines: DeskLine[]
+  /** Current and upcoming, soonest ending first. */
+  notices: Notice[]
+  /** Today and later, soonest first. */
+  doctorChanges: DoctorChange[]
+  /** Open first, then the last few resolved. */
+  flags: AnswerFlag[]
+  /** Doctors from the knowledge library, for choosing. */
+  doctors: { doctor: string; department: string }[]
+}
+
+/* ---------------------------------------------------------------- scenarios
+ * Scripted callers that check an agent behaves before its changes go live. */
+
+export interface Scenario {
+  id: string
+  name: string
+  /** What the caller says, one line per turn. */
+  callerSays: string[]
+  expect: {
+    /** The flow it should end up in, by intent label; empty for any. */
+    intent: string
+    /** Words the agent's replies must include, e.g. "slot". */
+    mustSay: string[]
+    /** It should hand over to a person (true), not hand over (false), or either (null). */
+    handover: boolean | null
+  }
+  lastRun: ScenarioRun | null
+}
+
+export interface ScenarioRun {
+  at: string
+  passed: boolean
+  /** What didn't match, in words; empty when it passed. */
+  problems: string[]
+  /** The replies it gave, in order. */
+  replies: string[]
+  /** The agent version it ran against, or null for the draft changes. */
+  version: number | null
+}
+
+export type ScenarioInput = Omit<Scenario, 'id' | 'lastRun'> & { id?: string }
 
 /** What an activity entry is about, for filtering. */
 export type ActivityArea = 'team' | 'agents' | 'library' | 'settings' | 'billing' | 'access'

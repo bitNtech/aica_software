@@ -3,6 +3,7 @@ import { asAuthError } from '../../../auth/types'
 import { useConsole } from '../../../console/ConsoleProvider'
 import type { Callback, Member } from '../../../console/types'
 import { useOrg } from '../../../console/useOrg'
+import { pageAccess } from '../../../console/access'
 import { ConsolePage } from '../../../components/console/ConsolePage'
 import { SegFilter } from '../../../components/console/ListTools'
 import { Alert } from '../../../components/ui/Alert'
@@ -24,9 +25,10 @@ const WHOSE_LABEL: Record<Whose, string> = { all: 'Everyone’s', mine: 'Mine', 
 
 /** /o/:slug/callbacks: missed calls and callers who asked to be called back. */
 export default function CallbacksPage() {
-  const { org, user } = useOrg()
+  const { org, user, access } = useOrg()
   const client = useConsole()
-  const frontDesk = org.role === 'front_desk'
+  // Without “Assign callbacks”: their own, and ones nobody has yet.
+  const frontDesk = pageAccess(access, 'callbacks') === 'own'
   const load = useCallback(async () => {
     const [callbacks, members] = await Promise.all([client.listCallbacks(org.orgSlug), client.listMembers(org.orgSlug)])
     // Only people who handle calls can be given one.

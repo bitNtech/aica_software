@@ -35,7 +35,7 @@ type State =
 
 /** /o/:slug/activity: the organisation's audit log. Owners and admins. */
 export default function ActivityPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const [area, setArea] = useState<Area>('all')
   const [actorId, setActorId] = useState('')
@@ -46,7 +46,7 @@ export default function ActivityPage() {
   const [focusFrom, setFocusFrom] = useState<string | null>(null)
   /** A new filter is loading over the old results. */
   const [refreshing, setRefreshing] = useState(false)
-  const owner = can(org.role, 'billing')
+  const owner = can(access, 'billing')
   /** The filter now showing: an older page that arrives after a change is dropped. */
   const shown = useRef('')
   shown.current = `${area}|${actorId}`

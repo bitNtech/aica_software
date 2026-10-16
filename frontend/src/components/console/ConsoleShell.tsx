@@ -20,7 +20,7 @@ const NARROW = '(max-width: 899px)'
  * header with <ConsolePage>.
  */
 export function ConsoleShell() {
-  const { user, org } = useOrg()
+  const { user, org, access } = useOrg()
   const { signOut } = useAuth()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -70,7 +70,7 @@ export function ConsoleShell() {
   }, [])
 
   const base = `/o/${org.orgSlug}`
-  const sections = navFor(org.role)
+  const sections = navFor(access)
   const switchable = user.memberships.filter((m) => m.orgStatus === 'active').length > 1
 
   return (
@@ -182,6 +182,10 @@ function NavIcon({ page }: { page: PageKey }) {
     home: <path d="M3.5 9.2 10 4l6.5 5.2V16a.5.5 0 0 1-.5.5h-3.8v-4.2H7.8v4.2H4a.5.5 0 0 1-.5-.5z" />,
     // A voice line: the agent.
     agents: <path d="M3 10h1.6M6.2 7v6M9.4 4.5v11M12.6 7v6M15.8 9v2M17 10h0" />,
+    // A desk bell.
+    desk: <path d="M3.5 14.5h13M5 14.5a5 5 0 0 1 10 0M10 9.5V7.8M8.6 6.2h2.8" />,
+    // A speech bubble with a question.
+    requests: <path d="M4 4.5h12v8.5H9.5L6 15.8V13H4zM8.4 7.4a1.6 1.6 0 1 1 2.2 1.5c-.4.2-.6.5-.6.9v.2M10 11.2h0" />,
     // A tray with an arrow going in.
     uploads: <path d="M10 3.5v8M6.8 6.7 10 3.5l3.2 3.2M3.5 12.5v2.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2.5" />,
     // An open book.

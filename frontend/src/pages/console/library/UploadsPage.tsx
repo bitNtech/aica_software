@@ -26,11 +26,11 @@ const matches = (c: SourceCall, f: Filter) => f === 'all' || (f === 'processing'
 
 /** /o/:slug/uploads: the recordings of past calls agents learn from. */
 export default function UploadsPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
-  const canEdit = pageAccess(org.role, 'uploads') === 'edit'
-  const canDelete = can(org.role, 'upload.delete')
+  const canEdit = pageAccess(access, 'uploads') === 'edit'
+  const canDelete = can(access, 'upload.delete')
   const load = useCallback(() => client.listCalls(org.orgSlug), [client, org.orgSlug])
   const [calls, reload] = useAsync(load)
   const [query, setQuery] = useState('')
@@ -106,7 +106,7 @@ export default function UploadsPage() {
 
   return (
     <ConsolePage
-      kicker="Build"
+      kicker="Agents"
       title="Call uploads"
       docTitle="Call uploads"
       lede={<p>Recordings of your past calls. AICA transcribes them and learns your conversations from them when you build an agent.</p>}

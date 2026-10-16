@@ -9,6 +9,8 @@ export type StepErrors = Record<string, string>
 export interface StepProps {
   draft: AgentDraft
   org: Membership
+  /** Where the organisation's pages live (`/ops/orgs/:slug` for bitNtech). */
+  base: string
   /** Every change goes through here, so it's saved. */
   update(change: (d: AgentDraft) => AgentDraft): void
   /** True once Next was pressed with something missing: show errors live. */

@@ -13,6 +13,7 @@ import { Button } from '../../../components/ui/Button'
 import { SelectField } from '../../../components/ui/Field'
 import { Spinner } from '../../../components/ui/Spinner'
 import { duration, languageName, points, share } from './shared'
+import { seconds } from '../calls/TranscriptDialog'
 import './Operate.css'
 
 type Days = ReportQuery['days']
@@ -27,7 +28,7 @@ const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : 
 
 /** /o/:slug/reports: how the agents are doing, over a period. */
 export default function ReportsPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
   const [days, setDays] = useState<Days>(7)
@@ -83,7 +84,7 @@ export default function ReportsPage() {
       lede={<p>How many people called, how many the agents answered on their own, and where callers needed your team.</p>}
       actions={
         r &&
-        can(org.role, 'export') && (
+        can(access, 'export') && (
           <Button variant="line" onClick={() => downloadCsv(r, days, agents.find((a) => a.id === agentId)?.name)}>
             Download as CSV
           </Button>
@@ -149,6 +150,63 @@ export default function ReportsPage() {
                 change={{ now: r.totals.avgDurationSec, before: r.previous.avgDurationSec, period: PERIOD[days], upIsGood: false, format: duration, words: ['longer', 'shorter'] }}
               />
             </dl>
+          </section>
+
+          <section className="op-section" aria-labelledby={`${id}-q`}>
+            <h2 id={`${id}-q`} className="op-section__title">
+              Quality
+            </h2>
+            <p className="op-section__sub">From each call’s analysis and the voice servers’ timings. Success is measured against each agent’s own criteria.</p>
+            <dl className="stats">
+              <StatTile label="Successful calls" value={pct(r.quality.success, r.totals.calls)} sub={`${r.quality.success.toLocaleString('en-IN')} met their agent’s criteria`} />
+              <StatTile
+                label="Callers pleased"
+                value={pct(r.quality.sentiment.positive, r.totals.calls)}
+                sub={`${pct(r.quality.sentiment.negative, r.totals.calls)} sounded unhappy`}
+              />
+              <StatTile label="Typical reply" value={seconds(r.quality.replyP50Ms)} sub={`Slowest 1 in 20: ${seconds(r.quality.replyP95Ms)}`} />
+              <StatTile label="First words" value={seconds(r.quality.firstWordMs)} sub="From answering to the greeting" />
+              <StatTile label="Caller cut in" value={String(r.quality.interruptionsPerCall)} sub="Times per call, on average" />
+            </dl>
+            <div className="op-split">
+              <div>
+                <h3 className="op-section__subtitle">Where a reply’s wait goes</h3>
+                <BarList
+                  label="Typical time for each part of a reply, in milliseconds"
+                  items={[
+                    { label: 'Hearing the caller (speech recognition)', value: r.quality.speechMs },
+                    { label: 'Working out the reply (language model)', value: r.quality.languageMs },
+                    { label: 'Starting to speak (voice)', value: r.quality.voiceMs },
+                  ]}
+                />
+              </div>
+              {!agentId && r.agents.length > 0 && (
+                <div>
+                  <h3 className="op-section__subtitle">By agent</h3>
+                  <table className="op-table">
+                    <caption className="sr-only">Calls, success and reply time for each agent</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Agent</th>
+                        <th scope="col">Calls</th>
+                        <th scope="col">Successful</th>
+                        <th scope="col">Typical reply</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.agents.map((a) => (
+                        <tr key={a.agentId}>
+                          <th scope="row">{a.name}</th>
+                          <td>{a.calls.toLocaleString('en-IN')}</td>
+                          <td>{pct(a.success, a.calls)}</td>
+                          <td>{seconds(a.replyP50Ms)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </section>
 
           {days > 1 && (
@@ -249,6 +307,19 @@ function downloadCsv(r: Report, days: Days, agentName?: string) {
     [],
     ['Hour', 'Calls'],
     ...r.byHour.map((n, h) => [`${String(h).padStart(2, '0')}:00`, n]),
+    [],
+    ['Quality', 'Value'],
+    ['Successful calls', r.quality.success],
+    ['Callers pleased', r.quality.sentiment.positive],
+    ['Callers neutral', r.quality.sentiment.neutral],
+    ['Callers unhappy', r.quality.sentiment.negative],
+    ['Typical reply (ms)', r.quality.replyP50Ms],
+    ['Slowest 1 in 20 replies (ms)', r.quality.replyP95Ms],
+    ['First words (ms)', r.quality.firstWordMs],
+    ['Caller cut in, per call', r.quality.interruptionsPerCall],
+    [],
+    ['Agent', 'Calls', 'Answered by the agent', 'Successful', 'Typical reply (ms)'],
+    ...r.agents.map((a) => [a.name, a.calls, a.byAgent, a.success, a.replyP50Ms]),
   ]
   const blob = new Blob([rows.map((row) => row.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

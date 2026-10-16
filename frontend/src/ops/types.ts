@@ -106,6 +106,9 @@ export interface OrgUsage {
   uploadHours: number
   /** Call minutes per day, oldest first, matching `days`. */
   minutesByDay: number[]
+  /** Caller stops → agent starts, across the period, ms: typical and slowest 1 in 20. */
+  replyP50Ms: number
+  replyP95Ms: number
 }
 
 export interface UsageReport {

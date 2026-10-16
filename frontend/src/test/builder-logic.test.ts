@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { defaultPipeline } from '../console/demo/agentConfig'
 import { defaultGlobalFlows } from '../console/demo/extraction'
 import type { AgentDraft, FlowNode } from '../console/types'
 import { checkFlow, confidenceLabel, lowConfidence, mergeIntents, moveNode, neighbour, position, removeNode } from '../pages/console/builder/flowTree'
@@ -96,6 +97,7 @@ describe('simulate', () => {
     attributes: [],
     globalFlows: defaultGlobalFlows(),
     context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: false, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true },
+    pipeline: defaultPipeline(),
     updatedAt: '',
   })
   const run = (flow: FlowNode[], message: string) => simulate(draft(flow), [], [], SIM_START, message).reply

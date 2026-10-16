@@ -15,11 +15,41 @@ export type OrgStatus = 'pending_review' | 'active' | 'declined' | 'suspended'
 export type BusinessType = 'hospital' | 'clinic' | 'diagnostics' | 'other'
 export type Language = 'tamil' | 'english' | 'tanglish'
 
+/** One thing a person may do in their organisation. A role gives a default
+ * set; an owner or admin can change it per person (console/access.ts). */
+export type Permission =
+  | 'agents.view'
+  | 'agents.configure'
+  | 'agents.publish'
+  | 'agents.test'
+  | 'requests.create'
+  | 'library.knowledge'
+  | 'library.uploads'
+  | 'library.numbers'
+  | 'library.secrets'
+  | 'desk.bot'
+  | 'desk.notices'
+  | 'calls.take'
+  | 'callbacks.assign'
+  | 'appointments.manage'
+  | 'calls.viewAll'
+  | 'calls.personal'
+  | 'calls.recordings'
+  | 'reports.view'
+  | 'reports.export'
+  | 'team.manage'
+  | 'settings.manage'
+  | 'activity.view'
+
 export interface Membership {
   orgSlug: string
   orgName: string
   city: string
   role: Role
+  /** What this person may do, when an owner or admin changed it from the
+   * role's defaults. Absent: the role's defaults. The server decides; the
+   * console only hides what isn't allowed. */
+  permissions?: Permission[]
   orgStatus: OrgStatus
   /** Why an organisation was declined or suspended, in words for the client. */
   statusReason?: string

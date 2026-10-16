@@ -120,6 +120,9 @@ export default function OpsUsagePage() {
                       Of plan <span className="sr-only">minutes for the period</span>
                     </th>
                     <th scope="col">Recordings</th>
+                    <th scope="col">
+                      Typical reply <span className="sr-only">time, with the slowest 1 in 20</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -141,13 +144,16 @@ export default function OpsUsagePage() {
                           {Math.round((o.minutes / allowance) * 100)}%{o.minutes > allowance && ' (over)'}
                         </td>
                         <td>{o.uploadHours} h</td>
+                        <td>
+                          {(o.replyP50Ms / 1000).toFixed(1)} s <span className="ops-muted">({(o.replyP95Ms / 1000).toFixed(1)} s)</span>
+                        </td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-            <p className="row__meta">“Of plan” compares minutes with the plan’s monthly minutes, scaled to the period. Organisations still in review aren’t listed.</p>
+            <p className="row__meta">“Of plan” compares minutes with the plan’s monthly minutes, scaled to the period. Organisations still in review aren’t listed. “Typical reply” is how long callers wait after they stop speaking, with the slowest 1 in 20 in brackets.</p>
           </section>
         </div>
       )}

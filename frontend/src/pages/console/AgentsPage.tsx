@@ -22,10 +22,12 @@ const ORDER: Record<AgentStatus, number> = { live: 0, draft: 1, paused: 2 }
 type Filter = 'all' | AgentStatus
 const FILTERS: Filter[] = ['all', 'live', 'draft', 'paused']
 
-/** /o/:slug/agents — every voice agent in the organisation. Owners and
- * admins create agents; supervisors and viewers read. */
+/** /o/:slug/agents — every voice agent in the organisation. bitNtech's
+ * master admin creates them (from Ops, /ops/orgs/:slug/agents, which shows
+ * this page too); the organisation asks for one and changes its everyday
+ * settings. */
 export default function AgentsPage() {
-  const { org } = useOrg()
+  const { org, access, base } = useOrg()
   const client = useConsole()
   const load = useCallback(() => client.listAgents(org.orgSlug), [client, org.orgSlug])
   const [agents, reload] = useAsync(load)
@@ -33,7 +35,8 @@ export default function AgentsPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const filterName = useId()
   const search = useRef<HTMLInputElement>(null)
-  const canCreate = can(org.role, 'agent.create')
+  const canCreate = can(access, 'agent.create')
+  const canRequest = can(access, 'request.create')
   // Set by the builder after publishing. Shown once: it's cleared from the
   // history entry so a reload or Back doesn't show it again.
   const location = useLocation()
@@ -72,15 +75,27 @@ export default function AgentsPage() {
 
   return (
     <ConsolePage
-      kicker="Build"
+      kicker="Agents"
       docTitle="Agents"
       title="Agents"
-      lede={<p>Each agent answers one phone line. It's built from recordings of your past calls, then tested and published.</p>}
+      lede={
+        canCreate ? (
+          <p>Each agent answers one phone line. Build it from recordings of {org.orgName}’s past calls, test it, then publish it for them.</p>
+        ) : (
+          <p>Each agent answers one phone line. bitNtech builds it from recordings of your past calls; you keep its greeting, knowledge and hours up to date.</p>
+        )
+      }
       actions={
-        canCreate && (
-          <Link className="btn btn--orange" to={`/o/${org.orgSlug}/agents/new`}>
+        canCreate ? (
+          <Link className="btn btn--orange" to={`${base}/agents/new`}>
             <span>New agent</span>
           </Link>
+        ) : (
+          canRequest && (
+            <Link className="btn btn--line" to={`${base}/requests?new=new_agent`}>
+              <span>Ask for a new agent</span>
+            </Link>
+          )
         )
       }
     >
@@ -115,17 +130,25 @@ export default function AgentsPage() {
         <EmptyState
           title="No agents yet"
           action={
-            canCreate && (
-              <Link className="btn btn--plum btn--sm" to={`/o/${org.orgSlug}/agents/new`}>
-                <span>Build your first agent</span>
+            canCreate ? (
+              <Link className="btn btn--plum btn--sm" to={`${base}/agents/new`}>
+                <span>Build the first agent</span>
               </Link>
+            ) : (
+              canRequest && (
+                <Link className="btn btn--plum btn--sm" to={`${base}/requests?new=new_agent`}>
+                  <span>Ask bitNtech for your first agent</span>
+                </Link>
+              )
             )
           }
         >
           <p>
             {canCreate
-              ? 'An agent answers one of your phone lines. You build it from recordings of your past calls.'
-              : 'When an owner or admin creates an agent, it appears here.'}
+              ? 'An agent answers one of their phone lines. Build it from recordings of their past calls.'
+              : canRequest
+                ? 'An agent answers one of your phone lines. bitNtech builds it from recordings of your past calls: upload some, then ask for it.'
+                : 'When bitNtech sets up an agent for you, it appears here.'}
           </p>
         </EmptyState>
       )}
@@ -182,7 +205,7 @@ export default function AgentsPage() {
           ) : (
             <ul className="rows" aria-label="Agents">
               {shown.map((a) => (
-                <AgentRow key={a.id} agent={a} base={`/o/${org.orgSlug}/agents`} canBuild={canCreate} />
+                <AgentRow key={a.id} agent={a} base={`${base}/agents`} canBuild={canCreate} />
               ))}
             </ul>
           )}
@@ -211,7 +234,7 @@ function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: str
         {a.hasChanges && <span className="agent-row__setup">Unpublished changes</span>}
         {a.setupStep && (
           <span className="agent-row__setup">
-            Setup: step {stepIndex(a.setupStep) + 1} of {BUILDER_STEPS.length}, {STEP_META[a.setupStep].label.toLowerCase()}
+            {canBuild ? `Setup: step ${stepIndex(a.setupStep) + 1} of ${BUILDER_STEPS.length}, ${STEP_META[a.setupStep].label.toLowerCase()}` : 'Being set up by bitNtech'}
             {canBuild && (
               <>
                 {' '}
