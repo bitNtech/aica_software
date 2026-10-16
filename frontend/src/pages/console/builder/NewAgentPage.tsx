@@ -7,9 +7,10 @@ import { ConsolePage } from '../../../components/console/ConsolePage'
 import { Alert } from '../../../components/ui/Alert'
 import { Spinner } from '../../../components/ui/Spinner'
 
-/** /o/:slug/agents/new — starts a draft and opens the builder on it. */
+/** /ops/orgs/:slug/agents/new — starts a draft and opens the builder on it.
+ * Only bitNtech's master admin creates agents. */
 export default function NewAgentPage() {
-  const { org } = useOrg()
+  const { org, base } = useOrg()
   const client = useConsole()
   const navigate = useNavigate()
   const [error, setError] = useState<unknown>(null)
@@ -28,13 +29,13 @@ export default function NewAgentPage() {
     setError(null)
     client.createDraft(org.orgSlug, org.orgName).then(
       (d) => {
-        if (here.current) navigate(`/o/${org.orgSlug}/agents/drafts/${d.id}/calls`, { replace: true })
+        if (here.current) navigate(`${base}/agents/drafts/${d.id}/calls`, { replace: true })
       },
       (err) => {
         if (here.current) setError(err)
       },
     )
-  }, [client, org.orgSlug, org.orgName, navigate])
+  }, [client, org.orgSlug, org.orgName, base, navigate])
 
   useEffect(() => {
     // Once, even when React runs effects twice in development.
@@ -52,7 +53,7 @@ export default function NewAgentPage() {
             <button type="button" className="btn-text" onClick={start}>
               Try again
             </button>
-            <Link className="link" to={`/o/${org.orgSlug}/agents`}>
+            <Link className="link" to={`${base}/agents`}>
               Back to agents
             </Link>
           </p>

@@ -29,10 +29,10 @@ const matches = (k: KnowledgeSource, f: Filter) =>
 
 /** /o/:slug/knowledge: what the agents answer from. */
 export default function KnowledgePage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
-  const canEdit = pageAccess(org.role, 'knowledge') === 'edit'
+  const canEdit = pageAccess(access, 'knowledge') === 'edit'
   const load = useCallback(() => client.listKnowledge(org.orgSlug), [client, org.orgSlug])
   const [lib, reload] = useAsync(load)
   const [query, setQuery] = useState('')
@@ -61,7 +61,7 @@ export default function KnowledgePage() {
 
   return (
     <ConsolePage
-      kicker="Build"
+      kicker="Agents"
       title="Knowledge"
       docTitle="Knowledge"
       lede={<p>What your agents answer from: doctor schedules, price lists, FAQs and pages from your website. Each agent uses the sources chosen for it.</p>}
@@ -199,7 +199,7 @@ export default function KnowledgePage() {
         source={opened}
         usedBy={opened ? usedBy(opened) : []}
         canEdit={canEdit}
-        canDelete={can(org.role, 'knowledge.delete')}
+        canDelete={can(access, 'knowledge.delete')}
         onClose={() => setOpenId(null)}
         onChanged={(_, done) => {
           setNote(done)

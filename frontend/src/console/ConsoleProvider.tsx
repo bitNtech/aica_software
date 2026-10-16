@@ -1,5 +1,6 @@
 import { createContext, use, useEffect, useRef, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { permissionsFor } from './access'
 import type { ConsoleClient } from './types'
 
 const ConsoleContext = createContext<ConsoleClient | null>(null)
@@ -15,7 +16,17 @@ export function ConsoleProvider({ client, children }: { client: ConsoleClient; c
 
   // Who's asking, before any page below fetches (their effects run before
   // this component's own). Setting it again with the same person is harmless.
-  client.setViewer?.(user ? { id: user.id, name: user.name, roles: Object.fromEntries(user.memberships.map((m) => [m.orgSlug, m.role])) } : null)
+  client.setViewer?.(
+    user
+      ? {
+          id: user.id,
+          name: user.name,
+          roles: Object.fromEntries(user.memberships.map((m) => [m.orgSlug, m.role])),
+          permissions: Object.fromEntries(user.memberships.map((m) => [m.orgSlug, permissionsFor(m.role, m.permissions)])),
+          platformRole: user.platformRole ?? null,
+        }
+      : null,
+  )
 
   useEffect(() => {
     if (who === undefined) return

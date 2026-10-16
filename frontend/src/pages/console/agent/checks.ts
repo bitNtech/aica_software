@@ -6,6 +6,8 @@ import { checkBehaviour } from '../builder/steps/StepBehaviour'
 import { checkContext } from '../builder/steps/StepContext'
 import { checkFlowStep } from '../builder/steps/StepFlow'
 import { checkGlobalFlows } from '../builder/steps/StepGlobal'
+import { checkPipeline } from '../builder/PipelineEditor'
+import { checkAnalysis } from './tabs/AnalysisTab'
 
 export function checkGuardrails(g: Guardrails): StepErrors {
   const e: StepErrors = {}
@@ -26,6 +28,8 @@ export function specProblems(spec: AgentSpec, voices: Voice[], tools: AgentTool[
     knowledge: context.knowledge ? { knowledge: context.knowledge } : {},
     tools: context.tools ? { tools: context.tools } : {},
     rules: checkGuardrails(spec.guardrails),
+    pipeline: checkPipeline(spec.pipeline),
+    analysis: checkAnalysis(spec.analysis),
   }
   for (const k of Object.keys(out) as AgentTab[]) if (Object.keys(out[k]!).length === 0) delete out[k]
   return out

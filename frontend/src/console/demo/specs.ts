@@ -2,6 +2,7 @@ import type { AgentContext, AgentDraft, AgentSpec, AgentSummary, AgentVersion, G
 import { defaultGlobalFlows, extractAttributes, extractFlow } from './extraction'
 import { ago } from './runtime'
 import { defaultBehaviour } from './templates'
+import { defaultAnalysis, defaultPipeline } from './agentConfig'
 
 /** Sample setups and version history for the sample agents, so the agent
  * workspace has something real-looking to show. */
@@ -38,6 +39,8 @@ export function specFromDraft(d: AgentDraft): AgentSpec {
     globalFlows: d.globalFlows,
     context: d.context,
     guardrails: defaultGuardrails(),
+    pipeline: d.pipeline,
+    analysis: defaultAnalysis(d.subTypeId),
   }
 }
 
@@ -96,6 +99,8 @@ export function seedDetail(orgSlug: string, agent: AgentSummary, calls: SourceCa
     globalFlows: defaultGlobalFlows(),
     context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: true, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true, ...seed.context },
     guardrails: { ...defaultGuardrails(), transferTo: seed.transferTo },
+    pipeline: defaultPipeline(),
+    analysis: defaultAnalysis(seed.subTypeId),
   }
 
   /** The version before `v`, and the note for `v` saying what it changed. */

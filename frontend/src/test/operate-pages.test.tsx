@@ -176,7 +176,7 @@ describe('Call history and detail', () => {
     expect(screen.getAllByText('Hidden').length).toBeGreaterThan(0)
     expect(screen.getByText(/personal details are hidden/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/add a note/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/recordings are for the front desk/i)).toBeInTheDocument()
+    expect(screen.getByText(/recordings of the calls you handled/i)).toBeInTheDocument()
   })
 })
 

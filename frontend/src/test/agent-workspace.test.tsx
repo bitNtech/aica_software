@@ -22,13 +22,13 @@ describe('agent workspace: who sees what', () => {
     await user.click(await screen.findByRole('link', { name: 'OPD appointments' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'OPD appointments' })).toBeInTheDocument()
     expect(within(tabs()).getByRole('link', { name: 'Flow' })).toHaveAttribute('aria-current', 'page')
-    expect(tabNames()).toEqual(['Flow', 'Behaviour and voice', 'Knowledge', 'Tools', 'Handoff and guardrails', 'Test', 'Versions', 'Settings'])
+    expect(tabNames()).toEqual(['Flow', 'Behaviour and voice', 'Voice pipeline', 'Knowledge', 'Tools', 'Handoff and guardrails', 'After each call', 'Test', 'Versions', 'Settings'])
     expect(screen.getByText(/answering \+91 00000 01210/i)).toBeInTheDocument()
   })
 
   it('is read-only for viewers, without tools, test or settings', async () => {
     await open('viewer@example.com', `${AGENT}/settings`)
-    expect(tabNames()).toEqual(['Flow', 'Behaviour and voice', 'Knowledge', 'Handoff and guardrails', 'Versions'])
+    expect(tabNames()).toEqual(['Flow', 'Behaviour and voice', 'Knowledge', 'Handoff and guardrails', 'After each call', 'Versions'])
     // Settings isn't theirs: they land on Flow.
     expect(within(tabs()).getByRole('link', { name: 'Flow' })).toHaveAttribute('aria-current', 'page')
     expect(await screen.findByRole('list', { name: /conversation flow/i })).toBeInTheDocument()
@@ -133,8 +133,14 @@ describe('agent workspace: settings', () => {
     expect(screen.getByRole('button', { name: /turn on/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('deletes only when the name is typed', async () => {
-    const { user } = await open('admin@example.com', `${AGENT}/settings`)
+  it('offers delete to nobody in the hospital', async () => {
+    await open('admin@example.com', `${AGENT}/settings`)
+    await screen.findByRole('heading', { name: /answering calls/i })
+    expect(screen.queryByRole('button', { name: /delete agent/i })).not.toBeInTheDocument()
+  })
+
+  it('lets bitNtech delete, only when the name is typed', async () => {
+    const { user } = await open('master@example.com', `/ops/orgs/arogya-demo/agents/agt_appointments/settings`)
     await user.click(screen.getByRole('button', { name: /delete agent/i }))
     const dialog = screen.getByRole('dialog', { name: /delete opd appointments/i })
     // Focus starts in the name field; a wrong name is flagged on it.
@@ -181,8 +187,8 @@ describe('agent workspace: edge cases', () => {
     client.deleteAgent = async () => {
       throw new AuthError('network', 'offline')
     }
-    const { user } = renderApp(`${AGENT}/settings`, { consoleClient: client })
-    await signIn(user, 'admin@example.com')
+    const { user } = renderApp(`/ops/orgs/arogya-demo/agents/agt_appointments/settings`, { consoleClient: client })
+    await signIn(user, 'master@example.com')
     await user.click(await screen.findByRole('button', { name: /delete agent/i }))
     const dialog = screen.getByRole('dialog', { name: /delete opd appointments/i })
     await user.type(within(dialog).getByLabelText(/type “opd appointments”/i), 'OPD appointments{Enter}')

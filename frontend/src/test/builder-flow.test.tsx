@@ -17,9 +17,9 @@ const rail = () => screen.getByRole('navigation', { name: /builder steps/i })
 async function toFlow(tweak?: (c: ConsoleClient) => void) {
   const client = createDemoConsoleClient({ latency: 0 })
   tweak?.(client)
-  const view = renderApp('/o/arogya-demo/agents', { consoleClient: client })
+  const view = renderApp('/ops/orgs/arogya-demo/agents', { consoleClient: client })
   const { user } = view
-  await signIn(user, 'admin@example.com')
+  await signIn(user, 'master@example.com')
   await user.click(await screen.findByRole('link', { name: /new agent/i }))
   await user.click(await screen.findByRole('checkbox', { name: /choose all ready calls/i }))
   await user.click(screen.getByRole('checkbox', { name: /callers agreed/i }))
@@ -252,7 +252,7 @@ describe('builder step 7: review and publish', () => {
 
 describe('builder step 3: reading and focus', () => {
   it('offers to write the flow by hand when reading fails', async () => {
-    const view = renderApp('/o/arogya-demo/agents', {
+    const view = renderApp('/ops/orgs/arogya-demo/agents', {
       consoleClient: (() => {
         const c = createDemoConsoleClient({ latency: 0 })
         c.extractFlow = async () => {
@@ -262,7 +262,7 @@ describe('builder step 3: reading and focus', () => {
       })(),
     })
     const { user } = view
-    await signIn(user, 'admin@example.com')
+    await signIn(user, 'master@example.com')
     await user.click(await screen.findByRole('link', { name: /new agent/i }))
     await user.click(await screen.findByRole('checkbox', { name: /choose all ready calls/i }))
     await user.click(screen.getByRole('checkbox', { name: /callers agreed/i }))

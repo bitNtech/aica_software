@@ -10,13 +10,13 @@ import type { TabProps } from '../shared'
 
 /** Builder steps 3 to 5 together: the flow, the details it collects, and
  * what it does anywhere in a call. */
-export function FlowTab({ org, spec, update, readOnly, errors }: TabProps) {
+export function FlowTab({ org, access, spec, update, readOnly, errors }: TabProps) {
   const id = useId()
   const [seenIn, setSeenIn] = useState<FlowNode | null>(null)
   const e = splitFlowErrors(errors)
   // The calls behind the flow are Call uploads material: only for roles
   // that can open that page.
-  const canSeeCalls = canOpen(org.role, 'uploads')
+  const canSeeCalls = canOpen(access, 'uploads')
   return (
     <div className="ws__sections">
       <section className="step__section" aria-labelledby={`${id}-flow`}>

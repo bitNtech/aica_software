@@ -8,13 +8,18 @@ import type { TabProps } from '../shared'
 
 interface Props extends TabProps {
   canDelete: boolean
+  canRename: boolean
+  /** Move it between phone lines. */
+  canNumber: boolean
+  /** Pause it, or turn it on. */
+  canPause: boolean
   /** Applies at once; `done` is said when it worked. */
   onUpdate(patch: AgentPatch, done: string): Promise<void>
   onDelete(): Promise<void>
 }
 
 /** Name, number, on or off, and deleting: outside versions, applied at once. */
-export function SettingsTab({ detail, spec, lib, canDelete, onUpdate, onDelete }: Props) {
+export function SettingsTab({ detail, spec, lib, canDelete, canRename, canNumber, canPause, onUpdate, onDelete }: Props) {
   const id = useId()
   const a = detail.agent
   const current = lib.numbers.find((n) => n.agentId === a.id)
@@ -134,18 +139,25 @@ export function SettingsTab({ detail, spec, lib, canDelete, onUpdate, onDelete }
         <h2 id={`${id}-name`} className="step__heading">
           Name
         </h2>
-        <form className="ws__inline-form" onSubmit={rename} noValidate>
-          <TextField ref={nameRef} label="Agent name" hint="Only your team sees this." value={name} maxLength={80} error={nameError} onChange={(e) => setName(e.target.value)} />
-          <Button type="submit" variant="line" busy={savingName} busyLabel="Saving…" className="rules__button">
-            Save name
-          </Button>
-        </form>
+        {canRename ? (
+          <form className="ws__inline-form" onSubmit={rename} noValidate>
+            <TextField ref={nameRef} label="Agent name" hint="Only your team sees this." value={name} maxLength={80} error={nameError} onChange={(e) => setName(e.target.value)} />
+            <Button type="submit" variant="line" busy={savingName} busyLabel="Saving…" className="rules__button">
+              Save name
+            </Button>
+          </form>
+        ) : (
+          <p>{a.name}</p>
+        )}
       </section>
 
       <section className="step__section" aria-labelledby={`${id}-num`}>
         <h2 id={`${id}-num`} className="step__heading">
           Phone number
         </h2>
+        {!canNumber ? (
+          <p>{current ? `${current.number} (${current.label}).` : 'No number.'} Someone who manages phone lines can move it.</p>
+        ) : (
         <form className="ws__inline-form" onSubmit={saveNumber} noValidate>
           <SelectField
             ref={numberRef}
@@ -160,6 +172,7 @@ export function SettingsTab({ detail, spec, lib, canDelete, onUpdate, onDelete }
             Save number
           </Button>
         </form>
+        )}
       </section>
 
       <section className="step__section" aria-labelledby={`${id}-on`}>
@@ -169,19 +182,22 @@ export function SettingsTab({ detail, spec, lib, canDelete, onUpdate, onDelete }
         {a.status === 'live' ? (
           <>
             <p>
-              It’s answering {a.phoneNumber}. Pause it to stop, without changing its setup. Calls then go to {spec.guardrails.transferTo}.
+              It’s answering {a.phoneNumber}. {canPause ? `Pause it to stop, without changing its setup. Calls then go to ${spec.guardrails.transferTo}.` : 'For a short break, the Bot desk can send the line to staff.'}
             </p>
-            <div>
-              <Button variant="line" onClick={() => setConfirm('pause')}>
-                Pause agent
-              </Button>
-            </div>
+            {canPause && (
+              <div>
+                <Button variant="line" onClick={() => setConfirm('pause')}>
+                  Pause agent
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <>
             <p id={`${id}-paused`}>
               {a.phoneNumber ? `It’s paused: calls to ${a.phoneNumber} go to ${spec.guardrails.transferTo}.` : 'It’s paused, and has no number to answer. Give it one above first.'}
             </p>
+            {canPause && (
             <div>
               <Button
                 variant="plum"
@@ -193,6 +209,7 @@ export function SettingsTab({ detail, spec, lib, canDelete, onUpdate, onDelete }
                 Turn on
               </Button>
             </div>
+            )}
             {statusError && (
               <p className="field__error" role="alert">
                 {statusError}

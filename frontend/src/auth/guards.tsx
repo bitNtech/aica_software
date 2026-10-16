@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import { Navigate, useLocation, useParams } from 'react-router'
 import { FullScreenStatus } from '../components/auth/FullScreenStatus'
-import { canOpen, type PageKey } from '../console/access'
+import { accessFor, canOpen, type PageKey } from '../console/access'
 import { homeFor, useAuth } from './AuthProvider'
 
 function safePath(p: unknown): string | null {
@@ -57,15 +57,15 @@ function OrgGate({ children }: { children: ReactNode }) {
   return <Fragment key={org.orgSlug}>{children}</Fragment>
 }
 
-/** One organisation page, inside <RequireOrg>: the person's role must be
- * allowed it (console/access.ts). If not, they go to the organisation's
+/** One organisation page, inside <RequireOrg>: the person's permissions
+ * must allow it (console/access.ts). If not, they go to the organisation's
  * Home, which says why. */
 export function OrgPage({ page, children }: { page: PageKey; children: ReactNode }) {
   const { user } = useAuth()
   const { slug } = useParams()
   const org = user?.memberships.find((m) => m.orgSlug === slug)
   if (!org) return null
-  if (!canOpen(org.role, page)) return <Navigate to={`/o/${org.orgSlug}`} replace state={{ deniedPage: page }} />
+  if (!canOpen(accessFor(org), page)) return <Navigate to={`/o/${org.orgSlug}`} replace state={{ deniedPage: page }} />
   return children
 }
 

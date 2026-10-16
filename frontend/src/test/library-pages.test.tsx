@@ -121,8 +121,8 @@ describe('Knowledge', () => {
 })
 
 describe('Tools and integrations', () => {
-  it('connects a system after checking it, and tests one', async () => {
-    const { user } = await open('admin@example.com', `${O}/integrations`)
+  it('lets bitNtech connect a system after checking it, and test one', async () => {
+    const { user } = await open('master@example.com', '/ops/orgs/arogya-demo/integrations')
     await user.click(await screen.findByRole('button', { name: /connect a system/i }))
     const form = screen.getByRole('dialog', { name: /connect a system/i })
     await user.click(within(form).getByRole('button', { name: /^add tool$/i }))
@@ -179,10 +179,14 @@ describe('Tools and integrations', () => {
     expect(within(secretForm).getByRole('button', { name: /replace key/i })).toBeInTheDocument()
     // Sent by tools: delete isn't offered.
     expect(screen.queryByRole('button', { name: /delete his_api_key/i })).not.toBeInTheDocument()
+    // Tools themselves are set up by bitNtech.
+    expect(screen.queryByRole('button', { name: /connect a system/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.getByText(/bitntech sets up tools and connects your systems/i)).toBeInTheDocument()
   })
 
-  it('asks before switching off a tool agents use, and not otherwise', async () => {
-    const { user } = await open('admin@example.com', `${O}/integrations`)
+  it('asks bitNtech before switching off a tool agents use, and not otherwise', async () => {
+    const { user } = await open('master@example.com', '/ops/orgs/arogya-demo/integrations')
     const transfer = await screen.findByRole('switch', { name: /transfer to a person/i })
     await user.click(transfer)
     const dialog = screen.getByRole('dialog', { name: /switch off transfer to a person/i })

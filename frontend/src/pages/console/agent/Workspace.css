@@ -88,3 +88,27 @@
   .ws__inline-form, .ws__pron-form { grid-template-columns: minmax(0, 1fr); }
   .ws__inline-form .rules__button, .ws__pron-form .rules__button { margin-top: 0; justify-self: start; }
 }
+
+/* ---- test scenarios ---- */
+
+.scn__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.scn__score { font-weight: 600; color: var(--warn-ink); }
+.scn__score--ok { color: var(--ok-ink); }
+.scn__list { display: grid; gap: 0.75rem; padding: 0; margin: 0; list-style: none; }
+.scn__item { display: grid; gap: 0.35rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
+.scn__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.scn__problems { margin: 0.2rem 0 0; padding-left: 1.1rem; color: var(--warn-ink); font-size: 0.9rem; }
+.scn__replies summary { cursor: pointer; font-size: 0.88rem; color: var(--muted); }
+.scn__replies ol { margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: 0.9rem; }
+.scn__row-actions { display: flex; gap: 1rem; }
+
+/* ---- after each call ---- */
+
+.analysis__fields { display: grid; gap: 0.9rem; padding: 0; margin: 0; list-style: none; }
+.analysis__field { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: 0.75rem 1rem; align-items: end; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); }
+.analysis__field--ro { display: block; }
+
+/* ---- structural tabs, for a hospital ---- */
+
+.ws__ask { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg-2); }
+.ws__ask p { margin: 0; font-size: 0.92rem; }

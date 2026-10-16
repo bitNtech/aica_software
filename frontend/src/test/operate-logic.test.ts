@@ -69,14 +69,14 @@ describe('demo client: who sees and does what', () => {
     const page = await c.listCallLog(ORG, { days: 30, limit: 500 })
     expect(page.calls.every((x) => x.handledBy === 'Meena S')).toBe(true)
     const other = callLog(ctx, 30).find((x) => x.handledBy && x.handledBy !== 'Meena S')!
-    await expect(c.getCallRecord(ORG, other.id)).rejects.toThrow(/calls they handled/i)
+    await expect(c.getCallRecord(ORG, other.id)).rejects.toThrow(/calls you handled/i)
   })
 
   it('keeps callbacks to the front desk’s own, and their assignments to themselves', async () => {
     const c = client(meena)
     const mine = await c.listCallbacks(ORG)
     expect(mine.every((x) => !x.assignedTo || x.assignedTo.id === 'u_frontdesk')).toBe(true)
-    await expect(c.updateCallback(ORG, 'cb_3', { assignedTo: 'u_frontdesk2' })).rejects.toThrow(/for themselves/i)
+    await expect(c.updateCallback(ORG, 'cb_3', { assignedTo: 'u_frontdesk2' })).rejects.toThrow(/for yourself/i)
     const taken = await c.updateCallback(ORG, 'cb_3', { assignedTo: 'u_frontdesk' })
     expect(taken.assignedTo?.name).toBe('Meena S')
   })
@@ -110,8 +110,8 @@ describe('demo client: who sees and does what', () => {
     // Notes only on real calls they handled.
     await expect(desk.addCallNote(ORG, 'call_1_999', 'Hi')).rejects.toThrow(/doesn't exist/i)
     const viewer = client({ id: 'u_viewer', name: 'Arun V', role: 'viewer' })
-    await expect(viewer.updateAppointment(ORG, 'apt_3', { status: 'confirmed' })).rejects.toThrow(/role can’t/i)
-    await expect(viewer.listLiveCalls(ORG)).rejects.toThrow(/role can’t/i)
+    await expect(viewer.updateAppointment(ORG, 'apt_3', { status: 'confirmed' })).rejects.toThrow(/permission to/i)
+    await expect(viewer.listLiveCalls(ORG)).rejects.toThrow(/permission to/i)
     const a = client(admin)
     await expect(a.updateAppointment(ORG, 'apt_3', { date: '2026-02-31' })).rejects.toThrow(/real date/i)
     await a.handoffToCallback(ORG, 'ho_2')

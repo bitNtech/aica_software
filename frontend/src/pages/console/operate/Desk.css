@@ -1,0 +1,17 @@
+/* The bot desk: a card per phone line, then notices, doctor changes and flags. */
+
+.desk__lines { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: 0.9rem; padding: 0; margin: 0; list-style: none; }
+.desk__line { display: grid; gap: 0.5rem; align-content: start; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
+.desk__line p { margin: 0; overflow-wrap: anywhere; }
+.desk__line--staff { border-color: var(--warn-ink); box-shadow: inset 4px 0 0 var(--warn-ink); }
+.desk__line-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.75rem; }
+.desk__items { display: grid; gap: 0.6rem; padding: 0; margin: 0; list-style: none; }
+.desk__item { display: grid; gap: 0.3rem; padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
+.desk__item p { margin: 0; overflow-wrap: anywhere; }
+.desk__item-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.desk__resolve { max-width: 32rem; }
+.desk__done summary { cursor: pointer; font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem; }
+.desk__done summary:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 3px; border-radius: 4px; }
+@media (prefers-reduced-motion: no-preference) {
+  .desk__line { transition: border-color 160ms ease, box-shadow 160ms ease; }
+}

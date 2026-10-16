@@ -375,6 +375,7 @@
 .flag { padding: 0.15rem 0.5rem; border: 1px solid var(--line-strong); border-radius: var(--r-pill); font-size: 0.75rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .flag--quiet { color: var(--muted); }
 .flag--warn { border-color: transparent; background: var(--warn-bg); color: var(--warn-ink); }
+.flag--ok { border-color: transparent; background: var(--ok-bg); color: var(--ok-ink); }
 .switch__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; }
 .switch__text { display: grid; gap: 0.15rem; padding-top: 0.05rem; min-width: 0; }
 .switch__label { font-weight: 600; color: var(--ink); cursor: pointer; }
@@ -481,6 +482,7 @@
 .transcript__turn--agent { background: color-mix(in srgb, var(--orange) 10%, var(--card)); }
 .transcript__who { font: 500 0.7rem/1.4 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .transcript__at { margin-left: 0.4rem; letter-spacing: 0.04em; }
+.transcript__cut { color: var(--warn-ink); }
 .transcript__text { color: var(--ink); }
 .transcript__note { font-size: 0.85rem; color: var(--muted); }
 .transcript__note--sample { margin-bottom: 0.5rem; padding: 0.6rem 0.8rem; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); font-weight: 600; }

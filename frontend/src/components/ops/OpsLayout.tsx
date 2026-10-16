@@ -23,8 +23,7 @@ interface Props {
  * asks. The bar is the landing page's night; the work sits on paper.
  */
 export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, demoData, children }: Props) {
-  const { user, signOut, client } = useAuth()
-  const [leaving, setLeaving] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
     document.title = `${docTitle} · AICA Ops`
@@ -37,6 +36,36 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, demoDat
       <a className="skip-link" href="#ops-main">
         Skip to content
       </a>
+      <OpsBar pendingCount={pendingCount} />
+
+      <main id="ops-main" className="ops__main" tabIndex={-1}>
+        <header className="ops__head">
+          <p className="label">
+            AICA Ops <i>/</i> {kicker}
+          </p>
+          <h1 className="display ops__title">{title}</h1>
+          {lede && <div className="ops__lede">{lede}</div>}
+          {demoData && (
+            <p className="ops__demo">
+              <span className="demo-chip">Demo data</span>
+              <span>Sample data: this page has no live connection yet. Changes stay in this browser tab until you close it.</span>
+            </p>
+          )}
+        </header>
+        {children}
+      </main>
+    </div>
+  )
+}
+
+/** The hairline and the night bar: Ops' own navigation and who's signed in.
+ * Shared by every Ops page, including the organisation frame. */
+export function OpsBar({ pendingCount }: { pendingCount?: number }) {
+  const { user, signOut, client } = useAuth()
+  const [leaving, setLeaving] = useState(false)
+  if (!user?.platformRole) return null
+  return (
+    <>
       <div className="ops__hairline" aria-hidden="true" />
       <header className="ops__bar stage">
         <Link to="/ops" className="ops__brand" aria-label="AICA Ops — overview">
@@ -56,6 +85,9 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, demoDat
                 <span className="sr-only"> waiting</span>
               </span>
             ) : null}
+          </NavLink>
+          <NavLink to="/ops/changes" className="ops__link">
+            Change requests
           </NavLink>
           <NavLink to="/ops/usage" className="ops__link">
             Usage
@@ -103,23 +135,6 @@ export function OpsLayout({ kicker, title, lede, docTitle, pendingCount, demoDat
           </button>
         </div>
       </header>
-
-      <main id="ops-main" className="ops__main" tabIndex={-1}>
-        <header className="ops__head">
-          <p className="label">
-            AICA Ops <i>/</i> {kicker}
-          </p>
-          <h1 className="display ops__title">{title}</h1>
-          {lede && <div className="ops__lede">{lede}</div>}
-          {demoData && (
-            <p className="ops__demo">
-              <span className="demo-chip">Demo data</span>
-              <span>Sample data: this page has no live connection yet. Changes stay in this browser tab until you close it.</span>
-            </p>
-          )}
-        </header>
-        {children}
-      </main>
-    </div>
+    </>
   )
 }

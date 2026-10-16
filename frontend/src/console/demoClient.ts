@@ -7,15 +7,22 @@ import type {
   AgentTool,
   AgentVersion,
   ActivityEntry,
+  AnswerFlag,
   Appointment,
   Billing,
   Callback,
   CallNote,
+  ChangeRequest,
   ConsoleClient,
   Credential,
+  Desk,
+  DoctorChange,
   Handoff,
+  LiveCall,
   Member,
+  Notice,
   OrgSettings,
+  Scenario,
   Viewer,
   FlowNode,
   KnowledgeSource,
@@ -30,13 +37,20 @@ import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
 import { passagesOf, search, seedCredentials } from './demo/passages'
-import { callLog, callRecord, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LogContext, type Pauses } from './demo/operations'
+import { callLog, callRecord, DEPARTMENTS, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
+import { defaultPipeline } from './demo/agentConfig'
+import { seedChangeRequests } from './demo/requests'
+import { seedDoctorChanges, seedFlags, seedNotices, type LineMode } from './demo/desk'
+import { runScenario, seedScenarios } from './demo/scenarios'
+import { permissionsFor } from './access'
+import type { Permission } from '../auth/types'
+import { localDay } from '../lib/time'
 import { billingPeriod, seedActivity, seedBilling, seedSettings } from './demo/manage'
 import { checkTool } from './toolRules'
 import { LANGUAGE_LABEL, ROLE_LABEL } from '../auth/roles'
 import type { Role } from '../auth/types'
 import { defaultBehaviour } from './demo/templates'
-import { currentPlans, enabledVoices, findSubType, publishedTypes } from './demo/platform'
+import { currentPlans, enabledVoices, findSubType, MODEL_OPTIONS, platform, publishedTypes } from './demo/platform'
 
 /**
  * Sample data for the organisation console until the real API exists. No
@@ -47,7 +61,7 @@ import { currentPlans, enabledVoices, findSubType, publishedTypes } from './demo
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v8'
+const STORE_KEY = 'aica.demo.console.v9'
 
 /** Versions kept per agent in the demo. */
 const KEEP_VERSIONS = 6
@@ -91,6 +105,17 @@ interface OrgData {
   /** Newest first. */
   activity: ActivityEntry[]
   billing: Omit<Billing, 'plans' | 'usage'>
+  /** Requests to bitNtech, newest first. */
+  requests: ChangeRequest[]
+  notices: Notice[]
+  doctorChanges: DoctorChange[]
+  flags: AnswerFlag[]
+  /** Lines switched to staff, by number id. */
+  lineModes: Record<string, LineMode>
+  /** Test scenarios per agent, seeded on first use. */
+  scenarios: Record<string, Scenario[]>
+  /** Notes to the agent and transfers on live calls, by call id. */
+  live: LiveExtras
 }
 
 export interface DemoConsoleOptions {
@@ -126,6 +151,13 @@ function seedOrg(slug: string): OrgData {
     settings: seedSettings(slug),
     activity: seedActivity(slug),
     billing: seedBilling(slug),
+    requests: seedChangeRequests(slug),
+    notices: seedNotices(slug),
+    doctorChanges: seedDoctorChanges(slug),
+    flags: seedFlags(slug),
+    lineModes: {},
+    scenarios: {},
+    live: { whispers: {}, transfers: {} },
   }
 }
 
@@ -148,6 +180,7 @@ function seedDrafts(slug: string): AgentDraft[] {
       attributes: [],
       globalFlows: [],
       context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: true, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true },
+      pipeline: defaultPipeline(),
       updatedAt: new Date(Date.now() - 12 * 36e5).toISOString(),
     },
   ]
@@ -325,9 +358,26 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
   let viewer: Viewer | null = null
   const by = () => viewer?.name ?? 'You'
   const roleIn = (o: string) => viewer?.roles[o]
+  const master = () => viewer?.platformRole === 'master_admin'
+  /** What the viewer may do in `o`. bitNtech: everything for the master
+   * admin, looking for staff. No viewer (some tests): everything. */
+  const permsIn = (o: string): Set<Permission> => {
+    if (!viewer || master()) return new Set(permissionsFor('owner'))
+    if (viewer.platformRole) return new Set<Permission>(['agents.view', 'agents.test', 'calls.viewAll', 'reports.view'])
+    const role = roleIn(o)
+    return new Set(role ? permissionsFor(role, viewer.permissions?.[o]) : [])
+  }
+  const has = (o: string, p: Permission) => permsIn(o).has(p)
+  /** Refuses unless the viewer has one of `perms`, as the server will. */
+  const allowPerm = (o: string, perms: Permission | Permission[], what: string) => {
+    const list = Array.isArray(perms) ? perms : [perms]
+    if (viewer && !list.some((p) => has(o, p))) throw new AuthError('forbidden', `You don’t have permission to ${what}.`)
+  }
+  /** Agents are created and restructured by bitNtech's master admin only. */
+  const allowMaster = (what: string) => {
+    if (viewer && !master()) throw new AuthError('forbidden', `Only bitNtech can ${what}. Send them a request instead.`)
+  }
 
-  /** The roles that handle calls (Live calls, Handoffs, Callbacks, Appointments). */
-  const HANDLERS = ['owner', 'admin', 'supervisor', 'front_desk']
   /** Refuses roles not in `roles`, as the server will. (No viewer set, as in
    * some tests: allowed.) */
   const allow = (o: string, roles: string[], what: string) => {
@@ -343,6 +393,23 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     return Number.isFinite(day) && days >= 1 && days <= 400 ? callLog(logContext(o), days).find((c) => c.id === id) : undefined
   }
 
+  /** Agents not taking calls now: paused, or their line switched to staff. */
+  const liveOff = (o: string) => {
+    const d = org(o)
+    const off = logContext(o).paused
+    for (const n of d.numbers) if (n.agentId && staffMode(o, n.id)) off.add(n.agentId)
+    return off
+  }
+  /** A line's switch to staff, unless it has run out. */
+  const staffMode = (o: string, numberId: string): LineMode | null => {
+    const m = org(o).lineModes[numberId]
+    if (!m) return null
+    if (m.until && Date.parse(m.until) <= Date.now()) {
+      delete org(o).lineModes[numberId]
+      return null
+    }
+    return m
+  }
   const logContext = (o: string): LogContext => {
     const d = org(o)
     return { orgSlug: o, paused: new Set(d.agents.filter((a) => a.status === 'paused').map((a) => a.id)), pauses: d.pauses }
@@ -352,15 +419,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     org(o).activity.unshift({
       id: newId('act'),
       at: new Date().toISOString(),
-      actor: by(),
-      actorKind: 'member',
-      ...(viewer ? { actorId: viewer.id } : {}),
+      actor: viewer?.platformRole ? `${by()} (bitNtech)` : by(),
+      actorKind: viewer?.platformRole ? 'bitntech' : 'member',
+      ...(viewer && !viewer.platformRole ? { actorId: viewer.id } : {}),
       area,
       text,
       ...(detail ? { detail } : {}),
     })
   }
-  const MANAGERS = ['owner', 'admin']
   const findMember = (o: string, id: string) => {
     const m = org(o).members.find((x) => x.id === id)
     if (!m) throw notFound('person')
@@ -389,6 +455,83 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     if (!c) throw notFound('callback')
     return c
   }
+  const KIND_WORD: Record<ChangeRequest['kind'], string> = { new_agent: 'a new agent', flow_change: 'a flow change', integration: 'an integration', number: 'a phone number', other: 'a change' }
+  /** Files a request to bitNtech (checks done by the caller). */
+  const addRequest = (o: string, input: Pick<ChangeRequest, 'kind' | 'agentId' | 'title' | 'detail' | 'urgency'>): ChangeRequest => {
+    const d = org(o)
+    const now = new Date().toISOString()
+    const agent = input.agentId ? d.agents.find((a) => a.id === input.agentId) : null
+    const r: ChangeRequest = {
+      id: newId('cr'),
+      orgSlug: o,
+      kind: input.kind,
+      agentId: agent?.id ?? null,
+      agentName: agent?.name ?? null,
+      title: input.title,
+      detail: input.detail,
+      urgency: input.urgency,
+      status: 'open',
+      createdAt: now,
+      createdBy: by(),
+      createdById: viewer?.id ?? null,
+      updatedAt: now,
+      replies: [],
+    }
+    d.requests.unshift(r)
+    log(o, 'agents', `Asked bitNtech for ${KIND_WORD[r.kind]}: “${r.title}”`)
+    return r
+  }
+  const findRequest = (o: string, id: string) => {
+    const r = org(o).requests.find((x) => x.id === id)
+    if (!r) throw notFound('request')
+    return r
+  }
+
+  /** The bot desk as the page shows it. */
+  const desk = (o: string): Desk => {
+    const d = org(o)
+    const now = new Date().toISOString()
+    const live = liveCalls(o, d.liveTaken, logContext(o).paused, d.live)
+    d.notices = d.notices.filter((n) => n.until > now)
+    const today = localDay(0)
+    d.doctorChanges = d.doctorChanges.filter((c) => c.date >= today)
+    const open = d.flags.filter((f) => f.status === 'open')
+    const done = d.flags.filter((f) => f.status !== 'open').slice(0, 5)
+    return copy({
+      lines: d.numbers.map((n) => {
+        const agent = d.agents.find((a) => a.id === n.agentId) ?? null
+        const m = staffMode(o, n.id)
+        return {
+          numberId: n.id,
+          number: n.number,
+          label: n.label,
+          agentId: agent?.id ?? null,
+          agentName: agent?.name ?? null,
+          agentStatus: agent?.status ?? null,
+          mode: m ? 'staff' : 'agent',
+          staffUntil: m?.until ?? null,
+          staffReason: m?.reason ?? null,
+          staffBy: m?.by ?? null,
+          liveCalls: m || !agent ? 0 : live.filter((c) => c.agentId === agent.id).length,
+        }
+      }),
+      notices: [...d.notices].sort((a, b) => a.until.localeCompare(b.until)),
+      doctorChanges: [...d.doctorChanges].sort((a, b) => a.date.localeCompare(b.date)),
+      flags: [...open, ...done],
+      doctors: DEPARTMENTS.map(([department, doctor]) => ({ doctor, department })),
+    })
+  }
+  const scenariosOf = (o: string, agentId: string) => {
+    findAgent(o, agentId)
+    return (org(o).scenarios[agentId] ??= seedScenarios(agentId))
+  }
+  const findLive = (o: string, id: string): LiveCall => {
+    const d = org(o)
+    const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
+    if (!call) throw new AuthError('invalid_input', 'That call has ended.')
+    return call
+  }
+
   const findHandoff = (o: string, id: string) => {
     const h = org(o).handoffs.find((x) => x.id === id)
     if (!h) throw notFound('handover')
@@ -430,6 +573,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async deleteCall(o, id) {
       await wait()
+      allowPerm(o, 'library.uploads', 'remove recordings')
       const d = org(o)
       if (!d.calls.some((c) => c.id === id)) throw notFound('call')
       d.calls = d.calls.filter((c) => c.id !== id)
@@ -441,6 +585,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async addRecordings(o, files) {
       await wait()
+      allowPerm(o, 'library.uploads', 'upload calls')
       const d = org(o)
       const now = new Date().toISOString()
       const added = files.map((f): SourceCall => {
@@ -484,8 +629,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       return copy(enabledVoices())
     },
 
+    async listModels() {
+      await wait()
+      return copy({ ...MODEL_OPTIONS, defaults: platform().models })
+    },
+
     async createDraft(o, orgName) {
       await wait()
+      allowMaster('create agents')
       const dr: AgentDraft = {
         id: newId('draft'),
         reached: 'calls',
@@ -500,6 +651,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         attributes: [],
         globalFlows: [],
         context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: true, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true },
+        pipeline: defaultPipeline(),
         updatedAt: new Date().toISOString(),
       }
       org(o).drafts.push(dr)
@@ -514,6 +666,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async saveDraft(o, draft) {
       await wait()
+      allowMaster('build agents')
       const d = org(o)
       const i = d.drafts.findIndex((x) => x.id === draft.id)
       if (i < 0) throw notFound('draft')
@@ -524,6 +677,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async discardDraft(o, id) {
       await wait()
+      allowMaster('discard drafts')
       findDraft(o, id)
       const d = org(o)
       d.drafts = d.drafts.filter((x) => x.id !== id)
@@ -534,6 +688,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       // Reading calls takes a moment, even in the demo.
       await wait()
       await wait()
+      allowMaster('read calls into a flow')
       const d = org(o)
       const dr = findDraft(o, id)
       const calls = d.calls.filter((c) => dr.sourceCallIds.includes(c.id) && c.status === 'ready')
@@ -555,6 +710,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async publishDraft(o, id, numberId) {
       await wait()
+      allowMaster('publish new agents')
       const d = org(o)
       const done = d.published[id] && d.agents.find((a) => a.id === d.published[id])
       if (done) return copy(done)
@@ -575,6 +731,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         lastPublishedAt: now,
         updatedAt: now,
         callsThisWeek: 0,
+        builtBy: viewer?.platformRole ? `bitNtech (${by()})` : by(),
       }
       d.agents.push(agent)
       const spec = specFromDraft(copy(dr))
@@ -598,6 +755,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async addKnowledge(o, input) {
       await wait()
+      allowPerm(o, 'library.knowledge', 'add knowledge')
       const d = org(o)
       const name = input.name.trim()
       if (name.length < 3) throw new AuthError('invalid_input', 'Give the source a name of at least 3 characters.')
@@ -631,6 +789,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async updateKnowledge(o, id, patch) {
       await wait()
+      allowPerm(o, 'library.knowledge', 'change knowledge')
       const d = org(o)
       const k = findKnowledge(o, id)
       // Check everything first: a refused change changes nothing.
@@ -674,6 +833,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async deleteKnowledge(o, id) {
       await wait()
+      allowPerm(o, 'library.knowledge', 'delete knowledge')
       const d = org(o)
       const k = findKnowledge(o, id)
       const users = knowledgeUsers(o, id)
@@ -703,6 +863,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async saveTool(o, tool) {
       await wait()
+      allowMaster('set up tools')
       const d = org(o)
       const existing = d.tools.find((t) => t.id === tool.id)
       if (existing?.kind === 'builtin') {
@@ -729,6 +890,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async deleteTool(o, id) {
       await wait()
+      allowMaster('remove tools')
       const d = org(o)
       const t = findTool(o, id)
       if (t.kind === 'builtin') throw new AuthError('invalid_input', 'Built-in tools can be switched off, not deleted.')
@@ -763,6 +925,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async setCredential(o, name, value) {
       await wait()
+      allowPerm(o, 'library.secrets', 'set secrets')
       const d = org(o)
       const key = name.trim().toUpperCase()
       if (!/^[A-Z][A-Z0-9_]{2,39}$/.test(key)) throw new AuthError('invalid_input', 'Use 3 to 40 capital letters, digits and underscores, starting with a letter, e.g. HIS_API_KEY.')
@@ -778,6 +941,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async deleteCredential(o, name) {
       await wait()
+      allowPerm(o, 'library.secrets', 'delete secrets')
       const d = org(o)
       const users = d.tools.filter((t) => t.credentialName === name)
       if (users.length) throw new AuthError('invalid_input', `${users.map((t) => `“${t.name}”`).join(', ')} ${users.length === 1 ? 'uses' : 'use'} ${name}. Change ${users.length === 1 ? 'that tool' : 'those tools'} first.`)
@@ -794,6 +958,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async updateNumber(o, id, patch) {
       await wait()
+      allowPerm(o, 'library.numbers', 'change phone lines')
       const d = org(o)
       const n = d.numbers.find((x) => x.id === id)
       if (!n) throw notFound('phone number')
@@ -831,8 +996,10 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async requestNumber(o, note) {
       await wait()
-      org(o)
+      allowPerm(o, ['library.numbers', 'requests.create'], 'ask for numbers')
       if (note.length > 500) throw new AuthError('invalid_input', 'Keep the note under 500 characters.')
+      addRequest(o, { kind: 'number', agentId: null, title: 'Another phone number', detail: note.trim() || 'No note.', urgency: 'normal' })
+      keep()
     },
 
     async getAgent(o, id) {
@@ -844,7 +1011,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async saveAgent(o, id, working) {
       await wait()
+      allowPerm(o, 'agents.configure', 'change agents')
       const r = recordOf(o, id)
+      // The structure is bitNtech's: a hospital's save may not change it.
+      if (viewer && !master()) {
+        const locked = (x: AgentSpec) =>
+          JSON.stringify([x.typeId, x.subTypeId, x.redact, x.flow, x.attributes, x.globalFlows, x.pipeline, x.context.toolIds, x.context.confirmBeforeActions, x.analysis?.fields])
+        if (locked(working) !== locked(r.working)) throw new AuthError('forbidden', 'The flow, tools and voice pipeline are set up by bitNtech. Send them a request to change these.')
+      }
       r.working = copy(working)
       r.changed = JSON.stringify(working) !== JSON.stringify(r.versions[0]?.spec)
       findAgent(o, id).updatedAt = new Date().toISOString()
@@ -854,6 +1028,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async publishAgent(o, id, note) {
       await wait()
+      allowPerm(o, 'agents.publish', 'publish agents')
       const r = recordOf(o, id)
       if (!r.changed) throw new AuthError('invalid_input', 'There are no unpublished changes to publish.')
       release(o, id, r.working, note.trim() || 'No note.')
@@ -865,6 +1040,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async discardAgentChanges(o, id) {
       await wait()
+      allowPerm(o, ['agents.publish', 'agents.configure'], 'discard changes')
       const r = recordOf(o, id)
       r.working = copy(r.versions[0].spec)
       r.changed = false
@@ -874,6 +1050,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async rollbackAgent(o, id, version) {
       await wait()
+      allowPerm(o, 'agents.publish', 'roll agents back')
       const v = recordOf(o, id).versions.find((x) => x.version === version)
       if (!v) throw notFound('version')
       release(o, id, v.spec, `Went back to version ${version}.`)
@@ -893,6 +1070,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         if (name.length < 3 || name.length > 60) throw new AuthError('invalid_input', 'Give the agent a name of 3 to 60 characters.')
         if (d.agents.some((x) => x.id !== id && x.name.toLowerCase() === name.toLowerCase())) throw new AuthError('invalid_input', `Another agent is already called “${name}”.`)
       }
+      if (name !== undefined) allowPerm(o, 'agents.configure', 'rename agents')
+      if (patch.status !== undefined) allowPerm(o, 'agents.publish', 'pause or turn on agents')
+      if (patch.numberId !== undefined) allowPerm(o, 'library.numbers', 'move agents between lines')
       const next = patch.numberId ? d.numbers.find((n) => n.id === patch.numberId) : null
       if (patch.numberId && !next) throw notFound('phone number')
       if (next?.agentId && next.agentId !== id) throw new AuthError('invalid_input', `${next.number} already has an agent. Choose a free number.`)
@@ -923,6 +1103,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async deleteAgent(o, id) {
       await wait()
+      allowMaster('delete agents')
       const d = org(o)
       const gone = findAgent(o, id)
       d.agents = d.agents.filter((x) => x.id !== id)
@@ -940,7 +1121,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async inviteMember(o, invite) {
       await wait()
-      allow(o, MANAGERS, 'manage the team')
+      allowPerm(o, 'team.manage', 'manage the team')
       const d = org(o)
       const email = invite.email.trim().toLowerCase()
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new AuthError('invalid_input', 'Enter an email address like name@hospital.in.')
@@ -948,7 +1129,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (invite.role === 'owner' && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can invite another owner.')
       const there = d.members.find((m) => m.email.toLowerCase() === email)
       if (there) throw new AuthError('invalid_input', there.status === 'invited' ? `${email} is already invited. Send the invitation again from their row.` : `${there.name} is already in the team.`)
-      const m: Member = { id: newId('inv'), name: email, email, role: invite.role, lastActiveAt: null, status: 'invited', invitedAt: new Date().toISOString(), invitedBy: by() }
+      const m: Member = { id: newId('inv'), name: email, email, role: invite.role, permissions: null, lastActiveAt: null, status: 'invited', invitedAt: new Date().toISOString(), invitedBy: by() }
       d.members.push(m)
       log(o, 'team', `Invited ${email} as ${ROLE_LABEL[invite.role]}`)
       keep()
@@ -957,7 +1138,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async resendInvite(o, id) {
       await wait()
-      allow(o, MANAGERS, 'manage the team')
+      allowPerm(o, 'team.manage', 'manage the team')
       const m = findMember(o, id)
       if (m.status !== 'invited') throw new AuthError('invalid_input', `${m.name} has already joined.`)
       if (m.role === 'owner' && roleIn(o) !== 'owner') throw new AuthError('forbidden', 'Only an owner can send an owner’s invitation.')
@@ -970,7 +1151,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async changeRole(o, id, role) {
       await wait()
-      allow(o, MANAGERS, 'manage the team')
+      allowPerm(o, 'team.manage', 'manage the team')
       const m = findMember(o, id)
       if (!(role in ROLE_LABEL)) throw new AuthError('invalid_input', 'Choose a role.')
       if (viewer && m.id === viewer.id) throw new AuthError('forbidden', 'You can’t change your own role. Ask another owner.')
@@ -979,6 +1160,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (m.role === 'owner' && m.status === 'active' && ownersBut(o, m.id) === 0) throw new AuthError('invalid_input', 'The organisation needs at least one owner. Make someone else an owner first.')
       const was = m.role
       m.role = role as Role
+      // A new role starts from its own defaults.
+      m.permissions = null
       if (role === 'viewer') freeCallbacks(o, m.id)
       log(o, 'team', m.status === 'invited' ? `Changed ${m.email}’s invitation from ${ROLE_LABEL[was]} to ${ROLE_LABEL[role]}` : `Changed ${m.name}’s role from ${ROLE_LABEL[was]} to ${ROLE_LABEL[role]}`)
       keep()
@@ -987,7 +1170,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async removeMember(o, id) {
       await wait()
-      allow(o, MANAGERS, 'manage the team')
+      allowPerm(o, 'team.manage', 'manage the team')
       const d = org(o)
       const m = findMember(o, id)
       if (viewer && m.id === viewer.id) throw new AuthError('forbidden', 'You can’t remove yourself. Ask another owner.')
@@ -1001,7 +1184,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listActivity(o, q) {
       await wait()
-      allow(o, MANAGERS, 'read the organisation’s activity')
+      allowPerm(o, 'activity.view', 'read the organisation’s activity')
       // Billing is the owners' business.
       const owner = !viewer || roleIn(o) === 'owner'
       const rows = org(o).activity.filter(
@@ -1013,13 +1196,13 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async getOrgSettings(o) {
       await wait()
-      allow(o, MANAGERS, 'see the organisation’s settings')
+      allowPerm(o, 'settings.manage', 'see the organisation’s settings')
       return copy(org(o).settings)
     },
 
     async updateOrgSettings(o, input) {
       await wait()
-      allow(o, MANAGERS, 'change the organisation’s settings')
+      allowPerm(o, 'settings.manage', 'change the organisation’s settings')
       const d = org(o)
       // Check everything first: a refused change changes nothing.
       const name = input.name.trim()
@@ -1124,16 +1307,16 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listLiveCalls(o) {
       await wait()
-      allow(o, HANDLERS, 'see live calls')
+      allowPerm(o, 'calls.take', 'see live calls')
       const d = org(o)
-      return copy(liveCalls(o, d.liveTaken, logContext(o).paused))
+      return copy(liveCalls(o, d.liveTaken, liveOff(o), d.live))
     },
 
     async takeOverCall(o, id) {
       await wait()
-      allow(o, HANDLERS, 'take calls')
+      allowPerm(o, 'calls.take', 'take calls')
       const d = org(o)
-      const call = liveCalls(o, d.liveTaken, logContext(o).paused).find((c) => c.id === id)
+      const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
       if (!call) throw new AuthError('invalid_input', 'That call has ended.')
       if (call.takenBy && call.takenBy !== by()) throw new AuthError('invalid_input', `${call.takenBy} has already taken this call.`)
       d.liveTaken[id] = by()
@@ -1143,13 +1326,13 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listHandoffs(o) {
       await wait()
-      allow(o, HANDLERS, 'see the handoff queue')
+      allowPerm(o, 'calls.take', 'see the handoff queue')
       return copy([...org(o).handoffs].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince)))
     },
 
     async takeHandoff(o, id) {
       await wait()
-      allow(o, HANDLERS, 'take calls')
+      allowPerm(o, 'calls.take', 'take calls')
       const h = findHandoff(o, id)
       if (h.status === 'taken') throw new AuthError('invalid_input', `${h.takenBy} has already taken this call.`)
       if (h.status === 'missed') throw new AuthError('invalid_input', 'The caller hung up. Make it a callback instead.')
@@ -1162,7 +1345,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async handoffToCallback(o, id) {
       await wait()
-      allow(o, HANDLERS, 'make callbacks')
+      allowPerm(o, 'calls.take', 'make callbacks')
       const d = org(o)
       const h = findHandoff(o, id)
       if (h.status === 'taken') throw new AuthError('invalid_input', `${h.takenBy} has already taken this call.`)
@@ -1193,24 +1376,25 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listCallbacks(o) {
       await wait()
       const d = org(o)
-      // Front desk see theirs, and ones nobody has yet.
-      const own = roleIn(o) === 'front_desk'
+      // Without "Assign callbacks": theirs, and ones nobody has yet.
+      const own = !has(o, 'callbacks.assign')
       return copy(d.callbacks.filter((c) => !own || !c.assignedTo || c.assignedTo.id === viewer?.id))
     },
 
     async updateCallback(o, id, patch) {
       await wait()
-      allow(o, HANDLERS, 'change callbacks')
+      allowPerm(o, ['calls.take', 'callbacks.assign'], 'change callbacks')
       const d = org(o)
       const c = findCallback(o, id)
-      // Front desk change only their own, or take one nobody has.
-      if (roleIn(o) === 'front_desk' && c.assignedTo && c.assignedTo.id !== viewer?.id)
+      // Without "Assign callbacks": only their own, or one nobody has.
+      const own = !has(o, 'callbacks.assign')
+      if (own && c.assignedTo && c.assignedTo.id !== viewer?.id)
         throw new AuthError('forbidden', `This callback is ${c.assignedTo.name}’s. Ask a supervisor to move it.`)
       const member = patch.assignedTo ? d.members.find((m) => m.id === patch.assignedTo && m.status === 'active') : null
       if (patch.assignedTo && !member) throw notFound('team member')
       if (member && member.role === 'viewer') throw new AuthError('invalid_input', `${member.name} is a viewer and can’t make calls for the team.`)
-      if (roleIn(o) === 'front_desk' && patch.assignedTo !== undefined && patch.assignedTo !== viewer?.id)
-        throw new AuthError('forbidden', 'Front desk can take callbacks for themselves, not assign them to others.')
+      if (own && patch.assignedTo !== undefined && patch.assignedTo !== viewer?.id)
+        throw new AuthError('forbidden', 'You can take callbacks for yourself, not assign them to others.')
       if (patch.note !== undefined && !patch.note.trim() && !patch.attempt) throw new AuthError('invalid_input', 'Write the note first.')
 
       if (patch.assignedTo !== undefined) c.assignedTo = member ? { id: member.id, name: member.name } : null
@@ -1233,7 +1417,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async updateAppointment(o, id, patch) {
       await wait()
-      allow(o, HANDLERS, 'change appointments')
+      allowPerm(o, 'appointments.manage', 'change appointments')
       const a = org(o).appointments.find((x) => x.id === id)
       if (!a) throw notFound('appointment')
       // A real date, not just the right shape (no 31 February).
@@ -1252,7 +1436,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async listCallLog(o, q) {
       await wait()
       const all = callLog(logContext(o), q.days)
-      const own = roleIn(o) === 'front_desk'
+      const own = !has(o, 'calls.viewAll')
       const text = q.q?.trim().toLowerCase()
       const digits = text?.replace(/\D/g, '')
       const hits = all.filter(
@@ -1262,7 +1446,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
           (!q.outcome || c.outcome === q.outcome) &&
           (!text ||
             // Viewers can't search by the caller's name: they don't see it.
-            [c.intent, c.agentName, roleIn(o) === 'viewer' ? '' : (c.callerName ?? '')].some((v) => v.toLowerCase().includes(text)) ||
+            [c.intent, c.agentName, has(o, 'calls.personal') ? (c.callerName ?? '') : ''].some((v) => v.toLowerCase().includes(text)) ||
             (digits && digits.length >= 3 && c.callerPhone.replace(/\D/g, '').includes(digits))),
       )
       return copy({ calls: hits.slice(0, q.limit ?? 50), total: hits.length })
@@ -1273,7 +1457,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const s = findCall(o, id)
       if (!s) throw notFound('call')
       const rec = callRecord(s)
-      if (roleIn(o) === 'front_desk' && rec.handledById !== viewer?.id) throw new AuthError('forbidden', 'Front desk can open the calls they handled.')
+      if (!has(o, 'calls.viewAll') && rec.handledById !== viewer?.id) throw new AuthError('forbidden', 'You can open the calls you handled.')
       return copy({ ...rec, notes: org(o).callNotes[id] ?? [] })
     },
 
@@ -1285,7 +1469,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (roleIn(o) === 'viewer') throw new AuthError('forbidden', 'Viewers can read notes, not add them.')
       const call = findCall(o, callId)
       if (!call) throw notFound('call')
-      if (roleIn(o) === 'front_desk' && callRecord(call).handledById !== viewer?.id) throw new AuthError('forbidden', 'Front desk can add notes to the calls they handled.')
+      if (!has(o, 'calls.viewAll') && callRecord(call).handledById !== viewer?.id) throw new AuthError('forbidden', 'You can add notes to the calls you handled.')
       const d = org(o)
       const note: CallNote = { id: newId('note'), by: by(), at: new Date().toISOString(), text: t }
       ;(d.callNotes[callId] ??= []).push(note)
@@ -1296,6 +1480,319 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async getReport(o, q) {
       await wait()
       return copy(report(logContext(o), q.days, q.agentId))
+    },
+
+    // ---- requests to bitNtech
+
+    async listChangeRequests(o) {
+      await wait()
+      if (viewer && !viewer.platformRole) allowPerm(o, ['requests.create', 'agents.view'], 'see requests to bitNtech')
+      return copy(org(o).requests)
+    },
+
+    async createChangeRequest(o, input) {
+      await wait()
+      if (viewer?.platformRole) throw new AuthError('forbidden', 'Requests come from the organisation. bitNtech replies to them.')
+      allowPerm(o, 'requests.create', 'ask bitNtech for changes')
+      const title = input.title.trim()
+      const detail = input.detail.trim()
+      if (!(input.kind in KIND_WORD)) throw new AuthError('invalid_input', 'Choose what you need.')
+      if (title.length < 5 || title.length > 120) throw new AuthError('invalid_input', 'Give the request a title of 5 to 120 characters.')
+      if (detail.length < 10 || detail.length > 2000) throw new AuthError('invalid_input', 'Describe what you need in 10 to 2,000 characters.')
+      if (input.agentId && !org(o).agents.some((a) => a.id === input.agentId)) throw notFound('agent')
+      if (input.kind === 'flow_change' && !input.agentId) throw new AuthError('invalid_input', 'Choose the agent whose flow should change.')
+      if (!['normal', 'soon', 'urgent'].includes(input.urgency)) throw new AuthError('invalid_input', 'Choose how soon you need it.')
+      const r = addRequest(o, { ...input, title, detail })
+      keep()
+      return copy(r)
+    },
+
+    async replyChangeRequest(o, id, text) {
+      await wait()
+      if (viewer && !master()) allowPerm(o, 'requests.create', 'reply to requests')
+      const r = findRequest(o, id)
+      const t = text.trim()
+      if (!t) throw new AuthError('invalid_input', 'Write the reply first.')
+      if (t.length > 1000) throw new AuthError('invalid_input', 'Keep replies under 1,000 characters.')
+      if (r.status === 'withdrawn') throw new AuthError('invalid_input', 'This request was withdrawn.')
+      const now = new Date().toISOString()
+      r.replies.push({ id: newId('crr'), by: by(), byKind: viewer?.platformRole ? 'bitntech' : 'member', at: now, text: t })
+      r.updatedAt = now
+      keep()
+      return copy(r)
+    },
+
+    async withdrawChangeRequest(o, id) {
+      await wait()
+      const r = findRequest(o, id)
+      if (viewer && r.createdById !== viewer.id && !has(o, 'team.manage')) throw new AuthError('forbidden', `Only ${r.createdBy} or someone who manages the team can withdraw this.`)
+      if (r.status !== 'open' && r.status !== 'in_progress') throw new AuthError('invalid_input', 'Only open requests can be withdrawn.')
+      r.status = 'withdrawn'
+      r.updatedAt = new Date().toISOString()
+      log(o, 'agents', `Withdrew the request “${r.title}”`)
+      keep()
+      return copy(r)
+    },
+
+    async updateChangeRequest(o, id, patch) {
+      await wait()
+      if (viewer && !master()) throw new AuthError('forbidden', 'Only bitNtech’s master admin can move requests on.')
+      const r = findRequest(o, id)
+      if (r.status === 'withdrawn') throw new AuthError('invalid_input', 'This request was withdrawn.')
+      const reply = patch.reply?.trim()
+      if (patch.status === 'declined' && !reply) throw new AuthError('invalid_input', 'Say why it’s declined. The organisation sees your reply.')
+      if (reply && reply.length > 1000) throw new AuthError('invalid_input', 'Keep replies under 1,000 characters.')
+      const now = new Date().toISOString()
+      if (reply) r.replies.push({ id: newId('crr'), by: by(), byKind: 'bitntech', at: now, text: reply })
+      if (patch.status && patch.status !== r.status) {
+        r.status = patch.status
+        const word = { open: 'reopened', in_progress: 'started on', done: 'finished', declined: 'declined' }[patch.status]
+        log(o, 'agents', `bitNtech ${word} the request “${r.title}”`, reply)
+      }
+      r.updatedAt = now
+      keep()
+      return copy(r)
+    },
+
+    // ---- bot desk
+
+    async getDesk(o) {
+      await wait()
+      allowPerm(o, ['desk.bot', 'desk.notices'], 'open the bot desk')
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async setLineMode(o, numberId, change) {
+      await wait()
+      allowPerm(o, 'desk.bot', 'switch lines to staff')
+      const d = org(o)
+      const n = d.numbers.find((x) => x.id === numberId)
+      if (!n) throw notFound('phone number')
+      if (change.mode === 'agent') {
+        if (staffMode(o, numberId)) log(o, 'agents', `Gave ${n.label} (${n.number}) back to the agent`)
+        delete d.lineModes[numberId]
+      } else {
+        if (!n.agentId) throw new AuthError('invalid_input', 'No agent answers this line, so its calls already go to your team.')
+        if (!n.transferTo) throw new AuthError('invalid_input', `Say where ${n.label}’s calls go first: Phone numbers → ${n.label} → handovers.`)
+        const until = change.until ?? null
+        if (until && Date.parse(until) <= Date.now()) throw new AuthError('invalid_input', 'Choose a time later than now.')
+        const reason = change.reason?.trim() ?? ''
+        if (reason.length > 120) throw new AuthError('invalid_input', 'Keep the reason under 120 characters.')
+        d.lineModes[numberId] = { until, reason, by: by() }
+        log(o, 'agents', `Sent ${n.label} (${n.number}) to staff`, reason || undefined)
+      }
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async saveNotice(o, input) {
+      await wait()
+      allowPerm(o, 'desk.notices', 'post notices')
+      const d = org(o)
+      const text = input.text.trim()
+      if (text.length < 5 || text.length > 300) throw new AuthError('invalid_input', 'Write the notice in 5 to 300 characters.')
+      if (Number.isNaN(Date.parse(input.from)) || Number.isNaN(Date.parse(input.until))) throw new AuthError('invalid_input', 'Choose when the notice starts and ends.')
+      if (input.until <= input.from) throw new AuthError('invalid_input', 'The notice must end after it starts.')
+      if (Date.parse(input.until) <= Date.now()) throw new AuthError('invalid_input', 'Choose an end later than now.')
+      if (Date.parse(input.until) - Date.parse(input.from) > 31 * DAY) throw new AuthError('invalid_input', 'Notices last up to 31 days. For longer, add it to Knowledge.')
+      if (input.agentId && !d.agents.some((a) => a.id === input.agentId)) throw notFound('agent')
+      const existing = input.id ? d.notices.find((x) => x.id === input.id) : null
+      if (input.id && !existing) throw notFound('notice')
+      const n: Notice = { id: existing?.id ?? newId('ntc'), text, agentId: input.agentId, from: input.from, until: input.until, createdBy: existing?.createdBy ?? by(), createdAt: existing?.createdAt ?? new Date().toISOString() }
+      d.notices = [...d.notices.filter((x) => x.id !== n.id), n]
+      log(o, 'agents', `${existing ? 'Changed' : 'Posted'} a notice: “${text.length > 60 ? `${text.slice(0, 57)}…` : text}”`)
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async removeNotice(o, id) {
+      await wait()
+      allowPerm(o, 'desk.notices', 'remove notices')
+      const d = org(o)
+      const n = d.notices.find((x) => x.id === id)
+      if (!n) throw notFound('notice')
+      d.notices = d.notices.filter((x) => x.id !== id)
+      log(o, 'agents', 'Took down a notice', n.text)
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async saveDoctorChange(o, input) {
+      await wait()
+      allowPerm(o, 'desk.notices', 'change doctor availability')
+      const d = org(o)
+      const doctor = input.doctor.trim()
+      const detail = input.detail.trim()
+      if (doctor.length < 3) throw new AuthError('invalid_input', 'Choose the doctor.')
+      const t = Date.parse(`${input.date}T00:00:00Z`)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(t) || new Date(t).toISOString().slice(0, 10) !== input.date) throw new AuthError('invalid_input', 'Choose a real date.')
+      if (input.date < localDay(0)) throw new AuthError('invalid_input', 'Choose today or a later day.')
+      if (!['away', 'late', 'moved'].includes(input.kind)) throw new AuthError('invalid_input', 'Choose what changed.')
+      if (detail.length > 200) throw new AuthError('invalid_input', 'Keep the detail under 200 characters.')
+      if ((input.kind === 'late' || input.kind === 'moved') && !detail) throw new AuthError('invalid_input', input.kind === 'late' ? 'Say from when they’re seeing patients.' : 'Say where they’re seeing patients.')
+      const existing = input.id ? d.doctorChanges.find((x) => x.id === input.id) : null
+      if (input.id && !existing) throw notFound('doctor change')
+      if (d.doctorChanges.some((x) => x.id !== input.id && x.doctor === doctor && x.date === input.date)) throw new AuthError('invalid_input', `${doctor} already has a change that day. Edit that one.`)
+      const c: DoctorChange = { id: existing?.id ?? newId('doc'), doctor, department: input.department.trim(), date: input.date, kind: input.kind, detail, createdBy: existing?.createdBy ?? by(), createdAt: existing?.createdAt ?? new Date().toISOString() }
+      d.doctorChanges = [...d.doctorChanges.filter((x) => x.id !== c.id), c]
+      log(o, 'agents', `Marked ${doctor} ${c.kind === 'away' ? 'away' : c.kind === 'late' ? 'late' : 'in another room'} on ${c.date}`, detail || undefined)
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async removeDoctorChange(o, id) {
+      await wait()
+      allowPerm(o, 'desk.notices', 'change doctor availability')
+      const d = org(o)
+      const c = d.doctorChanges.find((x) => x.id === id)
+      if (!c) throw notFound('doctor change')
+      d.doctorChanges = d.doctorChanges.filter((x) => x.id !== id)
+      log(o, 'agents', `Removed ${c.doctor}’s change on ${c.date}`)
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    async flagAnswer(o, input) {
+      await wait()
+      if (viewer && (viewer.platformRole || roleIn(o) === 'viewer' || !roleIn(o))) throw new AuthError('forbidden', 'Viewers can read calls, not flag answers.')
+      const text = input.text.trim()
+      const correction = input.correction.trim()
+      if (text.length < 5 || text.length > 300) throw new AuthError('invalid_input', 'Say what the agent got wrong, in 5 to 300 characters.')
+      if (correction.length > 300) throw new AuthError('invalid_input', 'Keep the correction under 300 characters.')
+      const f: AnswerFlag = { id: newId('flag'), callId: input.callId, agentName: input.agentName, text, correction, by: by(), at: new Date().toISOString(), status: 'open' }
+      org(o).flags.unshift(f)
+      keep()
+      return copy(f)
+    },
+
+    async resolveFlag(o, id, resolution) {
+      await wait()
+      allowPerm(o, ['agents.configure', 'library.knowledge'], 'resolve flagged answers')
+      const f = org(o).flags.find((x) => x.id === id)
+      if (!f) throw notFound('flagged answer')
+      if (f.status !== 'open') throw new AuthError('invalid_input', `${f.resolution?.by ?? 'Someone'} has already dealt with this.`)
+      const note = resolution.note.trim()
+      if (note.length > 300) throw new AuthError('invalid_input', 'Keep the note under 300 characters.')
+      if (resolution.status === 'fixed' && !note) throw new AuthError('invalid_input', 'Say what you changed, so the desk knows.')
+      f.status = resolution.status
+      f.resolution = { by: by(), at: new Date().toISOString(), note }
+      log(o, 'agents', `${resolution.status === 'fixed' ? 'Fixed' : 'Dismissed'} a flagged answer`, note || undefined)
+      const out = desk(o)
+      keep()
+      return out
+    },
+
+    // ---- live call monitoring
+
+    async whisperToAgent(o, id, text) {
+      await wait()
+      allowPerm(o, 'calls.take', 'guide the agent')
+      const call = findLive(o, id)
+      const t = text.trim()
+      if (!t) throw new AuthError('invalid_input', 'Write what the agent should know.')
+      if (t.length > 200) throw new AuthError('invalid_input', 'Keep it under 200 characters: the agent reads it mid-call.')
+      if (call.takenBy) throw new AuthError('invalid_input', `${call.takenBy} has taken this call, so the agent is no longer on it.`)
+      const d = org(o)
+      ;(d.live.whispers[id] ??= []).push({ by: by(), at: new Date().toISOString(), text: t })
+      keep()
+      return copy(findLive(o, id))
+    },
+
+    async transferCall(o, id, to, warm) {
+      await wait()
+      allowPerm(o, 'calls.take', 'transfer calls')
+      const call = findLive(o, id)
+      const d = org(o)
+      const m = d.members.find((x) => x.id === to && x.status === 'active')
+      if (!m) throw notFound('team member')
+      if (m.role === 'viewer') throw new AuthError('invalid_input', `${m.name} is a viewer and doesn’t take calls.`)
+      if (call.takenBy && call.takenBy !== by()) throw new AuthError('invalid_input', `${call.takenBy} has already taken this call.`)
+      d.liveTaken[id] = m.name
+      d.live.transfers[id] = { name: m.name, warm }
+      keep()
+      return copy(findLive(o, id))
+    },
+
+    // ---- test scenarios
+
+    async listScenarios(o, agentId) {
+      await wait()
+      allowPerm(o, ['agents.test', 'agents.view'], 'see test scenarios')
+      const out = copy(scenariosOf(o, agentId))
+      keep()
+      return out
+    },
+
+    async saveScenario(o, agentId, input) {
+      await wait()
+      allowPerm(o, 'agents.test', 'change test scenarios')
+      const list = scenariosOf(o, agentId)
+      const name = input.name.trim()
+      const lines = input.callerSays.map((l) => l.trim()).filter(Boolean)
+      if (name.length < 3 || name.length > 80) throw new AuthError('invalid_input', 'Give the scenario a name of 3 to 80 characters.')
+      if (!lines.length) throw new AuthError('invalid_input', 'Add at least one thing the caller says.')
+      if (lines.length > 10) throw new AuthError('invalid_input', 'Keep scenarios to 10 lines or fewer.')
+      if (list.some((x) => x.id !== input.id && x.name.toLowerCase() === name.toLowerCase())) throw new AuthError('invalid_input', `There’s already a scenario called “${name}”.`)
+      const existing = input.id ? list.find((x) => x.id === input.id) : null
+      if (input.id && !existing) throw notFound('scenario')
+      const sc: Scenario = {
+        id: existing?.id ?? newId('scn'),
+        name,
+        callerSays: lines,
+        expect: { intent: input.expect.intent.trim(), mustSay: input.expect.mustSay.map((w) => w.trim()).filter(Boolean), handover: input.expect.handover },
+        // Changed, so the last run no longer applies.
+        lastRun: null,
+      }
+      org(o).scenarios[agentId] = existing ? list.map((x) => (x.id === sc.id ? sc : x)) : [...list, sc]
+      keep()
+      return copy(sc)
+    },
+
+    async deleteScenario(o, agentId, id) {
+      await wait()
+      allowPerm(o, 'agents.test', 'change test scenarios')
+      const list = scenariosOf(o, agentId)
+      if (!list.some((x) => x.id === id)) throw notFound('scenario')
+      org(o).scenarios[agentId] = list.filter((x) => x.id !== id)
+      keep()
+    },
+
+    async runScenarios(o, agentId) {
+      await wait()
+      allowPerm(o, 'agents.test', 'run test scenarios')
+      const d = org(o)
+      const r = recordOf(o, agentId)
+      const list = scenariosOf(o, agentId)
+      const version = r.changed ? null : (findAgent(o, agentId).version ?? null)
+      for (const sc of list) sc.lastRun = runScenario(sc, r.working, d.tools, d.knowledge, version)
+      keep()
+      return copy(list)
+    },
+
+    async setPermissions(o, id, permissions) {
+      await wait()
+      allowPerm(o, 'team.manage', 'manage the team')
+      const m = findMember(o, id)
+      if (viewer && m.id === viewer.id) throw new AuthError('forbidden', 'You can’t change your own permissions. Ask another owner or admin.')
+      if (m.role === 'owner' && roleIn(o) !== 'owner' && viewer) throw new AuthError('forbidden', 'Only an owner can change an owner’s permissions.')
+      const next = permissions ? permissionsFor(m.role, permissions) : null
+      const same = (a: string[] | null, b: string[] | null) => JSON.stringify(a ? [...a].sort() : null) === JSON.stringify(b ? [...b].sort() : null)
+      // Exactly the defaults is the same as no change.
+      const stored = next && same(next, permissionsFor(m.role)) ? null : next
+      if (same(stored, m.permissions)) return copy(m)
+      m.permissions = stored
+      // Callbacks they can no longer take go back to nobody.
+      if (!permissionsFor(m.role, stored).includes('calls.take')) freeCallbacks(o, m.id)
+      log(o, 'team', stored ? `Changed what ${m.name} can do` : `Gave ${m.name} the ${ROLE_LABEL[m.role].toLowerCase()} defaults again`)
+      keep()
+      return copy(m)
     },
   }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react'
 import { ROLE_LABEL } from '../../../auth/roles'
-import { asAuthError, type Role } from '../../../auth/types'
-import { can } from '../../../console/access'
+import { asAuthError, type Permission, type Role } from '../../../auth/types'
+import { can, canGrant, defaultPermissions, PERMISSION_GROUP_LABEL, PERMISSIONS, permissionsFor, type PermissionGroup } from '../../../console/access'
 import { useConsole } from '../../../console/ConsoleProvider'
 import type { Member } from '../../../console/types'
 import { useOrg } from '../../../console/useOrg'
@@ -10,7 +10,7 @@ import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { ChoiceGroup } from '../../../components/ui/Choice'
 import { ConfirmDialog, Modal } from '../../../components/ui/Dialog'
-import { TextField } from '../../../components/ui/Field'
+import { Checkbox, TextField } from '../../../components/ui/Field'
 import { Spinner } from '../../../components/ui/Spinner'
 import { useAsync } from '../../../lib/useAsync'
 import { shortDate, timeAgo } from '../../../lib/time'
@@ -24,9 +24,9 @@ const ROLES: Role[] = ['owner', 'admin', 'supervisor', 'front_desk', 'viewer']
 /** What each role can do, in the words the Team page uses. */
 export const ROLE_DOES: Record<Role, string> = {
   owner: 'Everything, including billing and who can sign in.',
-  admin: 'Builds and publishes agents, manages the team. No billing.',
-  supervisor: 'Tests agents, reviews calls, takes over live calls. Can’t change an agent.',
-  front_desk: 'Takes the calls agents hand over, and callbacks.',
+  admin: 'Changes agents’ everyday settings and publishes them, asks bitNtech for new ones, manages the team. No billing.',
+  supervisor: 'Tests agents, reviews calls and reports, takes over live calls. Can’t change an agent.',
+  front_desk: 'Runs the Bot desk, takes the calls agents hand over, and callbacks.',
   viewer: 'Reads agents, calls and reports. Changes nothing.',
 }
 
@@ -42,18 +42,19 @@ function inviteState(m: Member, now: number): { expired: boolean; text: string }
 
 /** /o/:slug/team: who can sign in, and their roles. Owners and admins. */
 export default function TeamPage() {
-  const { org, user } = useOrg()
+  const { org, user, access } = useOrg()
   const client = useConsole()
   const id = useId()
   const load = useCallback(() => client.listMembers(org.orgSlug), [client, org.orgSlug])
   const [team, reload, setTeam] = useAsync(load)
   const [inviting, setInviting] = useState(false)
   const [changing, setChanging] = useState<Member | null>(null)
+  const [permitting, setPermitting] = useState<Member | null>(null)
   const [removing, setRemoving] = useState<Member | null>(null)
   const [note, say] = useAnnouncer()
   const membersHeading = useRef<HTMLHeadingElement>(null)
   const invitesHeading = useRef<HTMLHeadingElement>(null)
-  const isOwner = can(org.role, 'team.manageOwners')
+  const isOwner = can(access, 'team.manageOwners')
   const now = Date.now()
 
   const all = team.state === 'ready' ? team.data : []
@@ -117,6 +118,7 @@ export default function TeamPage() {
                         {m.name}
                         {m.id === user.id && <span className="lib-row__label">(you)</span>}
                         <span className={`status-chip team-role team-role--${m.role}`}>{ROLE_LABEL[m.role]}</span>
+                        {m.permissions && <span className="status-chip team-custom">Custom permissions</span>}
                         {m.status === 'disabled' && <span className="status-chip">Can’t sign in</span>}
                       </h3>
                       <p className="row__meta">
@@ -128,6 +130,9 @@ export default function TeamPage() {
                       <div className="lib-row__actions">
                         <button type="button" className="btn-text" aria-label={`Change ${m.name}’s role`} onClick={() => setChanging(m)}>
                           Change role
+                        </button>
+                        <button type="button" className="btn-text" aria-label={`Change what ${m.name} can do`} onClick={() => setPermitting(m)}>
+                          Permissions
                         </button>
                         <button type="button" className="btn-text lib-row__remove" aria-label={`Remove ${m.name}`} onClick={() => setRemoving(m)}>
                           Remove
@@ -169,6 +174,7 @@ export default function TeamPage() {
 
           <details className="team-roles">
             <summary>What each role can do</summary>
+            <p className="row__meta">Each role starts with these. Change what one person can do with Permissions on their row.</p>
             <dl>
               {ROLES.map((r) => (
                 <div key={r}>
@@ -201,6 +207,16 @@ export default function TeamPage() {
           if (!changed) return
           put(m)
           say(`${m.status === 'invited' ? m.email : m.name} is now ${ROLE_LABEL[m.role]}.`)
+        }}
+      />
+      <PermissionsDialog
+        member={permitting}
+        onClose={() => setPermitting(null)}
+        onSaved={(m, changed) => {
+          setPermitting(null)
+          if (!changed) return
+          put(m)
+          say(m.permissions ? `Saved what ${m.name} can do.` : `${m.name} has the ${ROLE_LABEL[m.role].toLowerCase()} defaults again.`)
         }}
       />
       <RemoveDialog
@@ -386,6 +402,7 @@ function RoleDialog({ member, isOwner, onClose, onSaved }: { member: Member | nu
         {member && role !== member.role && (
           <p className="row__meta" role="status">
             {role === 'viewer' && member.role !== 'viewer' ? 'Callbacks given to them go back to nobody: viewers don’t make calls. ' : ''}
+            {member.permissions ? 'Their custom permissions are replaced by the new role’s defaults. ' : ''}
             {member.status === 'active' ? 'It applies the next time a page loads for them.' : 'They join with the new role.'}
           </p>
         )}
@@ -457,5 +474,129 @@ function RemoveDialog({ member, orgName, onClose, onRemoved }: { member: Member 
         </>
       )}
     </ConfirmDialog>
+  )
+}
+
+const GROUPS = Object.keys(PERMISSION_GROUP_LABEL) as PermissionGroup[]
+
+/** What one person may do, starting from their role's defaults. Only what
+ * the role may hold is offered: viewers never change anything, and the team
+ * and settings stay with owners and admins. */
+function PermissionsDialog({ member, onClose, onSaved }: { member: Member | null; onClose(): void; onSaved(m: Member, changed: boolean): void }) {
+  const client = useConsole()
+  const { org } = useOrg()
+  const [chosen, setChosen] = useState<Set<Permission>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [said, say] = useAnnouncer()
+
+  useEffect(() => {
+    if (!member) return
+    setChosen(new Set(permissionsFor(member.role, member.permissions)))
+    setError(null)
+  }, [member])
+
+  if (!member) return <Modal open={false} title="Permissions" onClose={onClose}>{null}</Modal>
+  const role = member.role
+  const defaults = new Set(defaultPermissions(role))
+  const isDefault = defaults.size === chosen.size && [...defaults].every((p) => chosen.has(p))
+  const offered = (g: PermissionGroup) => (Object.keys(PERMISSIONS) as Permission[]).filter((p) => PERMISSIONS[p].group === g && canGrant(role, p))
+  const notOffered = (Object.keys(PERMISSIONS) as Permission[]).filter((p) => !canGrant(role, p))
+  const toggle = (p: Permission, on: boolean) =>
+    setChosen((c) => {
+      const next = new Set(c)
+      if (on) next.add(p)
+      else next.delete(p)
+      return next
+    })
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    if (!member || busy) return
+    const before = new Set(permissionsFor(member.role, member.permissions))
+    if (before.size === chosen.size && [...before].every((p) => chosen.has(p))) return onSaved(member, false)
+    setBusy(true)
+    setError(null)
+    try {
+      onSaved(await client.setPermissions(org.orgSlug, member.id, isDefault ? null : [...chosen]), true)
+    } catch (err) {
+      setError(asAuthError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open title={`What ${member.name} can do`} onClose={() => !busy && onClose()} wide>
+      <form className="op-form" onSubmit={save} noValidate>
+        <p className="sr-only" role="status">
+          {said}
+        </p>
+        <p>
+          {ROLE_LABEL[role]} · {isDefault ? `the ${ROLE_LABEL[role].toLowerCase()} defaults` : 'changed from the defaults'}.{' '}
+          {!isDefault && (
+            <button
+              type="button"
+              className="btn-text"
+              onClick={() => {
+                setChosen(new Set(defaults))
+                say(`Back to the ${ROLE_LABEL[role].toLowerCase()} defaults. Save to keep it.`)
+              }}
+            >
+              Use the defaults
+            </button>
+          )}
+        </p>
+        <div className="perm__groups">
+          {GROUPS.map((g) => {
+            const list = offered(g)
+            if (!list.length) return null
+            return (
+              <fieldset key={g} className="perm__group">
+                <legend className="perm__legend">{PERMISSION_GROUP_LABEL[g]}</legend>
+                {list.map((p) => (
+                  <Checkbox
+                    key={p}
+                    label={
+                      <>
+                        {PERMISSIONS[p].label}
+                        {defaults.has(p) !== chosen.has(p) && (
+                          <>
+                            {' '}
+                            <span className="perm__changed">(changed)</span>
+                          </>
+                        )}
+                      </>
+                    }
+                    hint={PERMISSIONS[p].description}
+                    checked={chosen.has(p)}
+                    onChange={(e) => toggle(p, e.target.checked)}
+                  />
+                ))}
+              </fieldset>
+            )
+          })}
+        </div>
+        {notOffered.length > 0 && (
+          <p className="row__meta">
+            Not for {ROLE_LABEL[role].toLowerCase()}s: {notOffered.map((p) => PERMISSIONS[p].label.toLowerCase()).join(', ')}. Change their role for these.
+          </p>
+        )}
+        <p className="row__meta">{member.status === 'active' ? 'It applies the next time a page loads for them.' : 'They join with these permissions.'} Billing stays with owners.</p>
+        {error && (
+          <p className="field__error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="dialog__actions">
+          <Button type="submit" variant="plum" size="sm" busy={busy} busyLabel="Saving…">
+            Save
+          </Button>
+          <Button variant="line" size="sm" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }

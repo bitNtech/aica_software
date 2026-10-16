@@ -1,7 +1,7 @@
 import { useCallback, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { asAuthError } from '../../../auth/types'
-import { can } from '../../../console/access'
+import { can, pageAccess } from '../../../console/access'
 import { useConsole } from '../../../console/ConsoleProvider'
 import type { CallNote, CallRecord } from '../../../console/types'
 import { useOrg } from '../../../console/useOrg'
@@ -11,21 +11,22 @@ import { Button } from '../../../components/ui/Button'
 import { TextAreaField } from '../../../components/ui/Field'
 import { Spinner } from '../../../components/ui/Spinner'
 import { useAsync } from '../../../lib/useAsync'
-import { TranscriptView } from '../calls/TranscriptDialog'
-import { clock, duration, languageName, OUTCOME_LABEL, timeOfDay } from './shared'
+import { seconds, TranscriptView } from '../calls/TranscriptDialog'
+import { FlagAnswerButton } from './FlagAnswer'
+import { clock, duration, languageName, OUTCOME_LABEL, SENTIMENT_LABEL, timeOfDay } from './shared'
 import { useAnnouncer } from './LiveBits'
 import './Operate.css'
 
 /** /o/:slug/calls/:callId: one call, in full. */
 export default function CallDetailPage() {
   const { callId = '' } = useParams()
-  const { org } = useOrg()
+  const { org, access, base } = useOrg()
   const client = useConsole()
   const load = useCallback(() => client.getCallRecord(org.orgSlug, callId), [client, org.orgSlug, callId])
   const [call, reload, setCall] = useAsync(load)
   const back = (
-    <Link className="op-crumb" to={`/o/${org.orgSlug}/calls`}>
-      {org.role === 'front_desk' ? 'Calls you handled' : 'Call history'}
+    <Link className="op-crumb" to={`${base}/calls`}>
+      {pageAccess(access, 'calls') === 'own' ? 'Calls you handled' : 'Call history'}
     </Link>
   )
 
@@ -44,7 +45,7 @@ export default function CallDetailPage() {
               <button type="button" className="btn-text" onClick={reload}>
                 Try again
               </button>
-              <Link className="link" to={`/o/${org.orgSlug}/calls`}>
+              <Link className="link" to={`${base}/calls`}>
                 Back to the calls
               </Link>
             </p>
@@ -56,7 +57,7 @@ export default function CallDetailPage() {
 
   const c = call.data
   // Viewers read the call without the caller's personal details.
-  const redact = org.role === 'viewer'
+  const redact = !can(access, 'call.personal')
   const started = new Date(c.startedAt)
 
   return (
@@ -84,6 +85,28 @@ export default function CallDetailPage() {
             <p className="op-card__summary">{redact && c.callerName ? c.summary.split(c.callerName).join('A caller') : c.summary}</p>
           </Section>
 
+          <Section title="After the call">
+            <dl className="op-facts">
+              <div>
+                <dt>Outcome</dt>
+                <dd>
+                  <span className={`flag${c.analysis.success ? ' flag--ok' : ' flag--warn'}`}>{c.analysis.success ? 'Successful' : 'Not successful'}</span>{' '}
+                  <span className="row__meta">{c.analysis.successReason}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>How the caller sounded</dt>
+                <dd>{SENTIMENT_LABEL[c.analysis.sentiment]}</dd>
+              </div>
+              {c.analysis.fields.map((f) => (
+                <div key={f.label}>
+                  <dt>{f.label}</dt>
+                  <dd>{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+
           <Section title="The conversation">
             {redact && <p className="transcript__note">Personal details are hidden.</p>}
             <TranscriptView transcript={{ callId: c.id, turns: c.transcript }} redact={redact} />
@@ -92,9 +115,15 @@ export default function CallDetailPage() {
           <Recording call={c} />
           <Notes
             call={c}
-            canAdd={can(org.role, 'call.notes')}
+            canAdd={can(access, 'call.notes')}
             onAdded={(n) => setCall((r) => (r.state === 'ready' ? { ...r, data: { ...r.data, notes: [...r.data.notes, n] } } : r))}
           />
+          {access.role !== 'viewer' && (
+            <Section title="Something wrong?">
+              <p className="row__meta">If the agent said something wrong, flag it. Whoever looks after the agent sees it on the Bot desk.</p>
+              <FlagAnswerButton callId={c.id} agentName={c.agentName} />
+            </Section>
+          )}
         </div>
 
         <aside className="op-detail__side" aria-label="Call details">
@@ -136,6 +165,31 @@ export default function CallDetailPage() {
             )}
           </Section>
 
+          <Section title="Response times">
+            <dl className="op-facts op-facts--stack">
+              <div>
+                <dt>First words</dt>
+                <dd>{seconds(c.metrics.firstWordMs)} after answering</dd>
+              </div>
+              <div>
+                <dt>Typical reply</dt>
+                <dd>
+                  {seconds(c.metrics.replyP50Ms)} <span className="row__meta">(slowest {seconds(c.metrics.replyP95Ms)})</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Where the wait went</dt>
+                <dd>
+                  Hearing {seconds(c.metrics.speechMs)} · thinking {seconds(c.metrics.languageMs)} · speaking {seconds(c.metrics.voiceMs)}
+                </dd>
+              </div>
+              <div>
+                <dt>Caller cut in</dt>
+                <dd>{c.metrics.interruptions === 0 ? 'Never' : c.metrics.interruptions === 1 ? 'Once' : `${c.metrics.interruptions} times`}</dd>
+              </div>
+            </dl>
+          </Section>
+
           <Section title="Knowledge used">{c.knowledgeUsed.length === 0 ? <p className="row__meta">None.</p> : <p>{c.knowledgeUsed.join(', ')}</p>}</Section>
         </aside>
       </div>
@@ -156,15 +210,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function Recording({ call }: { call: CallRecord }) {
-  const { org } = useOrg()
+  const { access, user } = useOrg()
   const client = useConsole()
   // Front desk only for calls they handled: the server checks that; here
   // they can only open those anyway.
-  const allowed = can(org.role, 'call.playRecording')
+  const allowed = can(access, 'call.playRecording') && (access.perms.has('calls.recordings') || call.handledById === user.id)
   return (
     <Section title="Recording">
       {!allowed ? (
-        <p className="row__meta">Recordings are for the front desk and above.</p>
+        <p className="row__meta">You can play recordings of the calls you handled. Ask an owner or admin for more.</p>
       ) : client.isDemo || !call.hasRecording ? (
         <div className="op-unavailable">
           <p>{client.isDemo ? 'The demo has no recordings: real calls play here.' : 'There’s no recording of this call.'}</p>

@@ -15,6 +15,7 @@ import type {
 } from '../types'
 import { localDay } from '../../lib/time'
 import { ago, ahead, DAY } from './runtime'
+import { callQuality, qualityOf, timeTurns } from './quality'
 
 /**
  * Sample operations data: the call log, live calls, handoffs, callbacks,
@@ -55,15 +56,24 @@ function pick<T>(r: () => number, items: readonly T[], weights?: readonly number
 
 export function seedMembers(orgSlug: string): Member[] {
   if (orgSlug !== 'arogya-demo')
-    return [{ id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'owner', lastActiveAt: ago(0.1), status: 'active' }]
+    return [{ id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'owner', permissions: null, lastActiveAt: ago(0.1), status: 'active' }]
   return [
-    { id: 'u_owner', name: 'Lakshmi K', email: 'owner@example.com', role: 'owner', lastActiveAt: ago(1), status: 'active' },
-    { id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'admin', lastActiveAt: ago(0.05), status: 'active' },
-    { id: 'u_supervisor', name: 'Priya N', email: 'supervisor@example.com', role: 'supervisor', lastActiveAt: ago(0.2), status: 'active' },
-    { id: 'u_frontdesk', name: 'Meena S', email: 'frontdesk@example.com', role: 'front_desk', lastActiveAt: ago(0.02), status: 'active' },
-    { id: 'u_frontdesk2', name: 'Suresh B', email: 'suresh@example.com', role: 'front_desk', lastActiveAt: ago(0.4), status: 'active' },
-    { id: 'u_viewer', name: 'Arun V', email: 'viewer@example.com', role: 'viewer', lastActiveAt: ago(6), status: 'active' },
-    { id: 'inv_newstaff', name: 'newstaff@example.com', email: 'newstaff@example.com', role: 'supervisor', lastActiveAt: null, status: 'invited', invitedAt: ago(1), invitedBy: 'Karthik R' },
+    { id: 'u_owner', name: 'Lakshmi K', email: 'owner@example.com', role: 'owner', permissions: null, lastActiveAt: ago(1), status: 'active' },
+    { id: 'u_admin', name: 'Karthik R', email: 'admin@example.com', role: 'admin', permissions: null, lastActiveAt: ago(0.05), status: 'active' },
+    { id: 'u_supervisor', name: 'Priya N', email: 'supervisor@example.com', role: 'supervisor', permissions: null, lastActiveAt: ago(0.2), status: 'active' },
+    { id: 'u_frontdesk', name: 'Meena S', email: 'frontdesk@example.com', role: 'front_desk', permissions: null, lastActiveAt: ago(0.02), status: 'active' },
+    // Changed from the front desk defaults: reads reports, but doesn't switch lines to staff.
+    {
+      id: 'u_frontdesk2',
+      name: 'Suresh B',
+      email: 'suresh@example.com',
+      role: 'front_desk',
+      permissions: ['desk.notices', 'calls.take', 'appointments.manage', 'calls.personal', 'reports.view'],
+      lastActiveAt: ago(0.4),
+      status: 'active',
+    },
+    { id: 'u_viewer', name: 'Arun V', email: 'viewer@example.com', role: 'viewer', permissions: null, lastActiveAt: ago(6), status: 'active' },
+    { id: 'inv_newstaff', name: 'newstaff@example.com', email: 'newstaff@example.com', role: 'supervisor', permissions: null, lastActiveAt: null, status: 'invited', invitedAt: ago(1), invitedBy: 'Karthik R' },
   ]
 }
 
@@ -75,7 +85,7 @@ const DESK = [
 ]
 
 const NAMES = ['Lakshmi Narayanan', 'Ramasamy K', 'Divya Prakash', 'Mohammed Irfan', 'Selvi Murugan', 'Anand Kumar', 'Fathima B', 'Gopal Krishnan', 'Priya Dharshini', 'Karthikeyan S', 'Meenakshi R', 'Joseph Antony', 'Revathi M', 'Senthil Kumar']
-const DEPARTMENTS: [string, string][] = [
+export const DEPARTMENTS: [string, string][] = [
   ['Cardiology', 'Dr. R. Ramachandran'],
   ['General medicine', 'Dr. S. Meenakshi'],
   ['Orthopaedics', 'Dr. K. Arvind'],
@@ -301,6 +311,8 @@ export function callRecord(s: CallSummary): Omit<CallRecord, 'notes'> {
   const walked = s.outcome === 'dropped' ? path.slice(0, Math.max(2, Math.ceil(path.length / 2))) : s.outcome === 'handed_over' ? [...path.slice(0, 3), 'Hand over to a person'] : path
   const turns = s.outcome === 'dropped' ? script.turns.slice(0, Math.max(3, Math.ceil(script.turns.length / 2))) : script.turns
   const handled = s.outcome === 'handed_over' || s.outcome === 'emergency' ? deskFor(s.id) : null
+  const q = callQuality(s)
+  const detail = (label: string) => script.details.find((d) => d.label === label)?.value
   const summary =
     s.outcome === 'booked'
       ? `${s.callerName ?? 'A caller'} booked an appointment. Details read back and confirmed.`
@@ -320,10 +332,24 @@ export function callRecord(s: CallSummary): Omit<CallRecord, 'notes'> {
     details: script.details,
     toolCalls: s.outcome === 'dropped' ? [] : script.tools,
     knowledgeUsed: script.knowledge,
-    transcript: turns,
+    transcript: timeTurns(s, turns, q.metrics),
     hasRecording: true,
     handledById: handled?.id ?? null,
     handledBy: handled?.name ?? null,
+    analysis: {
+      ...q.analysis,
+      // The fields each sample agent's analysis is set up to note.
+      fields:
+        s.agentId === 'agt_appointments'
+          ? [
+              { label: 'Department', value: detail('Department') ?? 'Not said' },
+              { label: 'First visit', value: detail('Visit type') ? (detail('Visit type') === 'First visit' ? 'Yes' : 'No') : 'Not said' },
+            ]
+          : s.agentId === 'agt_reports'
+            ? [{ label: 'Report ready', value: s.outcome === 'resolved' ? (s.intent.startsWith('Check') ? 'No' : 'Yes') : 'Not said' }]
+            : [{ label: 'Topic', value: /timing/i.test(s.intent) ? 'Timings' : /doctor/i.test(s.intent) ? 'Doctors' : /price/i.test(s.intent) ? 'Prices' : /bill/i.test(s.intent) ? 'Billing' : 'Other' }],
+    },
+    metrics: q.metrics,
   }
 }
 
@@ -385,6 +411,14 @@ export function report(ctx: LogContext, days: number, agentId?: string): Report 
     languages: [...languages].map(([language, calls]) => ({ language, calls })).sort((a, b) => b.calls - a.calls),
     intents: [...intents].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.calls - a.calls),
     dropOff: [...drops].map(([step, calls]) => ({ step, calls })).sort((a, b) => b.calls - a.calls).slice(0, 6),
+    quality: qualityOf(now),
+    agents: AGENTS.map((a) => {
+      const cs = now.filter((c) => c.agentId === a.id)
+      const q = qualityOf(cs)
+      return { agentId: a.id, name: a.name, calls: cs.length, byAgent: cs.filter((c) => c.outcome === 'resolved' || c.outcome === 'booked').length, success: q.success, replyP50Ms: q.replyP50Ms }
+    })
+      .filter((a) => a.calls > 0)
+      .sort((a, b) => b.calls - a.calls),
   }
 }
 
@@ -444,7 +478,12 @@ const LIVE_CYCLE = 150
 
 /** Calls in progress now. They come and go as time passes, so the page is
  * worth refreshing. `taken` holds who took over which call. */
-export function liveCalls(orgSlug: string, taken: Record<string, string>, paused: Set<string>): LiveCall[] {
+export interface LiveExtras {
+  whispers: Record<string, LiveCall['whispers']>
+  transfers: Record<string, { name: string; warm: boolean }>
+}
+
+export function liveCalls(orgSlug: string, taken: Record<string, string>, paused: Set<string>, extras: LiveExtras = { whispers: {}, transfers: {} }): LiveCall[] {
   if (orgSlug !== 'arogya-demo') return []
   const now = Date.now() / 1000
   return LIVE_SCRIPTS.flatMap((s, i) => {
@@ -472,6 +511,8 @@ export function liveCalls(orgSlug: string, taken: Record<string, string>, paused
         turns: s.turns.filter((turn) => turn.at <= elapsed),
         flagged: s.flagged && elapsed >= 4,
         takenBy: taken[id] ?? null,
+        whispers: extras.whispers[id] ?? [],
+        transferredTo: extras.transfers[id] ?? null,
       },
     ]
   })

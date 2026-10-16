@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { asAuthError } from '../../../auth/types'
 import { useConsole } from '../../../console/ConsoleProvider'
 import type { AgentSummary, CallLogPage, CallOutcome, CallQuery } from '../../../console/types'
+import { can, pageAccess } from '../../../console/access'
 import { useOrg } from '../../../console/useOrg'
 import { ConsolePage } from '../../../components/console/ConsolePage'
 import { SegFilter, useSettled } from '../../../components/console/ListTools'
@@ -26,9 +27,10 @@ const when = (iso: string) => {
 
 /** /o/:slug/calls: every call, searchable. Front desk see the calls they handled. */
 export default function CallHistoryPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
-  const own = org.role === 'front_desk'
+  const own = pageAccess(access, 'calls') === 'own'
+  const personal = can(access, 'call.personal')
   const [days, setDays] = useState<Days>(7)
   const [agentId, setAgentId] = useState('')
   const [outcome, setOutcome] = useState<CallOutcome | ''>('')
@@ -104,7 +106,7 @@ export default function CallHistoryPage() {
           label="Search"
           type="search"
           value={query}
-          placeholder={org.role === 'viewer' ? 'Number or what they asked' : 'Number, name or what they asked'}
+          placeholder={!personal ? 'Number or what they asked' : 'Number, name or what they asked'}
           autoComplete="off"
           className="list-tools__search"
           onChange={(e) => setQuery(e.target.value)}
@@ -168,7 +170,7 @@ export default function CallHistoryPage() {
                 <div className="op-row__main">
                   <Link className="op-row__link" to={`/o/${org.orgSlug}/calls/${c.id}`}>
                     {/* Viewers don't see callers' names. */}
-                    {(org.role !== 'viewer' && c.callerName) || 'A caller'}
+                    {(personal && c.callerName) || 'A caller'}
                     <span className="op-card__sub">{c.callerPhone}</span>
                   </Link>
                   <p className="row__meta">

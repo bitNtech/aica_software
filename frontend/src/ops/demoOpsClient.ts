@@ -274,6 +274,9 @@ export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}
           const use = dailyUse(slug, days * 2)
           const now = { calls: use.calls.slice(days), minutes: use.minutes.slice(days) }
           const plan = currentPlans().find((p) => p.id === seedBilling(slug).plan)!
+          // Each organisation's reply times hold steady from day to day.
+          const r = rng(hash(`${slug}:latency:${days}`))
+          const replyP50Ms = Math.round(820 + r() * 260)
           return {
             slug,
             name: o.name,
@@ -284,6 +287,8 @@ export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}
             minutes: now.minutes.reduce((s, n) => s + n, 0),
             uploadHours: uploadHours(slug, start),
             minutesByDay: now.minutes,
+            replyP50Ms,
+            replyP95Ms: Math.round(replyP50Ms * (1.6 + r() * 0.4)),
             prev: {
               calls: use.calls.slice(0, days).reduce((s, n) => s + n, 0),
               minutes: use.minutes.slice(0, days).reduce((s, n) => s + n, 0),

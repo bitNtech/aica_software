@@ -38,9 +38,9 @@ const time12 = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString(
 
 /** /o/:slug/appointments: bookings made on calls, to confirm or correct. */
 export default function AppointmentsPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
-  const canEdit = pageAccess(org.role, 'appointments') === 'edit'
+  const canEdit = pageAccess(access, 'appointments') === 'edit'
   // The next week, and a couple of days back for late corrections.
   const load = useCallback(() => client.listAppointments(org.orgSlug, dayFrom(-2), dayFrom(7)), [client, org.orgSlug])
   const [list, reload, setList] = useAsync(load)

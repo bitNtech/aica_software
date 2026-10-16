@@ -40,7 +40,7 @@ describe('team rules the server keeps', () => {
     await expect(c.inviteMember(ORG, { email: 'NEWSTAFF@example.com', role: 'viewer' })).rejects.toThrow(/already invited/i)
     await expect(c.inviteMember(ORG, { email: 'viewer@example.com', role: 'viewer' })).rejects.toThrow(/already in the team/i)
     await expect(as('u_supervisor', 'Priya N', 'supervisor').listMembers(ORG)).resolves.toBeTruthy()
-    await expect(as('u_supervisor', 'Priya N', 'supervisor').inviteMember(ORG, { email: 'x@example.com', role: 'viewer' })).rejects.toThrow(/role can’t/i)
+    await expect(as('u_supervisor', 'Priya N', 'supervisor').inviteMember(ORG, { email: 'x@example.com', role: 'viewer' })).rejects.toThrow(/permission to/i)
   })
 
   it('gives a removed person’s callbacks back to nobody, and logs it', async () => {

@@ -61,3 +61,7 @@
   .ops-service--flag { border: 2px solid CanvasText; }
   .ops-spark { color: CanvasText; }
 }
+
+/* An organisation's agents, with its open requests to bitNtech. */
+.ops-section__links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.ops-org__asks { padding: 0.7rem 0.9rem; border-left: 3px solid var(--orange); background: var(--bg-2); border-radius: 0 8px 8px 0; overflow-wrap: anywhere; }

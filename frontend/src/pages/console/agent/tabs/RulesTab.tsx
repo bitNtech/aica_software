@@ -10,12 +10,12 @@ const FAILURES = [1, 2, 3].map((n) => ({ value: String(n), label: n === 1 ? 'The
 const MINUTES = [5, 10, 15, 20, 30].map((n) => ({ value: String(n), label: `${n} minutes` }))
 
 /** When and where it hands over, what it won't discuss, and call limits. */
-export function RulesTab({ org, detail, spec, update, readOnly, errors }: TabProps) {
+export function RulesTab({ base, detail, spec, update, readOnly, errors }: TabProps) {
   const id = useId()
   const g = spec.guardrails
   const set = (patch: Partial<Guardrails>) => update((s) => ({ ...s, guardrails: { ...s.guardrails, ...patch } }))
   const flowLink = (
-    <Link className="link" to={`/o/${org.orgSlug}/agents/${detail.agent.id}/flow`}>
+    <Link className="link" to={`${base}/agents/${detail.agent.id}/flow`}>
       Flow
     </Link>
   )

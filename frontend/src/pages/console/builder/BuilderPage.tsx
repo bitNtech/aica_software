@@ -35,7 +35,8 @@ const STEP_VIEW: Record<BuilderStep, (p: StepProps) => ReactNode> = {
   review: StepReview,
 }
 
-/** /o/:slug/agents/drafts/:draftId/:step — the agent builder. The draft is
+/** /ops/orgs/:slug/agents/drafts/:draftId/:step — the agent builder, for
+ * bitNtech's master admin. The draft is
  * saved as you go; Next checks the step before moving on. Keyed by draft,
  * so opening another draft never shows or saves the previous one. */
 export default function BuilderRoute() {
@@ -44,7 +45,7 @@ export default function BuilderRoute() {
 }
 
 function BuilderPage() {
-  const { org } = useOrg()
+  const { org, base: orgBase } = useOrg()
   const client = useConsole()
   const navigate = useNavigate()
   const { draftId = '', step: stepParam } = useParams()
@@ -72,7 +73,7 @@ function BuilderPage() {
     setActionError(null)
   }, [stepParam])
 
-  const base = `/o/${org.orgSlug}/agents/drafts/${draftId}`
+  const base = `${orgBase}/agents/drafts/${draftId}`
 
   if (loadError) {
     return (
@@ -83,7 +84,7 @@ function BuilderPage() {
             <button type="button" className="btn-text" onClick={load}>
               Try again
             </button>
-            <Link className="link" to={`/o/${org.orgSlug}/agents`}>
+            <Link className="link" to={`${orgBase}/agents`}>
               Back to agents
             </Link>
           </p>
@@ -142,7 +143,7 @@ function BuilderPage() {
     setActionError(null)
     try {
       await autosave.flush()
-      navigate(`/o/${org.orgSlug}/agents`)
+      navigate(`${orgBase}/agents`)
     } catch {
       setActionError("Couldn't save the draft. Check your connection and try again.")
       setMoving(false)
@@ -156,7 +157,7 @@ function BuilderPage() {
     autosave.cancel()
     try {
       await client.discardDraft(org.orgSlug, draftId)
-      navigate(`/o/${org.orgSlug}/agents`, { replace: true })
+      navigate(`${orgBase}/agents`, { replace: true })
     } catch (err) {
       setDiscardError(asAuthError(err).message)
       setDiscarding('open')
@@ -164,7 +165,7 @@ function BuilderPage() {
   }
 
   const tries = attempt.step === step ? attempt.n : 0
-  const props: StepProps = { draft, org, update, showErrors: tries > 0, attempt: tries, validator, save: () => autosave.flush(), done: autosave.cancel }
+  const props: StepProps = { draft, org, base: orgBase, update, showErrors: tries > 0, attempt: tries, validator, save: () => autosave.flush(), done: autosave.cancel }
 
   return (
     <ConsolePage

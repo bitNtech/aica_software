@@ -19,11 +19,13 @@ import './Library.css'
 
 /** /o/:slug/integrations: what agents can do during a call. */
 export default function ToolsPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const id = useId()
-  const canEdit = pageAccess(org.role, 'integrations') === 'edit'
-  const canSecrets = can(org.role, 'tools.credentials')
+  // Tools and connected systems are set up by bitNtech; a hospital can
+  // replace the secrets its own systems use.
+  const canEdit = can(access, 'tools.manage')
+  const canSecrets = can(access, 'tools.credentials') && pageAccess(access, 'integrations') === 'edit'
   const load = useCallback(async () => {
     const [tools, credentials] = await Promise.all([client.listTools(org.orgSlug), client.listCredentials(org.orgSlug)])
     return { tools, credentials }
@@ -67,7 +69,7 @@ export default function ToolsPage() {
 
   return (
     <ConsolePage
-      kicker="Build"
+      kicker="Agents"
       title="Tools and integrations"
       docTitle="Tools and integrations"
       lede={<p>What agents can do during a call: hand over, send a message, or look up and book things in your own systems. Each agent uses the tools chosen for it.</p>}
@@ -92,7 +94,7 @@ export default function ToolsPage() {
 
       {lib.state === 'ready' && (
         <>
-          {!canEdit && <p className="lib__ro-note">You can look. Owners and admins change tools and connect systems.</p>}
+          {!canEdit && <p className="lib__ro-note">bitNtech sets up tools and connects your systems. To change them, send a request to bitNtech.</p>}
           <section className="lib__section" aria-labelledby={`${id}-built`}>
             <h2 id={`${id}-built`} className="lib__heading">
               Built in

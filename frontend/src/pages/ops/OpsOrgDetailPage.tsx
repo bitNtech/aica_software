@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { ReasonForm } from '../../components/ui/ReasonForm'
 import { Spinner } from '../../components/ui/Spinner'
 import { useOpsData } from '../../ops/OpsDataProvider'
+import { useConsole } from '../../console/ConsoleProvider'
 import type { OrgDetail, OrgJob } from '../../ops/types'
 import { useAsync } from '../../lib/useAsync'
 import { shortDate, timeAgo } from '../../lib/time'
@@ -277,46 +278,7 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
         </div>
       </section>
 
-      <section className="ops-section" aria-labelledby={`${id}-agents`}>
-        <div className="ops-section__head">
-          <h2 id={`${id}-agents`} className="ops-section__title">
-            Agents <span className="op-count">{d.agents.length}</span>
-          </h2>
-        </div>
-        {d.agents.length === 0 ? (
-          <p className="empty-note">No agents yet.</p>
-        ) : (
-          <ul className="lib-rows" aria-labelledby={`${id}-agents`}>
-            {d.agents.map((a) => (
-              <li key={a.id} className="lib-row lib-row--switch">
-                <div className="lib-row__main">
-                  <h3 className="lib-row__name">
-                    {a.name}
-                    <span className={`status-chip status-chip--${a.status}`}>{AGENT_STATUS[a.status]}</span>
-                  </h3>
-                  <p className="row__meta">
-                    {a.useCase} <i aria-hidden="true">·</i> {a.phoneNumber ?? 'No number'} <i aria-hidden="true">·</i> {a.version ? `version ${a.version}` : 'never published'}
-                  </p>
-                  {a.versions.length > 0 && (
-                    <details className="ops-versions">
-                      <summary>
-                        Versions <span className="sr-only">of {a.name}</span>
-                      </summary>
-                      <ol>
-                        {a.versions.map((v) => (
-                          <li key={v.version}>
-                            <strong>Version {v.version}</strong>, {shortDate(v.publishedAt)} by {v.publishedBy}. {v.note}
-                          </li>
-                        ))}
-                      </ol>
-                    </details>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <OrgAgents slug={org.slug} active={org.status === 'active'} isMaster={isMaster} />
 
       <section className="ops-section" aria-labelledby={`${id}-jobs`}>
         <div className="ops-section__head">
@@ -397,5 +359,103 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
         </ol>
       </section>
     </>
+  )
+}
+
+/** The organisation's agents and requests, from the same data its console
+ * shows, so an agent built here appears at once. */
+function OrgAgents({ slug, active, isMaster }: { slug: string; active: boolean; isMaster: boolean }) {
+  const client = useConsole()
+  const id = useId()
+  const load = useCallback(async () => {
+    const [agents, requests] = await Promise.all([client.listAgents(slug), client.listChangeRequests(slug)])
+    return { agents, open: requests.filter((r) => r.status === 'open' || r.status === 'in_progress') }
+  }, [client, slug])
+  const [data, reload] = useAsync(load)
+  const base = `/ops/orgs/${slug}`
+
+  return (
+    <section className="ops-section" aria-labelledby={`${id}-agents`}>
+      <div className="ops-section__head">
+        <h2 id={`${id}-agents`} className="ops-section__title">
+          Agents {data.state === 'ready' && <span className="op-count">{data.data.agents.length}</span>}
+        </h2>
+        <div className="ops-section__links">
+          {active && (
+            <Link className="link" to={`${base}/agents`}>
+              {isMaster ? 'Build and change agents' : 'Open agents'}
+            </Link>
+          )}
+          {isMaster && active && (
+            <Link className="btn btn--orange btn--sm" to={`${base}/agents/new`}>
+              <span>New agent</span>
+            </Link>
+          )}
+        </div>
+      </div>
+      {data.state === 'loading' && (
+        <div className="loading-row" role="status">
+          <Spinner />
+          <span>Loading agents…</span>
+        </div>
+      )}
+      {data.state === 'error' && (
+        <Alert tone="error" title="Couldn't load the agents">
+          <p>{asAuthError(data.error).message}</p>
+          <button type="button" className="btn-text" onClick={reload}>
+            Try again
+          </button>
+        </Alert>
+      )}
+      {data.state === 'ready' && (
+        <>
+          {data.data.open.length > 0 && (
+            <p className="ops-org__asks">
+              <strong>
+                {data.data.open.length} open {data.data.open.length === 1 ? 'request' : 'requests'}
+              </strong>{' '}
+              from the organisation: {data.data.open.map((r) => `“${r.title}”`).join(', ')}.{' '}
+              <Link className="link" to={`${base}/requests`}>
+                Reply and act
+              </Link>
+            </p>
+          )}
+          {data.data.agents.length === 0 ? (
+            <p className="empty-note">No agents yet.{isMaster && active ? ' Build the first from their call uploads.' : ''}</p>
+          ) : (
+            <ul className="lib-rows" aria-labelledby={`${id}-agents`}>
+              {data.data.agents.map((a) => (
+                <li key={a.id} className="lib-row">
+                  <div className="lib-row__main">
+                    <h3 className="lib-row__name">
+                      {active && !a.setupStep ? (
+                        <Link className="link" to={`${base}/agents/${a.id}`}>
+                          {a.name}
+                        </Link>
+                      ) : (
+                        a.name
+                      )}
+                      <span className={`status-chip status-chip--${a.status}`}>{AGENT_STATUS[a.status]}</span>
+                    </h3>
+                    <p className="row__meta">
+                      {a.useCase} <i aria-hidden="true">·</i> {a.phoneNumber ?? 'No number'} <i aria-hidden="true">·</i>{' '}
+                      {a.version ? `version ${a.version}, ${a.lastPublishedAt ? shortDate(a.lastPublishedAt) : ''}` : 'never published'}
+                      {a.hasChanges && ' · unpublished changes'}
+                    </p>
+                    {a.setupStep && isMaster && active && (
+                      <p>
+                        <Link className="link" to={`${base}/agents/drafts/${a.id}/${a.setupStep}`}>
+                          Continue setup<span className="sr-only"> of {a.name}</span>
+                        </Link>
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   )
 }

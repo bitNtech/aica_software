@@ -11,6 +11,7 @@ import { Switch } from '../../../../components/ui/Switch'
 import { useAsync, type Async } from '../../../../lib/useAsync'
 import { ListEditor } from '../ListEditor'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
+import { checkPipeline, PipelineEditor } from '../PipelineEditor'
 
 const TONES: { value: Tone; label: string; hint: string }[] = [
   { value: 'warm', label: 'Warm', hint: '“Of course! Let me find a slot for you.”' },
@@ -46,16 +47,20 @@ export function checkBehaviour(b: BotBehaviour, voice: Voice | undefined): StepE
   return e
 }
 
-/** Step 2: how the agent speaks. */
+/** Step 2: how the agent speaks, and its voice pipeline. */
 export function StepBehaviour({ draft, update, showErrors, attempt, validator }: StepProps) {
   const client = useConsole()
   const load = useCallback(() => client.listVoices(), [client])
   const [voices, reload] = useAsync(load)
+  const loadModels = useCallback(() => client.listModels(), [client])
+  const [models] = useAsync(loadModels)
   const b = draft.behaviour
+  const pipeline = draft.pipeline
+  const pipeId = useId()
 
   const voice = voices.state === 'ready' ? voices.data.find((v) => v.id === b.voiceId) : undefined
   const check = () => {
-    const e = checkBehaviour(b, voice)
+    const e = { ...checkBehaviour(b, voice), ...checkPipeline(pipeline) }
     if (voices.state !== 'ready') e.voice = voices.state === 'error' ? 'Voices didn’t load. Try again before going on.' : 'Wait for the voices to load.'
     return e
   }
@@ -66,6 +71,11 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} />
       <BehaviourEditor behaviour={b} onChange={(behaviour) => update((d) => ({ ...d, behaviour }))} errors={errors} voices={voices} onReloadVoices={reload} />
+      <details className="pipe__more" open={Object.keys(checkPipeline(pipeline)).length > 0 && showErrors ? true : undefined}>
+        <summary id={pipeId}>Voice pipeline: models, turn-taking and interruptions</summary>
+        <p className="step__sub step__sub--flat">Starts from settings that suit a busy hospital line. Change them only if test calls show a reason to.</p>
+        <PipelineEditor pipeline={pipeline} onChange={(p) => update((d) => ({ ...d, pipeline: p }))} errors={errors} models={models.state === 'ready' ? models.data : null} />
+      </details>
     </div>
   )
 }
