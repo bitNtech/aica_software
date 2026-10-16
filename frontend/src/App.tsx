@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } from './auth/guards'
 import { ConsoleShell } from './components/console/ConsoleShell'
 import type { PageKey } from './console/access'
@@ -142,6 +143,7 @@ export default function App() {
       <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <Analytics />
+      <SpeedInsights />
     </>
   )
 }
