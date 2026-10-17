@@ -98,24 +98,26 @@ export function ConsoleShell() {
       </header>
 
       <aside id="console-nav" className={`console__side${menuOpen ? ' is-open' : ''}`} aria-label="Organisation and account">
-        <Link to={base} className="console__brand console__brand--side" aria-label={`AICA — ${org.orgName} home`}>
-          <Wordmark by={false} />
-        </Link>
-
-        <div className="console__org">
-          <span className="org__mark" aria-hidden="true">
-            {initials(org.orgName)}
-          </span>
-          <span className="console__org-text">
-            <span className="console__org-name">{org.orgName}</span>
-            <span className="console__org-meta">{org.city}</span>
-          </span>
-        </div>
-        {switchable && (
-          <Link to="/choose" className="console__switch">
-            Switch organisation
+        {/* Identity block — never collapses regardless of sidebar state */}
+        <div className="console__identity">
+          <Link to={base} className="console__brand console__brand--side" aria-label={`AICA — ${org.orgName} home`}>
+            <Wordmark by={false} />
           </Link>
-        )}
+          <div className="console__org">
+            <span className="org__mark" aria-hidden="true">
+              {initials(org.orgName)}
+            </span>
+            <span className="console__org-text">
+              <span className="console__org-name">{org.orgName}</span>
+              <span className="console__org-meta">{org.city}</span>
+            </span>
+          </div>
+          {switchable && (
+            <Link to="/choose" className="console__switch">
+              Switch organisation
+            </Link>
+          )}
+        </div>
 
         <nav className="console__nav" aria-label="Organisation">
           {sections.map((s, i) => (

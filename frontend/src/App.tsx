@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes } from 'react-router'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } from './auth/guards'
@@ -21,7 +21,6 @@ import UploadsPage from './pages/console/library/UploadsPage'
 import AppointmentsPage from './pages/console/operate/AppointmentsPage'
 import CallDetailPage from './pages/console/operate/CallDetailPage'
 import CallHistoryPage from './pages/console/operate/CallHistoryPage'
-import ReportsPage from './pages/console/operate/ReportsPage'
 import TeamPage from './pages/console/manage/TeamPage'
 import ActivityPage from './pages/console/manage/ActivityPage'
 import OrgSettingsPage from './pages/console/manage/OrgSettingsPage'
@@ -110,7 +109,7 @@ export default function App() {
         <Route path="appointments" element={org('appointments', <AppointmentsPage />)} />
         <Route path="calls" element={org('calls', <CallHistoryPage />)} />
         <Route path="calls/:callId" element={org('calls', <CallDetailPage />)} />
-        <Route path="reports" element={org('reports', <ReportsPage />)} />
+        <Route path="reports" element={<Navigate to="../" replace />} />
         <Route path="team" element={org('team', <TeamPage />)} />
         <Route path="activity" element={org('activity', <ActivityPage />)} />
         <Route path="settings" element={org('settings', <OrgSettingsPage />)} />

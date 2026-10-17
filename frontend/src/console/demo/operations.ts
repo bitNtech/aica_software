@@ -381,6 +381,7 @@ export function report(ctx: LogContext, days: number, agentId?: string): Report 
   const dayKey = (iso: string) => new Date(Date.parse(iso) + IST).toISOString().slice(0, 10)
   for (let i = 0; i < days; i++) byDayMap.set(dayKey(new Date(start + i * DAY).toISOString()), { resolved: 0, handedOver: 0, dropped: 0 })
   const byHour = Array(24).fill(0) as number[]
+  const byDayHour = Array.from({ length: 7 }, () => Array(24).fill(0) as number[])
   const languages = new Map<Language | 'mixed', number>()
   const intents = new Map<string, { calls: number; byAgent: number }>()
   const drops = new Map<string, number>()
@@ -391,7 +392,11 @@ export function report(ctx: LogContext, days: number, agentId?: string): Report 
       else if (c.outcome === 'resolved' || c.outcome === 'booked') d.resolved++
       else d.handedOver++
     }
-    byHour[new Date(Date.parse(c.startedAt) + IST).getUTCHours()]++
+    const local = new Date(Date.parse(c.startedAt) + IST)
+    const hour = local.getUTCHours()
+    byHour[hour]++
+    // getUTCDay() is Sunday-first; the grid reads Monday-first.
+    byDayHour[(local.getUTCDay() + 6) % 7][hour]++
     languages.set(c.language, (languages.get(c.language) ?? 0) + 1)
     const it = intents.get(c.intent) ?? { calls: 0, byAgent: 0 }
     it.calls++
@@ -408,6 +413,7 @@ export function report(ctx: LogContext, days: number, agentId?: string): Report 
     previous: totals(before),
     byDay: [...byDayMap].map(([date, v]) => ({ date, ...v })),
     byHour,
+    byDayHour,
     languages: [...languages].map(([language, calls]) => ({ language, calls })).sort((a, b) => b.calls - a.calls),
     intents: [...intents].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.calls - a.calls),
     dropOff: [...drops].map(([step, calls]) => ({ step, calls })).sort((a, b) => b.calls - a.calls).slice(0, 6),

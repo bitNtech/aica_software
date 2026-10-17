@@ -64,19 +64,30 @@
 .status-chip--appt-confirmed { background: var(--ok-bg); color: var(--ok-ink); }
 .status-chip--appt-cancelled { background: var(--bg-2); color: var(--muted); }
 
-/* Headline numbers (stat tiles). */
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.9rem; margin: 0; }
-.stat { display: grid; align-content: start; gap: 0.2rem; padding: 1rem 1.15rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
-.stat__label { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-.stat__value { margin: 0.15rem 0 0; font: 650 2rem/1.1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
-.stat__sub { margin: 0; font-size: 0.85rem; color: var(--muted); }
-.stat__delta { margin: 0.2rem 0 0; font-size: 0.85rem; font-weight: 600; }
-.stat__delta--good { color: var(--ok-ink); }
-.stat__delta--bad { color: var(--danger-ink); }
-.stat__delta--flat { color: var(--muted); }
+/* Headline numbers (stat tiles): scoped to .op-report to avoid conflicts with the ops console bar layout. */
+.op-report .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: 0.9rem; margin: 0; border: none; background: transparent; border-radius: 0; overflow: visible; }
+.op-report .stat {
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  flex: unset;
+  transition: border-color 0.12s var(--ease), background-color 0.12s var(--ease);
+}
+.op-report .stat:hover { border-color: var(--line-strong); background: var(--bg-2); }
+.op-report .stat__label { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.op-report .stat__value { margin: 0.15rem 0 0; font: 650 2rem/1.1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
+.op-report .stat__sub { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.op-report .stat__delta { margin: 0.2rem 0 0; font-size: 0.85rem; font-weight: 600; }
+.op-report .stat__delta--good { color: var(--ok-ink); }
+.op-report .stat__delta--bad { color: var(--danger-ink); }
+.op-report .stat__delta--flat { color: var(--muted); }
 
 /* Home: what needs a person. */
-.home-attn { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.9rem; }
+.home-attn { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr)); gap: 0.9rem; }
 .home-attn__card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -98,18 +109,23 @@
 .home-attn__card.is-urgent .home-attn__detail { color: var(--warn-ink); font-weight: 600; }
 
 /* Filters above a list or report. */
-.op-filters { align-items: flex-end; }
-.op-filters__agent { min-width: 12rem; }
+.op-filters { align-items: flex-end; flex-wrap: wrap; }
+.op-filters__agent { min-width: min(12rem, 100%); }
 .op-section__sub { margin-top: -0.4rem; max-width: 46rem; font-size: 0.92rem; color: var(--muted); }
 /* A refetch keeps the last report on screen, dimmed: no jump, no flash. */
 .op-report.is-loading { opacity: 0.55; transition: opacity 0.2s var(--ease); }
-.op-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 0 2rem; }
+/* Cards size to their own content: a short bar list beside a long table
+   shouldn't stretch into a block of empty space. */
+.op-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr)); gap: 0 2rem; align-items: start; }
 .op-split > .op-section { align-content: start; }
-.op-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
-.op-table th, .op-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); text-align: right; }
+.op-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.op-table th, .op-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); text-align: right; word-break: break-word; }
 .op-table th:first-child { text-align: left; }
 .op-table thead th { font-weight: 600; font-size: 0.85rem; color: var(--muted); }
 .op-table tbody th { font-weight: 500; color: var(--ink); }
+.op-table tbody tr { transition: background-color 0.12s var(--ease); }
+.op-table tbody tr:hover { background: var(--bg-2); }
+.op-table tbody tr:hover th { color: var(--ink); font-weight: 600; }
 
 /* The call log. */
 .op-row--call { grid-template-columns: 7.5rem minmax(0, 1fr) auto; align-items: center; }
@@ -146,7 +162,7 @@
   .op-row__state { text-align: left; }
   .op-row--appt { grid-template-columns: 4.5rem minmax(0, 1fr); }
   .op-row--appt .status-chip { grid-column: 2; justify-self: start; }
-  .stat__value, .home-attn__count { font-size: 1.7rem; }
+  .op-report .stat__value, .home-attn__count { font-size: 1.7rem; }
 }
 
 /* ---- Timetable view ---- */
@@ -392,3 +408,67 @@
 .op-whispers__by { font-weight: 600; color: var(--muted); }
 .op-whisper { max-width: 36rem; }
 .op-section__subtitle { margin-bottom: 0.6rem; font: 700 1rem/1.3 var(--display); color: var(--ink); }
+
+/* ---- Report: sections become cards ---------------------------------------- */
+
+.op-report { display: grid; gap: 1rem; }
+.op-report > .op-section,
+.op-report > .op-split > .op-section {
+  padding: 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  gap: 1rem;
+  margin-bottom: 0;
+}
+/* Nested sections inside a card don't get card styling */
+.op-report > .op-section .op-section { padding: 0; border: none; border-radius: 0; background: transparent; margin-bottom: 0; }
+.op-report > .op-split { gap: 1rem; margin-bottom: 0; }
+
+/* ---- Hour heatmap --------------------------------------------------------- */
+
+/* Sequential encoding: one hue, low -> high, interpolated in oklab so the
+   steps read as evenly spaced. Dark mode gets its own steps, not a flip. */
+.heatmap { display: grid; gap: 0.5rem; --heat-low: #eef4fd; --heat-high: #1c5cab; }
+@media (prefers-color-scheme: dark) {
+  .heatmap { --heat-low: #15233a; --heat-high: #86b6ef; }
+}
+
+.heatmap__summary { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.heatmap__summary strong { color: var(--ink); font-weight: 600; }
+.heatmap__readout { min-height: 1.3rem; margin: 0; font-size: 0.85rem; color: var(--muted); }
+.heatmap__readout strong { color: var(--ink); font-weight: 600; }
+.heatmap__rows { display: grid; gap: 4px; }
+.heatmap__row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr); align-items: center; gap: 0.5rem; }
+.heatmap__day { font: 600 0.72rem/1.2 var(--sans); color: var(--muted); text-align: right; }
+.heatmap__grid { position: relative; display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; }
+.heatmap__cell {
+  min-height: 1.6rem;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--heat-high) calc(var(--heat, 0) * 100%), var(--heat-low));
+  cursor: default;
+  transition: transform 0.1s var(--ease), box-shadow 0.1s var(--ease);
+}
+.heatmap__cell.is-active {
+  transform: scale(1.14);
+  z-index: 1;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.heatmap__row--axis .heatmap__cell { min-height: 0; }
+.heatmap__legend-max { margin-left: auto; font-variant-numeric: tabular-nums; }
+.heatmap__tick { font: 500 0.6rem/1.2 var(--mono); color: var(--muted); text-align: center; }
+.heatmap__legend {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font: 500 0.7rem/1 var(--mono);
+  color: var(--muted);
+}
+.heatmap__legend-bar {
+  flex: 1;
+  max-width: 5rem;
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--heat-low), var(--heat-high));
+}
