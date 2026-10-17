@@ -111,13 +111,16 @@ describe('Callbacks', () => {
 describe('Appointments', () => {
   it('confirms, changes and cancels', async () => {
     const { user } = await open('frontdesk@example.com', `${O}/appointments`)
+    // "Needs a check" shows a flat list with buttons directly accessible.
     await user.click(await screen.findByRole('radio', { name: /needs a check/i }))
     const confirm = screen.getAllByRole('button', { name: /^confirm /i })[0]
     const who = confirm.getAttribute('aria-label')!.replace(/^Confirm /, '')
     await user.click(confirm)
     expect(await screen.findByText(/appointment is confirmed/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('radio', { name: /next 7 days/i }))
+    // "This week" shows the timetable; click a slot cell to open its detail panel.
+    await user.click(screen.getByRole('radio', { name: /this week/i }))
+    await user.click((await screen.findAllByRole('button', { name: /appointment/i }))[0])
     const change = screen.getAllByRole('button', { name: /^change /i })[0]
     await user.click(change)
     const dialog = screen.getByRole('dialog', { name: /change .*appointment/i })
@@ -126,6 +129,8 @@ describe('Appointments', () => {
     await user.click(within(dialog).getByRole('button', { name: /save and confirm/i }))
     expect(await screen.findByText(/at 5:15 pm\./i)).toBeInTheDocument()
 
+    // Slot panel closes after opening the change dialog; open another slot for cancel.
+    await user.click((await screen.findAllByRole('button', { name: /appointment/i }))[0])
     const cancel = screen.getAllByRole('button', { name: /^cancel /i })[0]
     await user.click(cancel)
     await user.click(within(screen.getByRole('dialog', { name: /cancel .*appointment/i })).getByRole('button', { name: /cancel appointment/i }))
@@ -135,7 +140,9 @@ describe('Appointments', () => {
 
   it('is read-only for viewers', async () => {
     await open('viewer@example.com', `${O}/appointments`)
-    await screen.findByRole('radio', { name: /next 7 days/i })
+    await screen.findByRole('radio', { name: /this week/i })
+    // In the timetable view, confirm/change/cancel buttons are only inside the slot
+    // detail panel; they are never rendered directly in the page.
     expect(screen.queryByRole('button', { name: /^(confirm|change|cancel) /i })).not.toBeInTheDocument()
   })
 })

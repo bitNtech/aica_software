@@ -149,6 +149,241 @@
   .stat__value, .home-attn__count { font-size: 1.7rem; }
 }
 
+/* ---- Timetable view ---- */
+.tt-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 68vh;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
+  -webkit-overflow-scrolling: touch;
+}
+
+.tt-grid {
+  display: grid;
+  grid-template-columns: 4.5rem repeat(var(--tt-days, 7), minmax(9.5rem, 1fr));
+  min-width: max-content;
+}
+
+/* Sticky top-left corner cell */
+.tt-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  border-bottom: 3px solid var(--line);
+}
+
+/* Day column header */
+.tt-day-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem 0.55rem;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  border-bottom: 3px solid var(--line);
+}
+
+.tt-day-head--today {
+  background: var(--bg-2);
+  border-bottom-color: var(--ink);
+}
+
+/* Two-line label: weekday on top, date below */
+.tt-day-head__info { display: grid; gap: 0.05rem; }
+.tt-day-name { font: 700 0.88rem/1.2 var(--sans); color: var(--ink); white-space: nowrap; }
+.tt-day-date { font: 500 0.75rem/1.2 var(--sans); color: var(--muted); white-space: nowrap; }
+.tt-day-head--today .tt-day-name { font-weight: 800; }
+.tt-day-head--today .tt-day-date { color: var(--text); }
+
+/* Badge cluster in the day header */
+.tt-day-head__counts { display: flex; align-items: center; gap: 0.3rem; flex-shrink: 0; }
+/* Warning-coloured count badge for appointments that need a check */
+.tt-count--check { background: var(--warn-bg); color: var(--warn-ink); }
+
+/* Time label column (sticky left) */
+.tt-time {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 0.55rem;
+  min-height: 1.75rem;
+  font: 500 0.72rem/1 var(--sans);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+/* On-the-hour labels are bolder and slightly larger */
+.tt-time--hour {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+/* Slot cells */
+.tt-cell {
+  padding: 0.3rem 0.4rem;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-height: 1.75rem;
+  display: grid;
+  gap: 0.22rem;
+  align-content: start;
+}
+
+.tt-cell--today { background: var(--bg); }
+
+.tt-cell--filled { cursor: pointer; }
+.tt-cell--filled:hover,
+.tt-cell--active { background: var(--bg-2); }
+
+.tt-cell--active {
+  outline: 2px solid var(--orange-text, var(--orange));
+  outline-offset: -2px;
+}
+
+.tt-cell--filled:focus-visible {
+  outline: 2px solid var(--orange-text, var(--orange));
+  outline-offset: -2px;
+}
+
+/* Mini appointment card inside a cell */
+.tt-appt {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.3rem 0.45rem 0.3rem 0.6rem;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+.tt-appt--needs_check { background: var(--warn-bg); border-left-color: var(--warn-ink); }
+.tt-appt--booked      { background: var(--info-bg); border-left-color: var(--info-ink); }
+.tt-appt--confirmed   { background: var(--ok-bg);   border-left-color: var(--ok-ink); }
+.tt-appt--cancelled   { background: var(--bg-2);    border-left-color: var(--line-strong); opacity: 0.5; }
+
+/* "Needs check" label — amber text, above the patient name */
+.tt-appt__badge {
+  font: 700 0.65rem/1.1 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn-ink);
+}
+
+.tt-appt__name {
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Doctor surname + department — secondary line */
+.tt-appt__sub {
+  font-size: 0.7rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Doctor name in the slot-detail modal rows */
+.op-row__doctor {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Slot detail modal */
+.tt-slot-meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.tt-slot-rows { min-width: min(32rem, 86vw); }
+
+/* Timetable toolbar (expand button row) */
+.tt-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.tt-toolbar__expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.tt-toolbar__expand:hover { color: var(--ink); }
+
+/* Fullscreen overlay */
+.tt-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.tt-fullscreen__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  flex-shrink: 0;
+}
+
+.tt-fullscreen__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.tt-fullscreen__title {
+  flex: 1;
+  font: 700 0.95rem/1.3 var(--sans);
+  color: var(--ink);
+}
+
+.tt-fullscreen__collapse {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.tt-fullscreen__collapse:hover { color: var(--ink); }
+
+/* tt-wrap overrides inside fullscreen */
+.tt-wrap--fullscreen {
+  flex: 1;
+  max-height: unset;
+  border-radius: 0;
+  border: none;
+}
+
 .op-stale { margin-bottom: 1.25rem; padding: 0.7rem 0.95rem; border: 1px solid var(--warn-ink); border-radius: 12px; background: var(--warn-bg); color: var(--ink); font-size: 0.92rem; }
 .op-badge { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: var(--r-pill); background: var(--danger-bg); color: var(--danger-ink); font: 700 0.75rem/1.5 var(--sans); vertical-align: middle; }
 
