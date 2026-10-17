@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react'
 import { asAuthError } from '../../../auth/types'
 import { pageAccess } from '../../../console/access'
 import { useConsole } from '../../../console/ConsoleProvider'
@@ -16,7 +16,7 @@ import { localDay as dayFrom } from '../../../lib/time'
 import './Operate.css'
 
 type Range = 'today' | 'tomorrow' | 'week' | 'check'
-const RANGE_LABEL: Record<Range, string> = { today: 'Today', tomorrow: 'Tomorrow', week: 'Next 7 days', check: 'Needs a check' }
+const RANGE_LABEL: Record<Range, string> = { today: 'Today', tomorrow: 'Tomorrow', week: 'This week', check: 'Needs a check' }
 export const APPT_STATUS_LABEL: Record<AppointmentStatus, string> = { needs_check: 'Needs a check', booked: 'Booked', confirmed: 'Confirmed', cancelled: 'Cancelled' }
 const DOCTORS: [string, string][] = [
   ['Cardiology', 'Dr. R. Ramachandran'],
@@ -26,6 +26,33 @@ const DOCTORS: [string, string][] = [
   ['ENT', 'Dr. V. Senthil'],
 ]
 
+/* ---- Timetable constants ---- */
+const SLOT_START = 8 * 60 // 08:00
+const SLOT_END = 19 * 60 + 30 // 19:30
+const SLOT_STEP = 30
+
+const TIME_SLOTS: string[] = (() => {
+  const slots: string[] = []
+  for (let m = SLOT_START; m <= SLOT_END; m += SLOT_STEP) {
+    slots.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+  }
+  return slots
+})()
+
+const STATUS_PRIORITY: Record<AppointmentStatus, number> = { needs_check: 0, booked: 1, confirmed: 2, cancelled: 3 }
+
+/** Round a time down to the nearest 30-min boundary for slot placement. */
+function snapSlot(time: string): string {
+  const [h, rawMin] = time.split(':').map(Number)
+  return `${String(h).padStart(2, '0')}:${rawMin < 30 ? '00' : '30'}`
+}
+
+/** Last surname from a doctor string, e.g. "Dr. R. Ramachandran" → "Ramachandran". */
+function doctorShort(doctor: string): string {
+  const parts = doctor.split(' ')
+  return parts[parts.length - 1]
+}
+
 /** "Today", "Tomorrow", or "Thu 16 Oct" for a yyyy-mm-dd date. */
 function dayName(date: string): string {
   if (date === dayFrom(0)) return 'Today'
@@ -33,6 +60,18 @@ function dayName(date: string): string {
   if (date === dayFrom(-1)) return 'Yesterday'
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
 }
+
+/** Short weekday label for a column header, e.g. "Mon" or "Today". */
+function dayHeadPrimary(date: string): string {
+  if (date === dayFrom(0)) return 'Today'
+  if (date === dayFrom(1)) return 'Tomorrow'
+  return new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })
+}
+
+/** Date sub-label for a column header, e.g. "17 Oct". */
+const dayHeadSecondary = (date: string) =>
+  new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+
 /** 24-hour "16:30" as "4:30 pm". */
 const time12 = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
 
@@ -61,13 +100,20 @@ export default function AppointmentsPage() {
   const shown = all.filter((a) => inRange(a, range))
   const days = [...new Set(shown.map((a) => a.date))]
 
+  // Timetable: fixed day columns (even if some have no appointments)
+  const timetableDays = useMemo<string[]>(() => {
+    if (range === 'today') return [dayFrom(0)]
+    if (range === 'tomorrow') return [dayFrom(1)]
+    if (range === 'week') return Array.from({ length: 7 }, (_, i) => dayFrom(i))
+    return []
+  }, [range])
+
   useEffect(() => {
     if (!focusAfter) return
     const target =
       document.querySelector<HTMLElement>(`[data-appt-status="${focusAfter.id}"]`) ??
       document.querySelector<HTMLElement>(`[data-day="${focusAfter.date}"]`) ??
       document.querySelector<HTMLElement>('[data-day]')
-    // The native dialog returns focus to its opener first: go after that.
     const t = window.setTimeout(() => target?.focus(), 0)
     setFocusAfter(null)
     return () => window.clearTimeout(t)
@@ -84,13 +130,21 @@ export default function AppointmentsPage() {
     setCancelBusy(true)
     setCancelError(null)
     try {
-      replace(await client.updateAppointment(org.orgSlug, cancelling.id, { status: 'cancelled' }), `${cancelling.patientName}’s appointment is cancelled.`)
+      replace(await client.updateAppointment(org.orgSlug, cancelling.id, { status: 'cancelled' }), `${cancelling.patientName}'s appointment is cancelled.`)
       setCancelling(null)
     } catch (err) {
       setCancelError(asAuthError(err).message)
     } finally {
       setCancelBusy(false)
     }
+  }
+
+  const handleConfirm = async (a: Appointment) =>
+    replace(await client.updateAppointment(org.orgSlug, a.id, { status: 'confirmed' }), `${a.patientName}'s appointment is confirmed.`)
+
+  const handleCancel = (a: Appointment) => {
+    setCancelError(null)
+    setCancelling(a)
   }
 
   return (
@@ -127,8 +181,18 @@ export default function AppointmentsPage() {
               options={(Object.keys(RANGE_LABEL) as Range[]).map((r) => ({ value: r, label: RANGE_LABEL[r], count: all.filter((a) => inRange(a, r)).length }))}
             />
           </div>
-          {shown.length === 0 ? (
-            <p className="empty-note">{range === 'check' ? 'Nothing needs a check.' : 'No appointments.'}</p>
+
+          {range !== 'check' ? (
+            <TimetableView
+              days={timetableDays}
+              appointments={shown}
+              canEdit={canEdit}
+              onConfirm={handleConfirm}
+              onChange={setChanging}
+              onCancel={handleCancel}
+            />
+          ) : shown.length === 0 ? (
+            <p className="empty-note">Nothing needs a check.</p>
           ) : (
             days.map((date) => (
               <DayGroup
@@ -136,12 +200,9 @@ export default function AppointmentsPage() {
                 date={date}
                 items={shown.filter((a) => a.date === date)}
                 canEdit={canEdit}
-                onConfirm={async (a) => replace(await client.updateAppointment(org.orgSlug, a.id, { status: 'confirmed' }), `${a.patientName}’s appointment is confirmed.`)}
+                onConfirm={handleConfirm}
                 onChange={setChanging}
-                onCancel={(a) => {
-                  setCancelError(null)
-                  setCancelling(a)
-                }}
+                onCancel={handleCancel}
               />
             ))
           )}
@@ -154,12 +215,12 @@ export default function AppointmentsPage() {
         onClose={() => setChanging(null)}
         onSaved={(a) => {
           setChanging(null)
-          replace(a, `${a.patientName}’s appointment is now ${dayName(a.date).toLowerCase()} at ${time12(a.time)}.`)
+          replace(a, `${a.patientName}'s appointment is now ${dayName(a.date).toLowerCase()} at ${time12(a.time)}.`)
         }}
       />
       <ConfirmDialog
         open={!!cancelling}
-        title={`Cancel ${cancelling?.patientName ?? ''}’s appointment?`}
+        title={`Cancel ${cancelling?.patientName ?? ''}'s appointment?`}
         confirmLabel="Cancel appointment"
         cancelLabel="Keep it"
         busyLabel="Cancelling…"
@@ -170,12 +231,251 @@ export default function AppointmentsPage() {
         onCancel={() => setCancelling(null)}
       >
         <p>
-          {cancelling && `${dayName(cancelling.date)} at ${time12(cancelling.time)} with ${cancelling.doctor}.`} Let the patient know: AICA doesn’t call them about it.
+          {cancelling && `${dayName(cancelling.date)} at ${time12(cancelling.time)} with ${cancelling.doctor}.`} Let the patient know: AICA doesn't call them about it.
         </p>
       </ConfirmDialog>
     </ConsolePage>
   )
 }
+
+/* ---- Timetable ---- */
+
+function TimetableView({
+  days,
+  appointments,
+  canEdit,
+  onConfirm,
+  onChange,
+  onCancel,
+}: {
+  days: string[]
+  appointments: Appointment[]
+  canEdit: boolean
+  onConfirm(a: Appointment): Promise<void>
+  onChange(a: Appointment): void
+  onCancel(a: Appointment): void
+}) {
+  const [activeSlot, setActiveSlot] = useState<{ day: string; slot: string } | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const today = dayFrom(0)
+
+  useEffect(() => {
+    if (!isFullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setIsFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey) }
+  }, [isFullscreen])
+
+  const slotMap = useMemo(() => {
+    const map = new Map<string, Appointment[]>()
+    for (const a of appointments) {
+      const key = `${a.date}:${snapSlot(a.time)}`
+      const arr = map.get(key) ?? []
+      arr.push(a)
+      map.set(key, arr)
+    }
+    for (const [key, appts] of map) {
+      map.set(key, [...appts].sort((a, b) => STATUS_PRIORITY[a.status] - STATUS_PRIORITY[b.status]))
+    }
+    return map
+  }, [appointments])
+
+  // Only render the time window that has appointments, plus one buffer slot each side.
+  const visibleSlots = useMemo(() => {
+    if (appointments.length === 0) return TIME_SLOTS
+    const usedIndices = [...new Set(appointments.map((a) => snapSlot(a.time)))]
+      .map((s) => TIME_SLOTS.indexOf(s))
+      .filter((i) => i >= 0)
+    if (usedIndices.length === 0) return TIME_SLOTS
+    const first = Math.max(0, Math.min(...usedIndices) - 1)
+    const last = Math.min(TIME_SLOTS.length - 1, Math.max(...usedIndices) + 1)
+    return TIME_SLOTS.slice(first, last + 1)
+  }, [appointments])
+
+  const activeAppts = useMemo(
+    () => (activeSlot ? (slotMap.get(`${activeSlot.day}:${activeSlot.slot}`) ?? []) : []),
+    [activeSlot, slotMap],
+  )
+
+  if (appointments.length === 0) {
+    return <p className="empty-note">No appointments scheduled.</p>
+  }
+
+  function toggleSlot(day: string, slot: string) {
+    setActiveSlot((prev) => (prev?.day === day && prev?.slot === slot ? null : { day, slot }))
+  }
+
+  const grid = (
+    <div className={`tt-wrap${isFullscreen ? ' tt-wrap--fullscreen' : ''}`} role="region" aria-label="Appointments timetable">
+      <div className="tt-grid" style={{ '--tt-days': days.length } as React.CSSProperties}>
+        {/* Sticky top-left corner */}
+        <div className="tt-corner" aria-hidden="true" />
+
+        {/* Day column headers */}
+        {days.map((day) => {
+          const activeCount = appointments.filter((a) => a.date === day && a.status !== 'cancelled').length
+          const checkCount = appointments.filter((a) => a.date === day && a.status === 'needs_check').length
+          return (
+            <div key={day} className={`tt-day-head${day === today ? ' tt-day-head--today' : ''}`}>
+              <div className="tt-day-head__info">
+                <span className="tt-day-name">{dayHeadPrimary(day)}</span>
+                <span className="tt-day-date">{dayHeadSecondary(day)}</span>
+              </div>
+              <div className="tt-day-head__counts">
+                <span className="op-count" title={`${activeCount} active appointment${activeCount !== 1 ? 's' : ''}`}>
+                  {activeCount}
+                </span>
+                {checkCount > 0 && (
+                  <span className="op-count tt-count--check" title={`${checkCount} need${checkCount !== 1 ? '' : 's'} a check`}>
+                    {checkCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Time slot rows */}
+        {visibleSlots.map((slot) => {
+          const isHour = slot.endsWith(':00')
+          return (
+            <Fragment key={slot}>
+              <div className={`tt-time${isHour ? ' tt-time--hour' : ''}`} aria-hidden="true">
+                {time12(slot)}
+              </div>
+              {days.map((day) => {
+                const appts = slotMap.get(`${day}:${slot}`) ?? []
+                const isActive = activeSlot?.day === day && activeSlot?.slot === slot
+                const hasCheck = appts.some((a) => a.status === 'needs_check')
+                return (
+                  <div
+                    key={day}
+                    className={[
+                      'tt-cell',
+                      day === today ? 'tt-cell--today' : '',
+                      appts.length > 0 ? 'tt-cell--filled' : '',
+                      isActive ? 'tt-cell--active' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    role={appts.length > 0 ? 'button' : undefined}
+                    tabIndex={appts.length > 0 ? 0 : undefined}
+                    aria-label={
+                      appts.length > 0
+                        ? `${time12(slot)}, ${dayName(day)}: ${appts.length} appointment${appts.length !== 1 ? 's' : ''}${hasCheck ? ', needs check' : ''}`
+                        : undefined
+                    }
+                    aria-expanded={appts.length > 0 ? isActive : undefined}
+                    onClick={() => appts.length > 0 && toggleSlot(day, slot)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && appts.length > 0) {
+                        e.preventDefault()
+                        toggleSlot(day, slot)
+                      }
+                    }}
+                  >
+                    {appts.map((a) => (
+                      <div key={a.id} className={`tt-appt tt-appt--${a.status}`}>
+                        {a.status === 'needs_check' && <span className="tt-appt__badge">Needs check</span>}
+                        <span className="tt-appt__name">{a.patientName}</span>
+                        <span className="tt-appt__sub">{doctorShort(a.doctor)} · {a.department}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </Fragment>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  return (
+    <>
+      {!isFullscreen && (
+        <div className="tt-toolbar">
+          <button
+            type="button"
+            className="btn-text tt-toolbar__expand"
+            onClick={() => setIsFullscreen(true)}
+            aria-label="Expand timetable to fullscreen"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true" focusable="false">
+              <path d="M1 4.5V1h3.5M8.5 1H12v3.5M12 8.5V12H8.5M4.5 12H1V8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Expand
+          </button>
+        </div>
+      )}
+
+      {isFullscreen ? (
+        <div className="tt-fullscreen" role="dialog" aria-modal="true" aria-label="Appointments timetable, fullscreen">
+          <div className="tt-fullscreen__header">
+            <button
+              type="button"
+              className="btn-text tt-fullscreen__back"
+              onClick={() => setIsFullscreen(false)}
+              aria-label="Exit fullscreen"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+                <path d="M9 1L5 7l4 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Back
+            </button>
+            <span className="tt-fullscreen__title">Appointments</span>
+            <button
+              type="button"
+              className="btn-text tt-fullscreen__collapse"
+              onClick={() => setIsFullscreen(false)}
+              aria-label="Exit fullscreen"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true" focusable="false">
+                <path d="M4.5 1v3.5H1M8.5 4.5V1H12M8.5 12v-3.5H12M1 8.5h3.5V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+          {grid}
+        </div>
+      ) : (
+        grid
+      )}
+
+      {/* Slot detail panel */}
+      <Modal
+        open={!!activeSlot && activeAppts.length > 0}
+        title={activeSlot ? `${time12(activeSlot.slot)} · ${dayName(activeSlot.day)}` : ''}
+        onClose={() => setActiveSlot(null)}
+      >
+        {activeAppts.length > 1 && (
+          <p className="tt-slot-meta">{activeAppts.length} appointments at this time</p>
+        )}
+        <ul className="op-rows tt-slot-rows">
+          {activeAppts.map((a) => (
+            <AppointmentRow
+              key={a.id}
+              appointment={a}
+              canEdit={canEdit}
+              onConfirm={onConfirm}
+              onChange={(appt) => {
+                setActiveSlot(null)
+                onChange(appt)
+              }}
+              onCancel={(appt) => {
+                setActiveSlot(null)
+                onCancel(appt)
+              }}
+            />
+          ))}
+        </ul>
+      </Modal>
+    </>
+  )
+}
+
+/* ---- Legacy list view (used for "Needs a check" range) ---- */
 
 function DayGroup({
   date,
@@ -227,7 +527,6 @@ function AppointmentRow({
     setBusy(true)
     setError(null)
     try {
-      // The page moves focus once the list has updated.
       await onConfirm(a)
     } catch (err) {
       setError(asAuthError(err).message)
@@ -243,8 +542,11 @@ function AppointmentRow({
         <p className="op-row__title">
           {a.patientName} {canEdit && <span className="op-card__sub">{a.phone}</span>}
         </p>
+        <p className="op-row__doctor">
+          {a.doctor} <span className="op-card__sub">{a.department}</span>
+        </p>
         <p className="row__meta">
-          {a.department} <i aria-hidden="true">·</i> {a.doctor} <i aria-hidden="true">·</i> {a.bookedBy === 'agent' ? `booked by ${a.agentName ?? 'an agent'}` : 'booked by staff'}
+          {a.bookedBy === 'agent' ? `Booked by ${a.agentName ?? 'agent'}` : 'Booked by staff'}
         </p>
         {a.checkReason && <p className="op-row__check">{a.checkReason}</p>}
         {a.note && <p className="row__meta">Note: {a.note}</p>}
@@ -301,7 +603,6 @@ function ChangeDialog({ orgSlug, appointment, onClose, onSaved }: { orgSlug: str
     setError(null)
     try {
       const department = DOCTORS.find(([, d]) => d === doctor)?.[0]
-      // A change by staff is checked: it's confirmed.
       onSaved(await client.updateAppointment(orgSlug, appointment.id, { date, time, department, doctor, note: text.trim(), status: 'confirmed' }))
     } catch (err) {
       setError(asAuthError(err).message)
@@ -311,7 +612,7 @@ function ChangeDialog({ orgSlug, appointment, onClose, onSaved }: { orgSlug: str
   }
 
   return (
-    <Modal open={!!appointment} title={`Change ${appointment?.patientName ?? ''}’s appointment`} onClose={() => !busy && onClose()}>
+    <Modal open={!!appointment} title={`Change ${appointment?.patientName ?? ''}'s appointment`} onClose={() => !busy && onClose()}>
       <form className="op-form" onSubmit={save} noValidate>
         <div className="step__grid">
           <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -319,7 +620,7 @@ function ChangeDialog({ orgSlug, appointment, onClose, onSaved }: { orgSlug: str
         </div>
         <SelectField label="Doctor" value={doctor} options={DOCTORS.map(([dept, d]) => ({ value: d, label: `${d}, ${dept}` }))} onChange={(e) => setDoctor(e.target.value)} />
         <TextAreaField label="Note" hint="Optional, for your team." rows={2} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} />
-        <p className="field__hint">Saving confirms it. Let the patient know about the change: AICA doesn’t call them.</p>
+        <p className="field__hint">Saving confirms it. Let the patient know about the change: AICA doesn't call them.</p>
         {error && (
           <p className="field__error" role="alert">
             {error}
