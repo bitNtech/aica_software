@@ -25,8 +25,10 @@ describe('Home', () => {
     const cards = now.closest('section')!
     expect(within(cards).getByRole('link', { name: /3 waiting in the handoff queue/i })).toHaveAttribute('href', `${O}/handoffs`)
     expect(within(cards).getByRole('link', { name: /calls in progress/i })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: /today so far/i })).toBeInTheDocument()
-    expect(screen.getByText('Answered by the agents')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeInTheDocument()
+    // Appears twice now Reports is embedded in Home: the stat tile and the
+    // trend chart's legend share the label.
+    expect(screen.getAllByText('Answered by the agents').length).toBeGreaterThan(0)
   })
 
   it('shows the front desk their work, without the numbers', async () => {
@@ -38,8 +40,10 @@ describe('Home', () => {
 
   it('shows viewers the numbers and appointments, not the queue', async () => {
     await open('viewer@example.com', O)
-    expect(await screen.findByRole('heading', { name: /today so far/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /appointments to check/i })).toBeInTheDocument()
+    // The "Needs a person" cards and the Reports section load independently;
+    // wait for the one each assertion actually needs, not an unrelated one.
+    expect(await screen.findByRole('link', { name: /appointments to check/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /handoff queue/i, current: false })).toBeNull()
   })
 })
@@ -187,9 +191,11 @@ describe('Call history and detail', () => {
   })
 })
 
-describe('Reports', () => {
+// Reports used to be its own page; it's now embedded in Home, and the old
+// /reports path just redirects there (App.tsx) for anyone with a bookmark.
+describe('Reports (embedded in Home)', () => {
   it('shows the period’s numbers, charts with tables, and switches period', async () => {
-    const { user } = await open('supervisor@example.com', `${O}/reports`)
+    const { user } = await open('supervisor@example.com', O)
     expect(await screen.findByRole('heading', { name: /^last 7 days$/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /calls each day, by what happened/i })).toBeInTheDocument()
     const toggle = screen.getAllByRole('button', { name: /show as a table/i })[0]
@@ -197,7 +203,7 @@ describe('Reports', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('table', { name: /calls each day/i })).toBeInTheDocument()
     expect(within(screen.getByRole('table', { name: /calls each day/i })).getAllByRole('row')).toHaveLength(8)
-    expect(screen.getByRole('button', { name: /download as csv/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /download csv/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('radio', { name: /^today$/i }))
     expect(await screen.findByRole('heading', { name: /^today$/i })).toBeInTheDocument()
@@ -205,7 +211,12 @@ describe('Reports', () => {
   })
 
   it('isn’t for the front desk', async () => {
-    await open('frontdesk@example.com', `${O}/reports`)
-    expect(await screen.findByText(/reports isn't part of the front desk role/i)).toBeInTheDocument()
+    await open('frontdesk@example.com', O)
+    expect(screen.queryByRole('heading', { name: /^reports$/i })).not.toBeInTheDocument()
+  })
+
+  it('redirects the old standalone page to Home', async () => {
+    await open('supervisor@example.com', `${O}/reports`)
+    expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeInTheDocument()
   })
 })
