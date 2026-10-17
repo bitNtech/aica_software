@@ -96,11 +96,12 @@ describe('console access map', () => {
 describe('per-person permissions', () => {
   it('follows changed permissions: a front desk member given reports, without the bot switch', () => {
     const a = accessFor({ role: 'front_desk', permissions: ['desk.notices', 'calls.take', 'reports.view'] })
+    // Reports lives embedded in Home now, not as its own nav destination;
+    // this is what gates that embedded section (ConsoleHomePage's `may('reports')`).
     expect(pageAccess(a, 'reports')).toBe('read')
     expect(can(a, 'desk.bot')).toBe(false)
     // Still opens the desk for notices.
     expect(pageAccess(a, 'desk')).toBe('edit')
-    expect(navFor(a).flatMap((s) => s.items).map((i) => i.page)).toContain('reports')
   })
 
   it('never gives a role what it may not hold', () => {
