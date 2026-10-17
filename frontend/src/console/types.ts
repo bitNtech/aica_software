@@ -933,6 +933,8 @@ export interface Report {
   byDay: ReportDay[]
   /** Calls per hour of the day, 0–23. */
   byHour: number[]
+  /** Calls by weekday then hour: 7 rows (0 = Monday) of 24. */
+  byDayHour: number[][]
   languages: { language: Language | 'mixed'; calls: number }[]
   intents: { label: string; calls: number; byAgent: number }[]
   /** Where callers hung up or were handed over, by flow step. */

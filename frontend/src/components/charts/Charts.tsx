@@ -281,18 +281,46 @@ function TableToggle({ open, onToggle, id, children }: { open: boolean; onToggle
  * you can read without the bars. The bars only show the proportions.
  */
 export function BarList({ items, label, valueText }: { items: { label: string; value: number }[]; label: string; valueText?(v: number): string }) {
+  const [active, setActive] = useState<number | null>(null)
   const max = Math.max(...items.map((i) => i.value), 1)
+  const total = items.reduce((s, i) => s + i.value, 0)
+  const num = (v: number) => v.toLocaleString('en-IN')
+  const share = (v: number) => (total ? Math.round((v / total) * 100) : 0)
+  const row = active !== null ? items[active] : null
   return (
-    <ul className="barlist" aria-label={label}>
-      {items.map((i) => (
-        <li key={i.label} className="barlist__row">
-          <span className="barlist__label">{i.label}</span>
-          <span className="barlist__track" aria-hidden="true">
-            <span className="barlist__bar" style={{ width: `${(i.value / max) * 100}%` }} />
-          </span>
-          <span className="barlist__value">{valueText ? valueText(i.value) : i.value.toLocaleString('en-IN')}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="barlist-wrap">
+      {/* Fixed-height readout, always in the layout: a hovered row's detail
+          never floats over a sibling row, and nothing shifts when it fills in. */}
+      <p className="barlist__readout" aria-hidden="true">
+        {row && total > 0 ? (
+          <>
+            <strong>{row.label}</strong>: {valueText ? valueText(row.value) : num(row.value)} of {num(total)} · {share(row.value)}%
+          </>
+        ) : (
+          ' '
+        )}
+      </p>
+      <ul className="barlist" aria-label={label}>
+        {items.map((i, k) => (
+          <li
+            key={i.label}
+            className={`barlist__row${active === k ? ' is-active' : ''}`}
+            tabIndex={0}
+            onPointerEnter={() => setActive(k)}
+            onPointerLeave={() => setActive((a) => (a === k ? null : a))}
+            onFocus={() => setActive(k)}
+            onBlur={() => setActive((a) => (a === k ? null : a))}
+          >
+            <span className="barlist__label">{i.label}</span>
+            <span className="barlist__track" aria-hidden="true">
+              <span className="barlist__bar" style={{ width: `${(i.value / max) * 100}%` }} />
+            </span>
+            <span className="barlist__value">{valueText ? valueText(i.value) : num(i.value)}</span>
+            {/* The share is read out always; the readout line above only repeats it for the eye. */}
+            {total > 0 && <span className="sr-only">{`, ${share(i.value)} percent of ${num(total)}`}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }

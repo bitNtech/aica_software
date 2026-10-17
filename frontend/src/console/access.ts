@@ -316,7 +316,6 @@ export const NAV: NavSection[] = [
       { page: 'callbacks', label: 'Callbacks', path: 'callbacks', description: 'Missed calls and people to call back.' },
       { page: 'appointments', label: 'Appointments', path: 'appointments', description: 'Bookings made on calls, to check.' },
       { page: 'calls', label: 'Call history', path: 'calls', description: 'Every call, with its transcript and what happened.' },
-      { page: 'reports', label: 'Reports', path: 'reports', description: 'Calls, outcomes, quality and response times.' },
     ],
   },
   {

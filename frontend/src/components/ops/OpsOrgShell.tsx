@@ -49,51 +49,53 @@ export function OpsOrgShell() {
         Skip to content
       </a>
       <OpsBar />
-      <nav className="ops-org__nav" aria-label="Organisation">
-        <div className="ops-org__inner">
-          <Link to={base} className="ops-org__name">
-            {org.state === 'ready' ? org.data.name : 'Organisation'}
-          </Link>
-          <NavLink to={`${base}/agents`} className="ops-org__link">
-            Agents
-          </NavLink>
-          <NavLink to={`${base}/integrations`} className="ops-org__link">
-            Tools and integrations
-          </NavLink>
-          <NavLink to={`${base}/uploads`} className="ops-org__link">
-            Call uploads
-          </NavLink>
-          <NavLink to={`${base}/requests`} className="ops-org__link">
-            Requests
-          </NavLink>
-        </div>
-      </nav>
-      <main id="ops-main" className="console__main ops-org__main" tabIndex={-1}>
-        {org.state === 'loading' && (
-          <div className="loading-row" role="status">
-            <Spinner />
-            <span>Loading the organisation…</span>
+      <div className="ops__body">
+        <nav className="ops-org__nav" aria-label="Organisation">
+          <div className="ops-org__inner">
+            <Link to={base} className="ops-org__name">
+              {org.state === 'ready' ? org.data.name : 'Organisation'}
+            </Link>
+            <NavLink to={`${base}/agents`} className="ops-org__link">
+              Agents
+            </NavLink>
+            <NavLink to={`${base}/integrations`} className="ops-org__link">
+              Tools and integrations
+            </NavLink>
+            <NavLink to={`${base}/uploads`} className="ops-org__link">
+              Call uploads
+            </NavLink>
+            <NavLink to={`${base}/requests`} className="ops-org__link">
+              Requests
+            </NavLink>
           </div>
-        )}
-        {org.state === 'error' && (
-          <Alert tone="error" title="Couldn't open this organisation">
-            <p>{org.error instanceof Error && org.error.message === 'missing' ? 'There’s no organisation at this address.' : asAuthError(org.error).message}</p>
-            <p className="builder__alert-actions">
-              <button type="button" className="btn-text" onClick={reload}>
-                Try again
-              </button>
-              <Link className="link" to="/ops">
-                Every organisation
-              </Link>
-            </p>
-          </Alert>
-        )}
-        {scope && (
-          <OrgScopeContext value={scope}>
-            <Outlet />
-          </OrgScopeContext>
-        )}
-      </main>
+        </nav>
+        <main id="ops-main" className="console__main ops-org__main" tabIndex={-1}>
+          {org.state === 'loading' && (
+            <div className="loading-row" role="status">
+              <Spinner />
+              <span>Loading the organisation…</span>
+            </div>
+          )}
+          {org.state === 'error' && (
+            <Alert tone="error" title="Couldn't open this organisation">
+              <p>{org.error instanceof Error && org.error.message === 'missing' ? "There's no organisation at this address." : asAuthError(org.error).message}</p>
+              <p className="builder__alert-actions">
+                <button type="button" className="btn-text" onClick={reload}>
+                  Try again
+                </button>
+                <Link className="link" to="/ops">
+                  Every organisation
+                </Link>
+              </p>
+            </Alert>
+          )}
+          {scope && (
+            <OrgScopeContext value={scope}>
+              <Outlet />
+            </OrgScopeContext>
+          )}
+        </main>
+      </div>
     </div>
   )
 }

@@ -94,17 +94,19 @@ export default function OpsOverviewPage() {
         <>
           <section className="stats" aria-label="Summary">
             <Link to="/ops/requests" className="stat stat--link">
-              <span className="label label--quiet">Waiting for review</span>
               <span className="stat__num">{count('pending_review')}</span>
-              <span className="stat__go">Review requests →</span>
+              <span className="stat__body">
+                <span className="label label--quiet">Waiting for review</span>
+                <span className="stat__go">Review requests →</span>
+              </span>
             </Link>
             <div className="stat">
-              <span className="label label--quiet">Active</span>
               <span className="stat__num">{count('active')}</span>
+              <span className="label label--quiet">Active</span>
             </div>
             <div className="stat">
-              <span className="label label--quiet">Suspended</span>
               <span className="stat__num">{count('suspended')}</span>
+              <span className="label label--quiet">Suspended</span>
             </div>
           </section>
 

@@ -8,7 +8,10 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* clip, not hidden — clip doesn't create a scroll container so position: sticky still works */
+  overflow-x: clip;
 }
+body { overflow-x: clip; }
 
 body {
   margin: 0;
@@ -153,3 +156,19 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---- custom scrollbars ---- */
+
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+/* Chromium / Safari */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+::-webkit-scrollbar-corner { background: transparent; }

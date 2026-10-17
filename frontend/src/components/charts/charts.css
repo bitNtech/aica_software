@@ -73,12 +73,30 @@
 .chart__table thead th { font-weight: 600; color: var(--muted); }
 .chart__table tbody th { font-weight: 500; color: var(--ink); }
 
-/* Labelled bars: one series, the value at each bar's tip. */
+/* Labelled bars: one series, the value at each bar's tip. A fixed-height
+   readout above the rows carries a hovered row's share of the total — never
+   a floating tooltip, which would have nowhere to go without covering a
+   neighbouring row in a tightly packed list. */
+.barlist-wrap { display: grid; gap: 0.4rem; }
+.barlist__readout { min-height: 1.3rem; margin: 0; font-size: 0.85rem; color: var(--muted); }
+.barlist__readout strong { color: var(--ink); font-weight: 600; }
 .barlist { display: grid; gap: 0.55rem; }
-.barlist__row { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) 3.5rem; align-items: center; gap: 0.75rem; }
+.barlist__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.45rem;
+  margin: 0 -0.45rem;
+  border-radius: 7px;
+  transition: background-color 0.12s var(--ease);
+}
+.barlist__row:hover, .barlist__row.is-active { background: var(--bg-2); }
+.barlist__row:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 1px; }
 .barlist__label { color: var(--ink); font-size: 0.9rem; overflow-wrap: anywhere; }
 .barlist__track { height: 14px; }
-.barlist__bar { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.barlist__bar { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--series-1); transition: filter 0.12s var(--ease); }
+.barlist__row:hover .barlist__bar, .barlist__row.is-active .barlist__bar { filter: brightness(1.12); }
 .barlist__value { font: 600 0.9rem/1 var(--sans); color: var(--ink); font-variant-numeric: tabular-nums; }
 
 @media (forced-colors: active) {

@@ -13,7 +13,7 @@
    visually hidden text in a cell is clipped with the table too. */
 .ops-table { position: relative; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
 .ops-table:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
-.ops-table .op-table th, .ops-table .op-table td { padding: 0.6rem 1rem; white-space: nowrap; }
+.ops-table .op-table th, .ops-table .op-table td { padding: 0.6rem 1rem; }
 .ops-table tbody tr:last-child > * { border-bottom: 0; }
 .ops-left th, .ops-left td { text-align: left; }
 .ops-table + .row__meta { margin-top: 0.6rem; }
