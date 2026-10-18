@@ -1,74 +1,41 @@
 /* ======================================================================
    AICA console — design tokens.
-   Midnight luxury, warm intelligence: a cinematic charcoal ground,
-   champagne type and surfaces, burnt orange for every action, and muted
-   lavender and sage used sparingly for depth and positive states.
+   The palette, type and curves are aica.bitntech.in's (and so bitntech.in's):
+   near-black ground, cream paper, plum ink, the orange accent. AICA's blue
+   keeps the one job it has on the landing page — it is AICA itself (the
+   voice line, "AICA is listening"). Orange is every action and focus ring.
 
-     Midnight charcoal #17191F · Deep charcoal #22242C ·
-     Champagne ivory #F2E8D8 · Warm white #FAF8F4 ·
-     Burnt orange #E58A4E · Muted lavender #A99BCB · Soft sage #78958A
-
-   Contrast (WCAG): champagne on charcoal 14.5:1; secondary #B8B6B1 8.7:1;
-   orange on charcoal 6.8:1 (and charcoal text on an orange button 6.8:1);
-   lavender 6.9:1; sage 5.3:1. On warm white, accents darken: orange text
-   #A64F1C 5.2:1, lavender #6B5C93 5.5:1, sage #3F5E52 6.8:1.
-
-   Historical names are kept so the rest of the CSS keeps working:
-   --orange* is the action colour; --sky is the accent (now burnt orange),
-   --ice the light highlight (champagne), --navy the deepest ground
-   (charcoal), --aqua/--aica lavender, --teal sage.
+   Brand tokens are fixed. Surface tokens (--bg, --ink, --text, --line, …)
+   are what components use; they flip with the theme. The `stage` surface is
+   dark by design, whatever the theme.
    ====================================================================== */
 
 :root {
-  /* ---- the palette ---- */
-  --charcoal: #17191f;
-  --charcoal-2: #22242c;
-  --champagne: #f2e8d8;
-  --warm-white: #faf8f4;
-  --burnt: #e58a4e;
-  --lavender: #a99bcb;
-  --sage: #78958a;
-  --stone: #b8b6b1;
+  /* ---- brand ---- */
+  --night: #05060a;
+  --coal: #0b0a0b;
+  --coal-2: #141214;
+  --ivory: #f7f3ed;
+  --ivory-2: rgba(247, 243, 237, 0.78);
+  --ivory-3: rgba(247, 243, 237, 0.56);
+  --line-d: rgba(247, 243, 237, 0.13);
+  --line-d2: rgba(247, 243, 237, 0.26);
 
-  /* Older names, mapped onto the new palette. */
-  --navy: var(--charcoal);
-  --ocean: #2b2d36;
-  --steel: #6e6a73;
-  --teal: var(--sage);
-  --aqua: var(--lavender);
-  --sky: var(--burnt);
-  --ice: var(--champagne);
+  --cream: #f5efe3;
+  --cream-2: #ece4d4;
+  --plum: #220934;
+  --paper-text: #57534e;
+  --line-p: #e2d9c8;
 
-  --night: #0e0f13;
-  --night-2: var(--charcoal);
-  --coal: #1d1f26;
-  --coal-2: var(--charcoal-2);
-  --ivory: var(--warm-white);
-  --ivory-2: rgba(242, 232, 216, 0.86);
-  --ivory-3: rgba(242, 232, 216, 0.62);
-  --line-d: rgba(242, 232, 216, 0.12);
-  --line-d2: rgba(242, 232, 216, 0.24);
+  --orange: #ff6e42;
+  --orange-2: #ff8c66;
+  --orange-ink: #1d0c05;
 
-  --cream: var(--warm-white);
-  --cream-2: #f2ece1;
-  --plum: var(--charcoal);
-  --midnight: var(--charcoal);
-  --paper-text: #45413b;
-  --line-p: rgba(23, 25, 31, 0.1);
-
-  --orange: var(--burnt);
-  --orange-2: #eda373;
-  --orange-ink: var(--charcoal);
-
-  --aica: var(--lavender);
-  --aica-deep: #6b5c93;
-  --cyan: var(--champagne);
-  --ok: var(--sage);
-  --danger: #c4554f;
-  --warn: #c9932f;
-
-  /* AICA's voice: lavender warming into champagne. */
-  --voice: linear-gradient(90deg, var(--lavender) 0%, #cdb9c0 50%, var(--champagne) 100%);
+  --aica: #5b84ff;
+  --aica-deep: #1b3fd0;
+  --ok: #1f9d68;
+  --danger: #c8283a;
+  --warn: #b26a00;
 
   /* ---- type ---- */
   --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
@@ -76,7 +43,7 @@
   --mono: 'DM Mono', ui-monospace, Consolas, monospace;
   --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
 
-  /* ---- space, shape: large panels, medium cards, compact controls ---- */
+  /* ---- space, shape ---- */
   --s-1: 0.25rem;
   --s-2: 0.5rem;
   --s-3: 0.75rem;
@@ -84,136 +51,77 @@
   --s-5: 1.5rem;
   --s-6: 2rem;
   --s-7: 3rem;
-  --r-panel: 22px;
-  --r-card: 14px;
-  --r-field: 10px;
+  --r-field: 14px;
+  --r-card: 20px;
   --r-pill: 999px;
-  --field-h: 48px;
-  --gap-float: 12px;
+  --field-h: 52px;
 
-  /* ---- motion ---- */
+  /* ---- motion: one curve for state changes, one for arrivals ---- */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --out: cubic-bezier(0.16, 1, 0.3, 1);
-  --spring: cubic-bezier(0.34, 1.36, 0.64, 1);
-  --dur-1: 0.18s;
-  --dur-2: 0.28s;
-  --dur-3: 0.5s;
 
-  /* ---- surfaces: dark (default) ----
-     Glass is reserved for floating layers (rail, header, dialogs, menus);
-     content cards are solid deep charcoal, so the two read differently. */
-  --blur: 22px;
-  --blur-lg: 32px;
-  --glass: rgba(34, 36, 44, 0.62);
-  --glass-2: rgba(14, 15, 19, 0.42);
-  --glass-3: rgba(30, 32, 39, 0.74);
-  --glass-light: rgba(242, 232, 216, 0.1);
-  --glass-edge: rgba(242, 232, 216, 0.12);
-  --glass-edge-hi: rgba(242, 232, 216, 0.24);
-  --hl: inset 0 1px 0 rgba(242, 232, 216, 0.06);
-  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --sh-2: 0 2px 6px rgba(0, 0, 0, 0.25), 0 18px 40px -16px rgba(0, 0, 0, 0.6);
-  --sh-3: 0 4px 10px rgba(0, 0, 0, 0.3), 0 40px 90px -24px rgba(0, 0, 0, 0.75);
-  --glow: radial-gradient(60% 120% at 100% 0%, rgba(229, 138, 78, 0.07), transparent 70%);
+  /* ---- surface: paper, light ---- */
+  --bg: var(--cream);
+  --bg-2: var(--cream-2);
+  --card: #fbf8f2;
+  --field: #fffdf9;
+  --ink: var(--plum);
+  --text: var(--paper-text);
+  --muted: #6b655e;
+  /* Orange for small text on paper: the brand orange is too light to read at 0.7rem. */
+  --orange-text: #b8400f;
+  --line: var(--line-p);
+  --line-strong: #c9bda7;
+  /* The edge of an unchecked checkbox, radio or switch: 3:1 or more on
+     paper and fields (WCAG 1.4.11). */
+  --control-border: #857a6b;
+  --danger-ink: var(--danger);
+  --danger-bg: #fbe9e7;
+  /* Darker than the brand green and amber, so small text on their tints
+     reaches 4.5:1. */
+  --ok-ink: #146c47;
+  --ok-bg: #e5f4ec;
+  --warn-ink: #8a5200;
+  --warn-bg: #fbf0dc;
+  --info-bg: #e8edff;
+  --info-ink: var(--aica-deep);
 
-  --bg: var(--charcoal);
-  --bg-2: #262830;
-  --card: #1f2128;
-  /* Opaque twin of --card, for sticky headers that content scrolls under. */
-  --card-solid: #1f2128;
-  --field: #14161b;
-  --ink: var(--warm-white);
-  --text: rgba(242, 232, 216, 0.86);
-  --muted: var(--stone);
-  --orange-text: var(--burnt);
-  --line: var(--glass-edge);
-  --line-strong: rgba(242, 232, 216, 0.22);
-  --control-border: rgba(242, 232, 216, 0.46);
-  --danger-ink: #f2a196;
-  --danger-bg: rgba(196, 85, 79, 0.16);
-  --ok-ink: #a9c4b8;
-  --ok-bg: rgba(120, 149, 138, 0.18);
-  --warn-ink: #e8c27a;
-  --warn-bg: rgba(201, 147, 47, 0.16);
-  --info-bg: rgba(169, 155, 203, 0.14);
-  --info-ink: #cfc5e6;
-
-  /* The field everything sits on: charcoal with a low warm light from one
-     corner, a lavender one from the other, and a fine grain. */
-  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --atmos:
-    radial-gradient(55vw 45vh at 0% 0%, rgba(229, 138, 78, 0.1), transparent 70%),
-    radial-gradient(50vw 50vh at 100% 100%, rgba(169, 155, 203, 0.09), transparent 70%),
-    linear-gradient(180deg, #1a1c22 0%, var(--charcoal) 60%, #131418 100%);
-
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-/* Light: warm white paper, charcoal ink, the same accents darkened. */
-@media (prefers-color-scheme: light) {
-  :root:not(.stage) {
-    --glass: rgba(255, 253, 249, 0.72);
-    --glass-2: rgba(23, 25, 31, 0.035);
-    --glass-3: rgba(255, 253, 249, 0.82);
-    --glass-light: rgba(23, 25, 31, 0.06);
-    --glass-edge: rgba(23, 25, 31, 0.09);
-    --glass-edge-hi: rgba(23, 25, 31, 0.18);
-    --hl: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    --sh-1: 0 1px 2px rgba(23, 25, 31, 0.05);
-    --sh-2: 0 2px 6px rgba(23, 25, 31, 0.04), 0 18px 40px -18px rgba(23, 25, 31, 0.16);
-    --sh-3: 0 4px 10px rgba(23, 25, 31, 0.05), 0 40px 90px -28px rgba(23, 25, 31, 0.28);
-    --glow: radial-gradient(60% 120% at 100% 0%, rgba(229, 138, 78, 0.08), transparent 70%);
-
-    --sky: #a64f1c;
-    --bg: var(--warm-white);
-    --bg-2: #f2ece1;
-    --card: #ffffff;
-    --card-solid: #ffffff;
-    --field: #ffffff;
-    --ink: var(--charcoal);
-    --text: var(--paper-text);
-    --muted: #5e5a53;
-    --orange-text: #a64f1c;
-    --line: rgba(23, 25, 31, 0.1);
-    --line-strong: rgba(23, 25, 31, 0.2);
-    --control-border: #7d776d;
-    --danger-ink: #a8323a;
-    --danger-bg: #f9e9e6;
-    --ok-ink: #3f5e52;
-    --ok-bg: #e8efeb;
-    --warn-ink: #8a5a00;
-    --warn-bg: #f8eedb;
-    --info-bg: #efebf6;
-    --info-ink: #6b5c93;
-
-    --atmos:
-      radial-gradient(55vw 45vh at 0% 0%, rgba(229, 138, 78, 0.08), transparent 70%),
-      radial-gradient(50vw 50vh at 100% 100%, rgba(169, 155, 203, 0.1), transparent 70%),
-      linear-gradient(180deg, #fbf9f5 0%, var(--warm-white) 60%, #f5f0e7 100%);
-
-    color-scheme: light;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12100f;
+    --bg-2: #1a1716;
+    --card: #1c1918;
+    --field: #161413;
+    --ink: var(--ivory);
+    --text: rgba(247, 243, 237, 0.72);
+    --muted: rgba(247, 243, 237, 0.56);
+    --orange-text: var(--orange);
+    --line: rgba(247, 243, 237, 0.13);
+    --line-strong: rgba(247, 243, 237, 0.28);
+    --control-border: rgba(247, 243, 237, 0.45);
+    --danger-ink: #ff8a8f;
+    --danger-bg: rgba(255, 77, 94, 0.12);
+    --ok-ink: #5fe0a8;
+    --ok-bg: rgba(60, 207, 145, 0.12);
+    --warn-ink: #ffc266;
+    --warn-bg: rgba(255, 176, 50, 0.12);
+    --info-bg: rgba(91, 132, 255, 0.14);
+    --info-ink: #9db6ff;
+    color-scheme: dark;
   }
 }
 
-/* The dark stage: charcoal, in any theme. */
+/* The dark stage: the landing page's night ground, in any theme. */
 .stage {
-  --sky: var(--burnt);
   --bg: var(--night);
-  --bg-2: rgba(14, 15, 19, 0.5);
-  --card: #1f2128;
-  --card-solid: #1f2128;
-  --field: #14161b;
-  --ink: var(--warm-white);
+  --ink: var(--ivory);
   --text: var(--ivory-2);
-  --muted: var(--stone);
-  --orange-text: var(--burnt);
+  --muted: var(--ivory-3);
+  --orange-text: var(--orange);
   --line: var(--line-d);
   --line-strong: var(--line-d2);
-  --glass: rgba(34, 36, 44, 0.62);
-  --glass-2: rgba(14, 15, 19, 0.42);
-  --glass-light: rgba(242, 232, 216, 0.1);
-  --glass-edge: rgba(242, 232, 216, 0.12);
-  --glass-edge-hi: rgba(242, 232, 216, 0.24);
-  --hl: inset 0 1px 0 rgba(242, 232, 216, 0.06);
   color-scheme: dark;
 }

@@ -27,7 +27,7 @@ export default function Problem() {
         <div className="problem__inner wrap">
           <div className="problem__copy">
             <p className="label">
-              The problem <i>·</i> <span className="problem__count">{beat + 1}</span> of 3
+              <span className="problem__count">0{beat + 1}</span> <i>/</i> 03 <i>·</i> The problem
             </p>
             <h2 className="display problem__title" id="problem-title">
               Your team answers the same questions <em>all day.</em>

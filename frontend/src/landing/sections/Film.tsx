@@ -71,7 +71,7 @@ export default function Film() {
   const current = CHAPTERS.reduce((acc, c, i) => (time >= c.at ? i : acc), 0)
 
   return (
-    <section className="film paper" id="film" ref={sectionRef} aria-labelledby="film-title">
+    <section className="film" id="film" ref={sectionRef} aria-labelledby="film-title">
       <div className="wrap">
         <header className="film__head rise">
           <p className="label">The film <i>/</i> 0:{FILM.seconds}</p>

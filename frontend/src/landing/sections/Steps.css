@@ -1,80 +1,40 @@
-/* How it works: three floating panels on one rail of light. */
-.steps { position: relative; padding: clamp(5rem, 12vh, 8rem) 0; }
-.steps__inner { display: grid; gap: clamp(2rem, 5vh, 3.5rem); }
-.steps__head { display: grid; gap: 1rem; justify-items: start; }
-.steps__title { font-size: clamp(2.4rem, 1rem + 4.4vw, 4.8rem); }
-.steps__lede { max-width: 30rem; font-size: 1.05rem; }
+.steps { padding: clamp(5rem, 12vh, 8rem) 0; background: var(--bg-2); }
+.steps__inner { display: grid; gap: 3rem; }
+.steps__head { display: grid; gap: 1rem; align-content: start; }
+.steps__title { font-size: clamp(2.6rem, 1rem + 5vw, 5.6rem); }
+.steps__lede { max-width: 24rem; font-size: 1.05rem; }
 
-.steps__track { position: relative; }
-/* The rail: vertical on phones, across the panels on wide screens. */
-.steps__rail { position: absolute; top: 28px; bottom: 28px; left: 27px; width: 2px; border-radius: 2px; background: var(--glass-light); }
-.steps__rail i {
-  position: absolute; inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, var(--teal), var(--sky), var(--ice));
-  box-shadow: 0 0 14px rgba(229, 138, 78, 0.6);
-  transform-origin: top;
-  transform: scaleY(var(--p, 0));
-}
+/* Tall enough that the scroll has something to fill. */
+.steps__track { position: relative; padding: 1rem 0 2rem; }
+.steps__rail { position: absolute; top: 1.5rem; bottom: 3rem; left: 27px; width: 2px; background: var(--line); }
+.steps__rail i { position: absolute; inset: 0; background: var(--orange); transform-origin: top; transform: scaleY(0); }
 
-.steps__list { position: relative; display: grid; gap: 1rem; }
-.steps__item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 1.1rem;
-  align-items: start;
-  padding: 0 0 0.5rem;
-}
-.steps__item > div {
-  padding: 1.25rem 1.35rem 1.4rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-card);
-  background: var(--glass);
-  box-shadow: var(--hl), var(--float);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.35);
-  backdrop-filter: blur(var(--blur)) saturate(1.35);
-  opacity: 0.55;
-  transform: translateY(8px);
-  transition: opacity 0.6s var(--ease), transform 0.7s var(--out), border-color 0.6s var(--ease);
-}
-.steps__item.is-on > div { opacity: 1; transform: none; border-color: var(--glass-edge-hi); }
-
+.steps__list { display: grid; gap: clamp(2.5rem, 8vh, 5rem); }
+.steps__item { position: relative; display: grid; grid-template-columns: 56px 1fr; gap: 1.5rem; align-items: start; }
 .steps__num {
   position: relative;
-  z-index: 1;
   display: grid;
   place-items: center;
   width: 56px;
   height: 56px;
-  border: 1px solid var(--glass-edge-hi);
-  border-radius: 50%;
-  background: var(--navy);
-  font: 600 0.9rem var(--mono);
-  color: var(--ivory-3);
-  transition: color 0.4s var(--ease), box-shadow 0.5s var(--ease), background-color 0.5s var(--ease);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+  font: 500 0.85rem var(--mono);
+  color: var(--orange);
+  transition: border-color 0.4s var(--ease);
 }
-/* Lit as the rail's light reaches it. */
-.steps__num::before {
-  content: '';
-  position: absolute; inset: 4px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--ice), var(--sky) 45%, var(--ocean));
-  opacity: var(--fill, 0);
-  transform: scale(calc(0.6 + var(--fill, 0) * 0.4));
-  transition: opacity 0.3s var(--ease);
-}
-.steps__num b { position: relative; font-weight: 600; }
-.steps__item.is-on .steps__num { color: var(--navy); box-shadow: 0 0 24px rgba(229, 138, 78, 0.45); }
-.steps__item h3 { font: 760 clamp(1.3rem, 1rem + 1vw, 1.75rem)/1.15 var(--display); letter-spacing: -0.025em; color: var(--ivory); }
-.steps__item p { margin-top: 0.55rem; font-size: 1rem; color: var(--ivory-2); }
+/* The box fills from the top as the line arrives, bitntech.in's way. */
+.steps__num::before { content: ''; position: absolute; inset: 0; background: var(--orange); transform: scaleY(var(--fill, 0)); transform-origin: top; }
+.steps__num b { position: relative; font-weight: 500; mix-blend-mode: normal; }
+.steps__item.is-on .steps__num { border-color: var(--orange); }
+.steps__item.is-on .steps__num b { color: var(--orange-ink); }
+.steps__item h3 { font: 800 clamp(1.6rem, 1.1rem + 1.8vw, 2.6rem)/1.05 var(--display); letter-spacing: -0.04em; color: var(--ink); }
+.steps__item p { margin-top: 0.6rem; max-width: 30rem; font-size: 1.05rem; }
 
 @media (min-width: 980px) {
-  .steps__head { justify-items: center; text-align: center; }
-  .steps__lede { text-align: center; }
-  .steps__rail { top: 27px; bottom: auto; left: calc(100% / 6); right: calc(100% / 6); width: auto; height: 2px; }
-  .steps__rail i { background: linear-gradient(90deg, var(--teal), var(--sky), var(--ice)); transform-origin: left; transform: scaleX(var(--p, 0)); }
-  .steps__list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
-  .steps__item { grid-template-columns: 1fr; justify-items: center; gap: 1.25rem; text-align: center; }
-  .steps__item > div { width: 100%; min-height: 100%; }
+  .steps__inner { grid-template-columns: 0.85fr 1.15fr; gap: 5rem; }
+  .steps__head { position: sticky; top: 8rem; align-self: start; }
+  .steps__track { min-height: 110vh; display: flex; align-items: center; }
 }

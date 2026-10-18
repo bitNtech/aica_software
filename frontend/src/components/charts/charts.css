@@ -1,21 +1,21 @@
-/* Charts. Series colours come from the AICA palette and differ in hue,
-   not just shade: sage, lavender, burnt orange (darkened on light
-   surfaces for contrast). Every chart also carries a legend, value labels
-   or a table view, so colour is never the only cue. Fixed order:
-   slot = identity, never rank. */
+/* Charts. Series colours: the first three slots of the reference
+   categorical palette, validated (scripts/validate_palette.js) against this
+   app's card colours: light #fbf8f2 passes every check, with slot 3 under
+   3:1 contrast, so every chart also has labels or a table; dark #1c1918
+   passes every check. Fixed order: slot = identity, never rank. */
 
 :root {
-  --series-1: #4f6e62;
-  --series-2: #6b5c93;
-  --series-3: #b85f28;
-  --chart-grid: rgba(23, 25, 31, 0.09);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --chart-grid: rgba(43, 18, 51, 0.1);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --series-1: #8fb0a3;
-    --series-2: #a99bcb;
-    --series-3: #e58a4e;
-    --chart-grid: rgba(242, 232, 216, 0.1);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-grid: rgba(247, 243, 237, 0.1);
   }
 }
 
@@ -43,7 +43,7 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
-  box-shadow: var(--sh-2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   font-size: 0.82rem;
   color: var(--text);

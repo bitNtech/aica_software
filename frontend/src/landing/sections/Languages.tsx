@@ -58,10 +58,10 @@ export default function Languages() {
   }
 
   return (
-    <section className="langs paper" id="languages" ref={ref} aria-labelledby="langs-title">
+    <section className="langs" ref={ref} aria-labelledby="langs-title">
       <div className="langs__glow" aria-hidden="true" />
       <div className="wrap">
-        <p className="label">Languages</p>
+        <p className="label">03 <i>/</i> Languages</p>
         <h2 className="sr-only" id="langs-title">Tamil. English. Tanglish. All in one call.</h2>
 
         <div className="langs__switch rise" role="tablist" aria-label="Choose a language">

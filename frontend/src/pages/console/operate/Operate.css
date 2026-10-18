@@ -5,11 +5,11 @@
 .op-section__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1.5rem; }
 .op-section__title { display: flex; align-items: center; gap: 0.6rem; font: 800 1.2rem/1.2 var(--display); letter-spacing: -0.025em; color: var(--ink); }
 .op-section__title:focus { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 3px; border-radius: 4px; }
-.op-count { display: inline-grid; place-items: center; min-width: 1.7rem; height: 1.6rem; padding: 0 0.55rem; border: 1px solid var(--glass-edge); border-radius: var(--r-pill); background: var(--glass-2); color: var(--ink); font: 700 0.8rem/1 var(--sans); letter-spacing: normal; }
+.op-count { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 0.4rem; border-radius: var(--r-pill); background: var(--bg-2); color: var(--ink); font: 700 0.85rem/1 var(--sans); letter-spacing: normal; }
 
 /* Cards: a call, a handover, a callback. */
 .op-cards { display: grid; gap: 0.9rem; }
-.op-card { display: grid; gap: 0.5rem; min-width: 0; padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--hl), var(--sh-1); }
+.op-card { display: grid; gap: 0.5rem; min-width: 0; padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
 .op-card--flag { border-color: var(--warn-ink); box-shadow: inset 4px 0 0 var(--warn-ink); }
 .op-card__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.35rem 1rem; }
 .op-card__title { font: 700 1.05rem/1.35 var(--sans); letter-spacing: normal; color: var(--ink); overflow-wrap: anywhere; border-radius: 4px; }
@@ -44,7 +44,7 @@
 .op-form { display: grid; gap: 1rem; }
 
 /* Rows: recent handovers, appointments, the call log. */
-.op-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--hl), var(--sh-1); }
+.op-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
 .op-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.4rem 1.25rem; padding: 0.85rem 1.1rem; }
 .op-row + .op-row { border-top: 1px solid var(--line); }
 .op-row__main { display: grid; gap: 0.2rem; min-width: 0; }
@@ -65,41 +65,21 @@
 .status-chip--appt-cancelled { background: var(--bg-2); color: var(--muted); }
 
 /* Headline numbers (stat tiles): scoped to .op-report to avoid conflicts with the ops console bar layout. */
-.op-report .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); align-items: stretch; gap: 0.9rem; margin: 0; border: none; background: transparent; border-radius: 0; overflow: visible; }
+.op-report .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: 0.9rem; margin: 0; border: none; background: transparent; border-radius: 0; overflow: visible; }
 .op-report .stat {
-  position: relative;
   display: grid;
   align-content: start;
   gap: 0.2rem;
-  padding: 1.05rem 1.2rem 1.1rem;
-  border: 1px solid var(--glass-edge);
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
   border-radius: var(--r-card);
-  background: var(--glass-2);
+  background: var(--card);
   flex: unset;
-  overflow: hidden;
-  transition: border-color var(--dur-2) var(--ease), box-shadow 0.3s var(--out), transform 0.3s var(--out);
-  box-shadow: var(--hl), var(--sh-1);
-  animation: rise-in 0.55s var(--out) backwards;
+  transition: border-color 0.12s var(--ease), background-color 0.12s var(--ease);
 }
-.op-report .stat:nth-child(2) { animation-delay: 0.04s; }
-.op-report .stat:nth-child(3) { animation-delay: 0.08s; }
-.op-report .stat:nth-child(4) { animation-delay: 0.12s; }
-.op-report .stat:nth-child(n + 5) { animation-delay: 0.16s; }
-/* A hairline of AICA's light along the top edge, brighter on hover. */
-.op-report .stat::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--aica) 55%, transparent), transparent);
-  opacity: 0.45;
-  transition: opacity var(--dur-2) var(--ease);
-}
-.op-report .stat:hover { border-color: var(--glass-edge-hi); background: var(--glass-light); box-shadow: var(--hl), var(--sh-2); transform: translateY(-2px); }
-
-.op-report .stat:hover::before { opacity: 1; }
-.op-report .stat__label { font-size: 0.85rem; font-weight: 600; color: var(--text); }
-.op-report .stat__value { margin: 0.2rem 0 0; font: 760 2.1rem/1.05 var(--display); letter-spacing: -0.035em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.op-report .stat:hover { border-color: var(--line-strong); background: var(--bg-2); }
+.op-report .stat__label { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+.op-report .stat__value { margin: 0.15rem 0 0; font: 650 2rem/1.1 var(--sans); letter-spacing: -0.02em; color: var(--ink); }
 .op-report .stat__sub { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .op-report .stat__delta { margin: 0.2rem 0 0; font-size: 0.85rem; font-weight: 600; }
 .op-report .stat__delta--good { color: var(--ok-ink); }
@@ -120,14 +100,10 @@
   background: var(--card);
   color: var(--ink);
   text-decoration: none;
-  box-shadow: var(--hl), var(--sh-1);
-  transition: border-color var(--dur-2) var(--ease), box-shadow 0.3s var(--out), transform 0.3s var(--out);
 }
-.home-attn__card:hover { border-color: color-mix(in srgb, var(--ink) 40%, var(--line-strong)); box-shadow: var(--hl), var(--sh-2); transform: translateY(-2px); }
-.home-attn__card.is-urgent:hover { border-color: var(--warn-ink); box-shadow: inset 4px 0 0 var(--warn-ink), var(--sh-2); }
+.home-attn__card:hover { border-color: var(--ink); }
 .home-attn__card.is-urgent { border-color: var(--warn-ink); box-shadow: inset 4px 0 0 var(--warn-ink); }
-.home-attn__count { grid-row: 1 / 3; font: 760 2.1rem/1 var(--display); letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
-
+.home-attn__count { grid-row: 1 / 3; font: 650 2rem/1 var(--sans); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .home-attn__label { font-weight: 700; }
 .home-attn__detail { font-size: 0.85rem; color: var(--text); }
 .home-attn__card.is-urgent .home-attn__detail { color: var(--warn-ink); font-weight: 600; }
@@ -198,7 +174,6 @@
   border-radius: var(--r-card);
   background: var(--card);
   -webkit-overflow-scrolling: touch;
-  box-shadow: var(--hl), var(--sh-1);
 }
 
 .tt-grid {
@@ -213,7 +188,7 @@
   top: 0;
   left: 0;
   z-index: 4;
-  background: var(--card-solid);
+  background: var(--card);
   border-right: 1px solid var(--line);
   border-bottom: 3px solid var(--line);
 }
@@ -228,13 +203,13 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.6rem 0.75rem 0.55rem;
-  background: var(--card-solid);
+  background: var(--card);
   border-right: 1px solid var(--line);
   border-bottom: 3px solid var(--line);
 }
 
 .tt-day-head--today {
-  background: color-mix(in srgb, var(--sky) 14%, var(--card-solid));
+  background: var(--bg-2);
   border-bottom-color: var(--ink);
 }
 
@@ -264,7 +239,7 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  background: var(--card-solid);
+  background: var(--card);
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -429,49 +404,22 @@
 .op-badge { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: var(--r-pill); background: var(--danger-bg); color: var(--danger-ink); font: 700 0.75rem/1.5 var(--sans); vertical-align: middle; }
 
 /* Live call guidance: notes staff gave the agent. */
-.op-whispers { display: grid; gap: 0.35rem; margin: 0; padding: 0.6rem 0.8rem; list-style: none; border-left: 3px solid var(--aica); background: var(--bg-2); border-radius: 0 8px 8px 0; font-size: 0.9rem; }
+.op-whispers { display: grid; gap: 0.35rem; margin: 0; padding: 0.6rem 0.8rem; list-style: none; border-left: 3px solid var(--plum); background: var(--bg-2); border-radius: 0 8px 8px 0; font-size: 0.9rem; }
 .op-whispers__by { font-weight: 600; color: var(--muted); }
 .op-whisper { max-width: 36rem; }
 .op-section__subtitle { margin-bottom: 0.6rem; font: 700 1rem/1.3 var(--display); color: var(--ink); }
 
 /* ---- Report: sections become cards ---------------------------------------- */
 
-/* Each report section is a floating glass panel; what sits inside it
-   (tiles, rows) is a deeper, nested glass — the dashboard reference. */
-.op-report { display: grid; gap: var(--gap-float); }
+.op-report { display: grid; gap: 1rem; }
 .op-report > .op-section,
 .op-report > .op-split > .op-section {
-  padding: 1.3rem 1.35rem 1.4rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-panel);
-  background: var(--glass);
+  padding: 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--card);
   gap: 1rem;
   margin-bottom: 0;
-  box-shadow: var(--hl), var(--sh-2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.3);
-  backdrop-filter: blur(var(--blur)) saturate(1.3);
-  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-3) var(--out);
-}
-.op-report > .op-section:hover,
-.op-report > .op-split > .op-section:hover { border-color: var(--glass-edge-hi); box-shadow: var(--hl), var(--sh-3); }
-/* The panel title: a small kicker line, as in the reference panels. */
-.op-report > .op-section > .op-section__subtitle,
-.op-report > .op-split > .op-section > .op-section__subtitle {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  font: 750 1.05rem/1.2 var(--display);
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-.op-report > .op-section > .op-section__subtitle::before,
-.op-report > .op-split > .op-section > .op-section__subtitle::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--lavender);
-  box-shadow: 0 0 10px rgba(169, 155, 203, 0.7);
 }
 /* Nested sections inside a card don't get card styling */
 .op-report > .op-section .op-section { padding: 0; border: none; border-radius: 0; background: transparent; margin-bottom: 0; }
@@ -481,9 +429,9 @@
 
 /* Sequential encoding: one hue, low -> high, interpolated in oklab so the
    steps read as evenly spaced. Dark mode gets its own steps, not a flip. */
-.heatmap { display: grid; gap: 0.5rem; --heat-low: #f4eee4; --heat-high: #b85f28; }
+.heatmap { display: grid; gap: 0.5rem; --heat-low: #eef4fd; --heat-high: #1c5cab; }
 @media (prefers-color-scheme: dark) {
-  .heatmap { --heat-low: rgba(242, 232, 216, 0.05); --heat-high: #e58a4e; }
+  .heatmap { --heat-low: #15233a; --heat-high: #86b6ef; }
 }
 
 .heatmap__summary { margin: 0; font-size: 0.85rem; color: var(--muted); }
@@ -523,42 +471,4 @@
   height: 6px;
   border-radius: 99px;
   background: linear-gradient(to right, var(--heat-low), var(--heat-high));
-}
-
-/* ---- Home as a floating dashboard -------------------------------------------
-   "Needs a person" is one glass panel; Reports is a large glass container
-   whose sections sit inside it as deeper tiles, and whose numbers sit on
-   those tiles as lighter glass — three depths, as in the spatial reference. */
-
-.op-section:has(> .home-attn),
-.op-section:has(> .op-report) {
-  padding: 1.3rem 1.35rem 1.4rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-panel);
-  background: var(--glass);
-  box-shadow: var(--hl), var(--sh-2);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.3);
-  backdrop-filter: blur(var(--blur)) saturate(1.3);
-  margin-bottom: var(--gap-float);
-}
-.op-section:has(> .home-attn) > .op-section__head .op-section__title,
-.op-section:has(> .op-report) > .op-section__head .op-section__title,
-.op-section:has(> .home-attn) > .op-section__title,
-.op-section:has(> .op-report) > .op-section__title { font-size: 1.15rem; }
-.op-section:has(> .op-report) .op-report > .op-section,
-.op-section:has(> .op-report) .op-report > .op-split > .op-section {
-  background: var(--glass-2);
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-.op-section:has(> .op-report) .op-report .stat { background: var(--glass); }
-.op-section:has(> .op-report) .op-report .stat:hover { background: var(--glass-light); }
-.home-attn__card { background: var(--glass-2); }
-.home-attn__card.is-urgent { border-color: color-mix(in srgb, var(--warn-ink) 55%, transparent); }
-@media (max-width: 600px) {
-  .op-section:has(> .home-attn),
-  .op-section:has(> .op-report) { padding: 1rem 0.85rem 1.1rem; border-radius: 22px; }
-  .op-section:has(> .op-report) .op-report > .op-section,
-  .op-section:has(> .op-report) .op-report > .op-split > .op-section { padding: 1rem 0.9rem; border-radius: 18px; }
 }

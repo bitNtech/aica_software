@@ -1,137 +1,123 @@
-/* A floating glass bar, inset from the screen's edges. */
+.nav { --nav-ink: var(--plum); }
+.nav--dark { --nav-ink: var(--ivory); }
 
-.nav {
+.nav__progress {
   position: fixed;
-  inset: calc(12px + env(safe-area-inset-top)) 0 auto;
-  z-index: 300;
+  inset: 0 0 auto;
+  z-index: 301;
   display: flex;
-  justify-content: center;
-  padding-inline: 12px;
+  gap: 4px;
+  height: 4px;
   pointer-events: none;
-  animation: nav-in 0.9s var(--out) 0.15s both;
 }
-@keyframes nav-in { from { opacity: 0; transform: translateY(-14px); } }
+.nav__seg { flex: 1; overflow: hidden; background: rgba(34, 9, 52, 0.08); }
+.nav--dark .nav__seg { background: rgba(255, 255, 255, 0.14); }
+.nav__fill { height: 100%; background: var(--orange); transform: scaleX(0); transform-origin: left; }
 
 .nav__bar {
-  position: relative;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 300;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  width: min(100%, 1180px);
-  min-height: 60px;
-  padding: 8px 8px 8px 18px;
-  border: 1px solid var(--glass-edge);
-  border-radius: 999px;
-  background: rgba(23, 25, 31, 0.74);
-  box-shadow: var(--hl), 0 12px 40px -12px rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
-  overflow: hidden;
-  pointer-events: auto;
-  transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease);
+  justify-content: space-between;
+  gap: 1rem;
+  padding: calc(20px + env(safe-area-inset-top)) clamp(16px, 3vw, 40px) 20px;
 }
-.is-scrolled .nav__bar { background: rgba(23, 25, 31, 0.86); border-color: var(--glass-edge-hi); }
+
+/* Closed down to nothing at the top of the page, then it opens around the
+   whole bar — bitntech.in's capsule, minus the links it carried there. */
+.nav__glass {
+  position: absolute;
+  top: calc(50% + env(safe-area-inset-top) / 2);
+  left: 50%;
+  width: 0;
+  height: 56px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  transition: width 0.9s var(--out), border-color 0.5s var(--ease), background-color 0.5s var(--ease);
+  pointer-events: none;
+}
+.is-scrolled .nav__glass {
+  width: calc(100% - clamp(16px, 3vw, 32px));
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(245, 239, 227, 0.55);
+}
+.nav--dark.is-scrolled .nav__glass { border-color: rgba(255, 255, 255, 0.14); background: rgba(5, 6, 10, 0.45); }
 
 .nav__brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 6px;
-  margin: -6px;
-  border-radius: 999px;
-  color: var(--ivory);
-  text-decoration: none;
-}
-/* AICA's mark: a small lit orb. */
-.nav__mark {
   position: relative;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #faf8f4 0, var(--sky) 30%, var(--ocean) 75%);
-  box-shadow: 0 0 18px rgba(229, 138, 78, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 10px 6px;
+  margin: -10px -6px -10px 4px;
+  color: var(--nav-ink);
+  text-decoration: none;
+  transition: color 0.35s var(--ease);
 }
-.nav__mark i {
-  position: absolute;
-  inset: -4px;
-  border: 1px solid rgba(229, 138, 78, 0.35);
-  border-radius: 50%;
-  animation: mark-pulse 3.2s var(--ease) infinite;
+.nav__word {
+  font: 800 1.45rem/1 var(--display);
+  letter-spacing: -0.05em;
 }
-@keyframes mark-pulse { 0% { transform: scale(0.85); opacity: 1; } 100% { transform: scale(1.35); opacity: 0; } }
-.nav__word { font: 780 1.2rem/1 var(--display); letter-spacing: -0.03em; }
-.nav__by { font-size: 0.75rem; color: var(--ivory-3); }
+.nav__word i { font-style: normal; color: var(--orange); }
+.nav__by {
+  font: 500 0.66rem var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.nav__by em { font-style: normal; color: var(--orange); opacity: 1; }
 
-.nav__links {
+.nav__actions {
+  position: relative;
   display: flex;
-  gap: 2px;
-  margin-left: auto;
-  padding: 3px;
-  border-radius: 999px;
-  background: rgba(14, 15, 19, 0.4);
+  align-items: center;
+  gap: 4px;
 }
+
+/* Existing customers' way in: present, but it never competes with the CTA. */
 .nav__link {
   display: inline-flex;
   align-items: center;
-  min-height: 38px;
-  padding: 0 0.9rem;
-  border-radius: 999px;
-  color: var(--ivory-3);
-  font: 600 0.84rem var(--sans);
-  text-decoration: none;
-  white-space: nowrap;
-  transition: color 0.25s var(--ease), background-color 0.3s var(--ease);
-}
-.nav__link:hover { color: var(--ivory); background: var(--glass-light); }
-.nav__link[aria-current='location'] { color: var(--navy); background: var(--ice); }
-
-.nav__actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.nav__links + .nav__actions { margin-left: 0.25rem; }
-@media (max-width: 1080px) { .nav__links + .nav__actions { margin-left: auto; } }
-.nav__console {
-  display: inline-flex;
-  align-items: center;
   min-height: 44px;
-  padding: 0 1rem;
-  border-radius: 999px;
-  color: var(--ivory);
+  padding: 10px 14px;
+  border-radius: 100px;
+  color: var(--nav-ink);
   font: 600 0.875rem var(--sans);
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color 0.3s var(--ease);
+  transition: color 0.35s var(--ease), background-color 0.3s var(--ease);
 }
-.nav__console:hover { background: var(--glass-light); }
+.nav__link:hover { background: rgba(34, 9, 52, 0.08); }
+.nav--dark .nav__link:hover { background: rgba(255, 255, 255, 0.1); }
+
 .nav__cta {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 44px;
-  padding: 0 1.15rem;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #eda373, var(--sky));
-  color: var(--navy);
+  padding: 10px 18px;
+  border-radius: 100px;
+  background: #fff;
+  color: #14161a;
   font: 700 0.875rem var(--sans);
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 22px -10px rgba(229, 138, 78, 0.9);
-  transition: transform 0.3s var(--out), box-shadow 0.3s var(--out);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  transition: background-color 0.3s var(--ease), color 0.3s var(--ease), transform 0.3s var(--out);
 }
+.nav:not(.nav--dark) .nav__cta { background: var(--plum); color: #fff; }
 .nav__cta:hover { transform: translateY(-1px); }
 
-/* Reading progress: a hairline along the bar's foot. */
-.nav__progress { position: absolute; left: 22px; right: 22px; bottom: 0; height: 1px; background: rgba(242, 232, 216, 0.08); }
-.nav__progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--sky), var(--ice)); transform: scaleX(0); transform-origin: left; }
-
-@media (max-width: 1080px) { .nav__links { display: none; } }
 @media (max-width: 520px) {
-  .nav { inset-block-start: calc(8px + env(safe-area-inset-top)); padding-inline: 8px; }
-  .nav__bar { min-height: 54px; padding: 6px 6px 6px 12px; gap: 0.5rem; }
   .nav__by { display: none; }
-  .nav__console { padding: 0 0.7rem; }
-  .nav__cta { padding: 0 0.9rem; }
+  .nav__bar { padding-top: calc(14px + env(safe-area-inset-top)); padding-bottom: 14px; }
+  .nav__glass { height: 52px; }
+  .nav__link { padding-inline: 10px; }
+  .nav__cta { padding-inline: 14px; }
 }
-
-/* The bar clips its overflow, so focus rings sit inside each control. */
-.nav__bar a:focus-visible { outline-offset: -2px; }

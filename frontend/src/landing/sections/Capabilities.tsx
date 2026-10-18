@@ -25,14 +25,14 @@ export default function Capabilities() {
   }, [])
 
   return (
-    <section className="caps" id="meet" aria-labelledby="caps-title">
+    <section className="caps paper" id="meet" aria-labelledby="caps-title">
       <div className="wrap">
         <header className="caps__head rise">
           <p className="caps__meet display" aria-hidden="true">
             <span className="ghost">Meet</span> AICA<em>.</em>
           </p>
           <div className="caps__intro">
-            <p className="label">What AICA does</p>
+            <p className="label">02 <i>/</i> Capabilities</p>
             <h2 className="display caps__title" id="caps-title">What AICA does on <em>every call.</em></h2>
             <p className="caps__lede">One call, start to finish — and the ones after hours.</p>
           </div>

@@ -2,9 +2,11 @@
 .problem {
   position: relative;
   height: 300vh;
-  /* A darker pocket of the environment: the after-hours beat dims it further. */
-  background: linear-gradient(180deg, transparent, rgba(14, 15, 19, 0.55) 12%, rgba(14, 15, 19, 0.55) 88%, transparent);
+  background: var(--coal);
+  transition: background-color 0.8s var(--ease);
 }
+.problem.is-beat-1 { background: #0a0708; }
+.problem.is-beat-2 { background: #12081a; }
 
 .problem__stage {
   position: sticky;
@@ -17,13 +19,12 @@
 .problem__stage::before {
   content: '';
   position: absolute; inset: 0;
-  background: radial-gradient(40rem 26rem at 80% 50%, rgba(229, 138, 78, 0.14), transparent 70%);
-  transition: opacity 0.8s var(--ease), background 0.8s var(--ease);
+  background: radial-gradient(40rem 26rem at 80% 50%, rgba(255, 110, 66, 0.1), transparent 70%);
+  transition: opacity 0.8s var(--ease);
   pointer-events: none;
 }
-.is-beat-1 .problem__stage { background: rgba(0, 10, 25, 0.35); transition: background-color 0.8s var(--ease); }
 .is-beat-1 .problem__stage::before { background: radial-gradient(40rem 26rem at 80% 50%, rgba(255, 77, 94, 0.12), transparent 70%); }
-.is-beat-2 .problem__stage::before { background: radial-gradient(40rem 26rem at 80% 50%, rgba(110, 104, 120, 0.16), transparent 70%); }
+.is-beat-2 .problem__stage::before { background: radial-gradient(40rem 26rem at 80% 50%, rgba(140, 60, 200, 0.16), transparent 70%); }
 
 .problem__inner {
   position: relative;
@@ -52,32 +53,29 @@
 .problem__beat.is-on { opacity: 1; transform: none; pointer-events: auto; }
 .problem__stat { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
 .problem__stat b {
-  font: 780 clamp(3.2rem, 2rem + 4.6vw, 6.2rem)/0.9 var(--display);
+  font: 900 clamp(3.2rem, 2rem + 4.6vw, 6.4rem)/0.9 var(--display);
+  font-stretch: 112%;
   letter-spacing: -0.05em;
-  color: var(--sky);
+  color: var(--orange);
 }
 .is-beat-1 .problem__stat b { color: var(--miss); }
-.is-beat-2 .problem__stat b { color: #f2e8d8; }
+.is-beat-2 .problem__stat b { color: #c792ff; }
 .problem__stat span { font: 500 0.75rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ivory-3); }
 .problem__beat h3 { margin-top: 0.85rem; font: 700 clamp(1.25rem, 1rem + 0.8vw, 1.6rem)/1.2 var(--display); letter-spacing: -0.02em; color: var(--ivory); }
 .problem__beat h3 + p { margin-top: 0.4rem; max-width: 30rem; color: var(--ivory-3); }
 
 .problem__ticks { display: flex; gap: 6px; margin-top: clamp(1rem, 3vh, 2rem); max-width: 16rem; }
 .problem__ticks li { flex: 1; height: 3px; overflow: hidden; background: var(--line-d); border-radius: 2px; }
-.problem__ticks li { height: 4px; border-radius: 4px; background: var(--glass-light); }
-.problem__ticks i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--sky)); transform-origin: left; transform: scaleX(var(--fill, 0)); }
+.problem__ticks i { display: block; height: 100%; background: var(--orange); transform-origin: left; transform: scaleX(var(--fill, 0)); }
 
 /* ---- the switchboard ---- */
 
 .board {
   position: relative;
-  padding: clamp(0.85rem, 1.5vw, 1.2rem);
-  border: 1px solid var(--glass-edge-hi);
-  border-radius: var(--r-panel);
-  background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 40%), var(--glass);
-  box-shadow: var(--hl), var(--float-lg);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.35);
-  backdrop-filter: blur(var(--blur)) saturate(1.35);
+  padding: clamp(0.75rem, 1.5vw, 1.1rem);
+  border: 1px solid var(--line-d);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(247, 243, 237, 0.035), rgba(247, 243, 237, 0.01));
   transform: perspective(1400px) rotateY(-9deg) rotateX(4deg);
   transform-origin: left center;
   transition: transform 1s var(--out);
@@ -104,9 +102,9 @@
   gap: 0.35rem;
   min-height: 78px;
   padding: 0.65rem 0.75rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: 14px;
-  background: var(--glass-2);
+  border: 1px solid var(--line-d);
+  border-radius: 12px;
+  background: rgba(20, 18, 20, 0.85);
   transition: border-color 0.5s var(--ease), background-color 0.5s var(--ease), opacity 0.5s var(--ease);
   transition-delay: calc(var(--i) * 40ms);
 }
@@ -120,7 +118,7 @@
 .line--ringing .line__live i { background: var(--orange); box-shadow: 0 0 10px var(--orange); animation: blink 0.9s steps(2) infinite; }
 .line--waiting .line__live i { background: #f4b740; }
 .line--hold .line__live i { background: var(--orange-2); }
-.line--ringing { border-color: rgba(229, 138, 78, 0.35); }
+.line--ringing { border-color: rgba(255, 110, 66, 0.35); }
 .line__missed i { background: var(--miss); box-shadow: 0 0 0 3px rgba(255, 77, 94, 0.18); }
 .line__bot { display: grid; gap: 0.2rem; font-size: 0.78rem; line-height: 1.35; }
 .line__bot b { font-weight: 600; color: var(--ivory); font-size: 0.86rem; }
@@ -131,9 +129,9 @@
 .is-beat-1 .line__live, .is-beat-2 .line__live { opacity: 0; transform: translateY(-8px); }
 .is-beat-1 .line__missed { opacity: 1; transform: none; }
 .is-beat-2 .line__bot { opacity: 1; transform: none; }
-.is-beat-1 .line { border-color: rgba(255, 77, 94, 0.18); background: rgba(14, 15, 19, 0.9); }
+.is-beat-1 .line { border-color: rgba(255, 77, 94, 0.18); background: rgba(16, 10, 12, 0.9); }
 .is-beat-1 .line:nth-child(n + 7) { opacity: 0.55; }
-.is-beat-2 .line { border-color: rgba(242, 232, 216, 0.16); }
+.is-beat-2 .line { border-color: rgba(199, 146, 255, 0.16); }
 
 /* A question surfacing on a line that has been ringing too long. */
 .line__ask {
@@ -141,10 +139,9 @@
   left: 50%; top: -0.9rem;
   z-index: 2;
   padding: 0.35rem 0.7rem;
-  border-radius: 12px 12px 12px 3px;
-  background: var(--ice);
-  color: #17191f;
-
+  border-radius: 10px 10px 10px 2px;
+  background: #fff;
+  color: #14161a;
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;

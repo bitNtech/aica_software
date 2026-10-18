@@ -6,8 +6,7 @@ import { readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-// A file:// URL, not a path: Node's import() rejects `C:\…` paths on Windows.
-const { render } = await import(new URL('../dist-ssr/entry-server.js', import.meta.url).href)
+const { render } = await import(`${root}dist-ssr/entry-server.js`)
 const file = `${root}dist/index.html`
 const html = readFileSync(file, 'utf8')
 if (!html.includes('<!--app-->')) throw new Error('dist/index.html has no <!--app--> marker')

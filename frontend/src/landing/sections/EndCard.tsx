@@ -4,15 +4,17 @@ import { useSignedIn } from '../lib/session'
 import './EndCard.css'
 
 /**
- * The page signs off the way the film does: the mark, the line, the
- * address — on one floating glass panel. The last thing on the page is the
- * two ways forward: a demo for the new, the console for those ready to set up.
+ * The page signs off the way the film does: its light end card — the mark,
+ * the line, the address. It also gives the footer what it pours into on
+ * bitntech.in: cream, not black, so the pink reads as liquid rising, not as
+ * loose balls floating in the dark. The last thing on the page is the two
+ * ways forward: a demo for the new, the console for those ready to set up.
  */
 export default function EndCard() {
   const signedIn = useSignedIn()
 
   return (
-    <section className="end" aria-label="AICA by BitNTech">
+    <section className="end paper" aria-label="AICA by BitNTech">
       <div className="end__rings" aria-hidden="true"><i /><i /><i /></div>
       <div className="wrap end__inner rise">
         <p className="end__mark display">AICA<em>.</em></p>

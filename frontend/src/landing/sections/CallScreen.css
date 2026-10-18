@@ -1,21 +1,19 @@
-/* The AICA call card: a floating glass window with the blue orb; Sky Blue
-   for AICA, Pale Ice for the caller. */
+/* The AICA call card, in the film's own colours: night-navy glass, the blue
+   orb, blue for AICA, orange for the caller. */
 .cs {
-  --cs-line: rgba(242, 232, 216, 0.16);
+  --cs-line: rgba(160, 180, 230, 0.16);
   position: relative;
   display: grid;
   align-content: start;
   gap: 1rem;
   min-height: 100%;
   padding: clamp(1.1rem, 2vw, 1.5rem);
-  border: 1px solid rgba(242, 232, 216, 0.28);
-  border-radius: var(--r-panel, 26px);
+  border: 1px solid var(--cs-line);
+  border-radius: 22px;
   background:
-    linear-gradient(160deg, rgba(242, 232, 216, 0.12), transparent 40%),
-    rgba(34, 36, 44, 0.3);
-  box-shadow: inset 0 1px 0 rgba(242, 232, 216, 0.14), 0 40px 100px -20px rgba(0, 0, 0, 0.7);
-  -webkit-backdrop-filter: blur(24px) saturate(1.35);
-  backdrop-filter: blur(24px) saturate(1.35);
+    radial-gradient(120% 80% at 100% 0%, rgba(27, 63, 208, 0.32), transparent 60%),
+    linear-gradient(165deg, #141d3a, #0a0f22 70%);
+  box-shadow: 0 40px 90px rgba(10, 8, 30, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--ivory);
   overflow: hidden;
   animation: cs-in 0.6s var(--out);
@@ -30,14 +28,14 @@
   flex: none;
   width: 38px; height: 38px;
   border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, #faf8f4 0 6%, #a99bcb 24%, #2b2d36 62%, #17191f 100%);
-  box-shadow: 0 0 0 2px rgba(229, 138, 78, 0.3), 0 0 22px rgba(229, 138, 78, 0.55);
+  background: radial-gradient(circle at 38% 34%, #eef2ff 0 6%, #5b84ff 24%, #1b3fd0 62%, #0c1a5a 100%);
+  box-shadow: 0 0 0 2px rgba(120, 150, 255, 0.3), 0 0 22px rgba(91, 132, 255, 0.55);
   animation: cs-orb 2.4s ease-in-out infinite;
 }
-@keyframes cs-orb { 50% { box-shadow: 0 0 0 5px rgba(229, 138, 78, 0.14), 0 0 30px rgba(229, 138, 78, 0.7); } }
+@keyframes cs-orb { 50% { box-shadow: 0 0 0 5px rgba(120, 150, 255, 0.14), 0 0 30px rgba(91, 132, 255, 0.7); } }
 .cs__who { display: grid; line-height: 1.2; }
 .cs__who b { font: 800 1.1rem var(--display); letter-spacing: -0.03em; }
-.cs__who small { color: rgba(242, 232, 216, 0.55); font-size: 0.78rem; }
+.cs__who small { color: rgba(247, 243, 237, 0.55); font-size: 0.78rem; }
 .cs__timer { margin-left: auto; display: inline-flex; align-items: center; gap: 0.4rem; font: 500 0.75rem var(--mono); color: var(--ivory-2); }
 .cs__timer i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 
@@ -50,23 +48,23 @@
   line-height: 1.5;
 }
 .cs__bubble small { display: block; margin-bottom: 0.2rem; font: 500 0.62rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.7; }
-.cs__bubble--caller { justify-self: start; border-top-left-radius: 4px; background: rgba(229, 138, 78, 0.14); border: 1px solid rgba(229, 138, 78, 0.3); }
+.cs__bubble--caller { justify-self: start; border-top-left-radius: 4px; background: rgba(255, 110, 66, 0.14); border: 1px solid rgba(255, 110, 66, 0.3); }
 .cs__bubble--caller small { color: var(--orange-2); opacity: 1; }
-.cs__bubble--aica { justify-self: end; border-top-right-radius: 4px; background: rgba(34, 36, 44, 0.45); border: 1px solid rgba(229, 138, 78, 0.45); animation: cs-reply 0.7s var(--out) 0.35s both; }
+.cs__bubble--aica { justify-self: end; border-top-right-radius: 4px; background: rgba(27, 63, 208, 0.45); border: 1px solid rgba(91, 132, 255, 0.45); animation: cs-reply 0.7s var(--out) 0.35s both; }
 @keyframes cs-reply { from { opacity: 0; transform: translateY(8px); } }
 
-.cs__foot { display: flex; align-items: center; gap: 0.5rem; margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--cs-line); font-size: 0.82rem; color: rgba(242, 232, 216, 0.6); }
+.cs__foot { display: flex; align-items: center; gap: 0.5rem; margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--cs-line); font-size: 0.82rem; color: rgba(247, 243, 237, 0.6); }
 .cs__foot svg { width: 16px; height: 16px; padding: 2px; border-radius: 50%; background: var(--aica-deep); stroke: #fff; stroke-width: 3; }
 
 /* speak */
 .cs__wave { display: flex; align-items: center; gap: 4px; height: 52px; }
-.cs__wave i { flex: 1; height: calc(var(--h) * 100%); border-radius: 3px; background: linear-gradient(180deg, #eda373, var(--orange)); animation: cs-wave 1.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.09s); }
+.cs__wave i { flex: 1; height: calc(var(--h) * 100%); border-radius: 3px; background: linear-gradient(180deg, #ff9a78, var(--orange)); animation: cs-wave 1.2s ease-in-out infinite; animation-delay: calc(var(--i) * -0.09s); }
 @keyframes cs-wave { 50% { transform: scaleY(0.3); } }
 .cs__said { font-size: clamp(1.25rem, 1rem + 1vw, 1.7rem); font-weight: 600; line-height: 1.4; }
-.cs__heard { color: rgba(242, 232, 216, 0.55); font-size: 0.9rem; }
+.cs__heard { color: rgba(247, 243, 237, 0.55); font-size: 0.9rem; }
 .cs__langs { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .cs__langs span { padding: 0.25rem 0.65rem; border: 1px solid var(--cs-line); border-radius: 8px; background: rgba(255, 255, 255, 0.05); font-size: 0.8rem; font-weight: 600; }
-.cs__langs i { font-style: normal; color: rgba(242, 232, 216, 0.4); }
+.cs__langs i { font-style: normal; color: rgba(247, 243, 237, 0.4); }
 .cs__langs em { margin-left: 0.35rem; font: 500 0.66rem var(--mono); font-style: normal; letter-spacing: 0.14em; text-transform: uppercase; color: var(--aica); }
 
 /* workflow */
@@ -74,13 +72,13 @@
 .cs__steps::before { content: ''; position: absolute; top: 12px; left: 12.5%; right: 12.5%; height: 2px; background: var(--cs-line); }
 .cs__steps::after { content: ''; position: absolute; top: 12px; left: 12.5%; right: 12.5%; height: 2px; background: var(--aica); transform-origin: left; animation: cs-fill 2.4s var(--out) both; }
 @keyframes cs-fill { from { transform: scaleX(0); } }
-.cs__steps li { position: relative; z-index: 1; display: grid; justify-items: center; gap: 0.45rem; font-size: 0.7rem; color: rgba(242, 232, 216, 0.6); text-align: center; }
-.cs__steps li span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--aica-deep); box-shadow: 0 0 0 4px #22242c; animation: cs-pop 0.4s var(--out) both; animation-delay: calc(0.3s + var(--i) * 0.55s); }
+.cs__steps li { position: relative; z-index: 1; display: grid; justify-items: center; gap: 0.45rem; font-size: 0.7rem; color: rgba(247, 243, 237, 0.6); text-align: center; }
+.cs__steps li span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--aica-deep); box-shadow: 0 0 0 4px #10183a; animation: cs-pop 0.4s var(--out) both; animation-delay: calc(0.3s + var(--i) * 0.55s); }
 .cs__steps li span svg { width: 13px; height: 13px; stroke: #fff; stroke-width: 3; }
 @keyframes cs-pop { from { transform: scale(0); } }
 .cs__rows { display: grid; border-top: 1px solid var(--cs-line); }
 .cs__rows div { display: flex; justify-content: space-between; padding: 0.65rem 0; border-bottom: 1px solid var(--cs-line); font-size: 0.92rem; }
-.cs__rows dt { color: rgba(242, 232, 216, 0.55); }
+.cs__rows dt { color: rgba(247, 243, 237, 0.55); }
 .cs__rows dd { margin: 0; font-weight: 600; }
 
 /* transfer */
@@ -88,33 +86,33 @@
 .cs__node { display: grid; gap: 0.2rem; align-content: start; padding: 1rem; min-height: 170px; border: 1px solid var(--cs-line); border-radius: 16px; background: rgba(255, 255, 255, 0.03); }
 .cs__node .cs__orb { width: 30px; height: 30px; margin-bottom: 0.5rem; }
 .cs__node b { font: 700 1.02rem var(--display); letter-spacing: -0.02em; }
-.cs__node small { color: rgba(242, 232, 216, 0.55); font-size: 0.78rem; }
-.cs__flag { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: auto; padding-top: 1rem; font-size: 0.78rem; font-style: normal; color: rgba(242, 232, 216, 0.7); }
+.cs__node small { color: rgba(247, 243, 237, 0.55); font-size: 0.78rem; }
+.cs__flag { display: inline-flex; align-items: center; gap: 0.4rem; margin-top: auto; padding-top: 1rem; font-size: 0.78rem; font-style: normal; color: rgba(247, 243, 237, 0.7); }
 .cs__flag i { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
 .cs__wire { position: relative; height: 2px; background: var(--cs-line); }
 .cs__wire i { position: absolute; inset: 0; background: linear-gradient(90deg, var(--orange), var(--aica)); transform-origin: left; animation: cs-fill 1.2s var(--out) 0.3s both; }
-.cs__node--team { border-color: rgba(229, 138, 78, 0.35); animation: cs-reply 0.6s var(--out) 1s both; }
+.cs__node--team { border-color: rgba(91, 132, 255, 0.35); animation: cs-reply 0.6s var(--out) 1s both; }
 .cs__people { display: flex; margin-bottom: 0.5rem; }
-.cs__people i { width: 30px; height: 30px; margin-right: -8px; border-radius: 50%; border: 2px solid #1d1f26; background: radial-gradient(circle at 50% 36%, #f2e8d8 0 22%, transparent 23%), radial-gradient(ellipse at 50% 100%, #f2e8d8 0 44%, transparent 45%), #45413b; }
+.cs__people i { width: 30px; height: 30px; margin-right: -8px; border-radius: 50%; border: 2px solid #0f1630; background: radial-gradient(circle at 50% 36%, #d8deec 0 22%, transparent 23%), radial-gradient(ellipse at 50% 100%, #d8deec 0 44%, transparent 45%), #46506c; }
 .cs__done { margin-top: auto; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--aica-deep); font-size: 0.8rem; font-weight: 700; font-style: normal; text-align: center; }
 
 /* always */
 .cs__time { font: 200 clamp(3.4rem, 2.4rem + 3vw, 5rem)/1 var(--display); letter-spacing: -0.05em; }
-.cs__time small { margin-left: 0.3rem; font-size: 0.3em; font-weight: 500; letter-spacing: 0; color: rgba(242, 232, 216, 0.55); }
+.cs__time small { margin-left: 0.3rem; font-size: 0.3em; font-weight: 500; letter-spacing: 0; color: rgba(247, 243, 237, 0.55); }
 .cs__log { display: grid; gap: 0.45rem; }
 .cs__log li { display: grid; grid-template-columns: auto 1fr; column-gap: 0.7rem; align-items: center; padding: 0.6rem 0.8rem; border: 1px solid var(--cs-line); border-radius: 12px; background: rgba(255, 255, 255, 0.035); animation: cs-reply 0.5s var(--out) both; animation-delay: calc(0.2s + var(--i) * 0.25s); }
 .cs__log span { grid-row: span 2; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(60, 207, 145, 0.18); color: var(--ok); }
 .cs__log span svg { width: 13px; height: 13px; stroke-width: 3; }
 .cs__log b { font-size: 0.9rem; }
-.cs__log small { font: 400 0.68rem var(--mono); color: rgba(242, 232, 216, 0.5); }
+.cs__log small { font: 400 0.68rem var(--mono); color: rgba(247, 243, 237, 0.5); }
 
 /* deploy */
 .cs__deploy { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; align-content: start; }
 .cs__opt { display: grid; gap: 0.25rem; padding: 1.1rem; border: 1px solid var(--cs-line); border-radius: 16px; background: rgba(255, 255, 255, 0.035); animation: cs-glow 4s ease-in-out infinite; }
 .cs__opt:nth-child(2) { animation-delay: -2s; }
-@keyframes cs-glow { 0%, 100% { border-color: var(--cs-line); } 50% { border-color: rgba(229, 138, 78, 0.55); background: rgba(34, 36, 44, 0.18); } }
-.cs__icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 0.5rem; border-radius: 12px; background: rgba(229, 138, 78, 0.16); color: #f2e8d8; }
+@keyframes cs-glow { 0%, 100% { border-color: var(--cs-line); } 50% { border-color: rgba(91, 132, 255, 0.55); background: rgba(27, 63, 208, 0.18); } }
+.cs__icon { display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 0.5rem; border-radius: 12px; background: rgba(91, 132, 255, 0.16); color: #a9bdff; }
 .cs__icon svg { width: 22px; height: 22px; stroke-width: 1.8; }
 .cs__opt b { font: 700 1rem var(--display); letter-spacing: -0.02em; }
-.cs__opt small { color: rgba(242, 232, 216, 0.55); font-size: 0.8rem; }
+.cs__opt small { color: rgba(247, 243, 237, 0.55); font-size: 0.8rem; }
 .cs__deploy .cs__foot { grid-column: 1 / -1; }
