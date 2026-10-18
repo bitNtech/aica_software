@@ -11,7 +11,7 @@
 .lib-form__done { font-size: 0.9rem; color: var(--ok-ink); }
 
 /* A list of things, one row each. */
-.lib-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.lib-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--hl), var(--sh-1); }
 .lib-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: start; gap: 0.5rem 1.25rem; padding: 0.95rem 1.1rem; }
 .lib-row + .lib-row { border-top: 1px solid var(--line); }
 .lib-row--switch { grid-template-columns: minmax(0, 1fr); }

@@ -1,31 +1,60 @@
+/* The sign-off: one large floating glass panel holding the mark, the line
+   and the two ways forward, an orb of light rising behind it. */
 .end {
   position: relative;
-  overflow: hidden;
   isolation: isolate;
-  padding: clamp(5rem, 14vh, 8rem) 0 clamp(9rem, 20vh, 12rem);
+  padding: clamp(4rem, 10vh, 6rem) 0 clamp(4rem, 10vh, 6rem);
   text-align: center;
 }
-/* The film's end card draws the orb as a few loose rings. */
-.end__rings { position: absolute; left: 50%; top: 42%; z-index: -1; width: min(520px, 90vw); aspect-ratio: 1; transform: translate(-50%, -50%); }
-.end__rings i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(27, 63, 208, 0.16); animation: end-drift 18s linear infinite; }
-.end__rings i:nth-child(2) { inset: 3%; border-color: rgba(255, 110, 66, 0.18); border-radius: 48% 52% 50% 50%; animation-duration: 24s; animation-direction: reverse; }
-.end__rings i:nth-child(3) { inset: -2%; border-color: rgba(34, 9, 52, 0.1); border-radius: 52% 48% 49% 51%; animation-duration: 30s; }
+.end__rings { position: absolute; left: 50%; top: 46%; z-index: -1; width: min(640px, 110vw); aspect-ratio: 1; transform: translate(-50%, -50%); }
+.end__rings i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(123, 189, 232, 0.16); animation: end-drift 22s linear infinite; }
+.end__rings i:first-child { background: radial-gradient(closest-side, rgba(123, 189, 232, 0.2), rgba(10, 65, 116, 0.18) 60%, transparent); border-color: transparent; }
+.end__rings i:nth-child(2) { inset: 8%; border-radius: 48% 52% 50% 50%; animation-duration: 28s; animation-direction: reverse; }
+.end__rings i:nth-child(3) { inset: -6%; border-color: rgba(189, 216, 233, 0.1); border-radius: 52% 48% 49% 51%; animation-duration: 36s; }
 @keyframes end-drift { to { transform: rotate(360deg); } }
 
-.end__mark { font-size: clamp(5rem, 2rem + 14vw, 13rem); font-weight: 900; line-height: 0.85; letter-spacing: -0.06em; }
-.end__line { margin-top: 1.25rem; font: 600 clamp(1.3rem, 1rem + 1.4vw, 2.2rem)/1.2 var(--display); letter-spacing: -0.03em; color: var(--ink); }
-.end__line b { color: var(--orange); font-weight: 700; }
-.end__sub { margin-top: 0.6rem; font-size: 1rem; }
-.end__url { margin-top: 2rem; font: 500 0.72rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; }
+.end__inner {
+  display: grid;
+  justify-items: center;
+  width: min(100% - 2 * var(--pad), 860px);
+  padding: clamp(2.25rem, 6vw, 4rem) clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid var(--glass-edge-hi);
+  border-radius: calc(var(--r-panel) + 8px);
+  background: linear-gradient(160deg, rgba(189, 216, 233, 0.12), transparent 45%), var(--glass);
+  box-shadow: var(--hl), var(--float-lg);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
+  backdrop-filter: blur(var(--blur)) saturate(1.4);
+}
+
+.end__mark {
+  font-size: clamp(4rem, 2rem + 9vw, 8.5rem);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: -0.055em;
+  background: linear-gradient(180deg, #fff 20%, rgba(189, 216, 233, 0.45));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.end__mark em { -webkit-text-fill-color: var(--sky); }
+.end__line { margin-top: 1.25rem; font: 650 clamp(1.25rem, 1rem + 1.2vw, 2rem)/1.2 var(--display); letter-spacing: -0.025em; color: var(--ivory); }
+.end__line b { color: var(--sky); font-weight: 700; }
+.end__sub { margin-top: 0.6rem; font-size: 1rem; color: var(--ivory-2); }
+.end__url { margin-top: 2rem; font: 500 0.72rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ivory-3); }
 .end__url i { font-style: normal; margin: 0 0.5em; opacity: 0.5; }
-.end__url em { font-style: normal; color: var(--orange); }
+.end__url em { font-style: normal; color: var(--sky); }
 
 .end__ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 2rem; }
-.end__console { border-color: var(--line); color: var(--ink); background: transparent; }
-.end__console:hover { border-color: var(--ink); }
-.end__signin { margin-top: 1rem; font-size: 0.95rem; }
-.end__signin a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
-.end__signin a:hover { color: var(--orange); }
+.end__console {
+  border-color: var(--glass-edge-hi);
+  color: var(--ivory);
+  background: var(--glass-2);
+}
+.end__console:hover { border-color: var(--ice); background: var(--glass-light); }
+.end__signin { margin-top: 1rem; font-size: 0.95rem; color: var(--ivory-3); }
+.end__signin a { color: var(--ivory); font-weight: 600; text-underline-offset: 3px; }
+.end__signin a:hover { color: var(--sky); }
 @media (max-width: 520px) {
+  .end__ctas { width: 100%; }
   .end__ctas .btn { flex: 1 1 100%; }
 }

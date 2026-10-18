@@ -32,7 +32,7 @@ export default function Capabilities() {
             <span className="ghost">Meet</span> AICA<em>.</em>
           </p>
           <div className="caps__intro">
-            <p className="label">02 <i>/</i> Capabilities</p>
+            <p className="label">What AICA does</p>
             <h2 className="display caps__title" id="caps-title">What AICA does on <em>every call.</em></h2>
             <p className="caps__lede">One call, start to finish — and the ones after hours.</p>
           </div>

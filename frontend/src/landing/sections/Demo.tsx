@@ -102,7 +102,7 @@ export default function Demo() {
       <div className="demo__glow" aria-hidden="true" />
       <div className="demo__inner wrap">
         <div className="demo__copy rise">
-          <p className="label">06 <i>/</i> Book a demo</p>
+          <p className="label">Book a demo</p>
           <h2 className="display demo__title" id="demo-title">
             Hear what AICA can do <em>for your calls.</em>
           </h2>
