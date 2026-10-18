@@ -5,7 +5,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   min-height: 100dvh;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* ---- stage ---- */
@@ -21,9 +21,24 @@
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(120% 70% at 85% 100%, rgba(27, 63, 208, 0.28), transparent 60%),
+    radial-gradient(120% 70% at 85% 100%, rgb(10 65 116 / 0.32), transparent 60%),
+    radial-gradient(70% 50% at 0% 0%, rgb(110 162 179 / 0.07), transparent 70%),
     var(--night);
   color: var(--text);
+}
+/* A fine engineering grid, fading out toward the voice line. */
+.auth__stage::before {
+  content: '';
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(189 216 233 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(189 216 233 / 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(90% 70% at 30% 35%, #000 20%, transparent 75%);
+  -webkit-mask-image: radial-gradient(90% 70% at 30% 35%, #000 20%, transparent 75%);
+  pointer-events: none;
 }
 
 /* The film's blue orb, sunk into the corner. */
@@ -35,21 +50,42 @@
   width: 34vw;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 36% 32%, #e8eeff 0, var(--aica) 18%, var(--aica-deep) 55%, #0c1a5a 85%);
-  box-shadow: 0 0 120px 20px rgba(91, 132, 255, 0.25);
-  opacity: 0.42;
+  background: radial-gradient(circle at 36% 32%, #eef6fb 0, var(--aica) 18%, var(--aica-deep) 55%, #001d39 85%);
+  box-shadow: 0 0 140px 30px rgb(123 189 232 / 0.28);
+  opacity: 0.5;
+  animation: orb-drift 14s var(--ease) infinite alternate;
+}
+@keyframes orb-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-2.5vw, -2vw, 0) scale(1.04); }
 }
 .auth__orb::after {
   content: '';
   position: absolute;
   inset: -9%;
   border-radius: 50%;
-  border: 1px solid rgba(142, 169, 255, 0.35);
+  border: 1px solid rgb(123 189 232 / 0.35);
+}
+.auth__orb::before {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  border: 1px solid rgb(110 162 179 / 0.14);
 }
 
 .auth__brand { justify-self: start; text-decoration: none; padding: 6px; margin: -6px; border-radius: 8px; }
 
 .auth__pitch { align-self: center; display: grid; gap: 1.25rem; max-width: 34rem; }
+.auth__pitch > * { animation: rise-in 0.8s var(--out) backwards; }
+.auth__pitch > :nth-child(2) { animation-delay: 0.08s; }
+.auth__pitch > :nth-child(3) { animation-delay: 0.16s; }
+.auth__line em {
+  background: linear-gradient(100deg, var(--orange) 10%, var(--orange-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
 .auth__line { font-size: clamp(2.6rem, 1rem + 3.6vw, 4.6rem); }
 .auth__sub { max-width: 26rem; font-size: 1.05rem; color: var(--text); }
 
@@ -64,10 +100,10 @@
   color: var(--ivory);
 }
 .auth__status i { font-style: normal; opacity: 0.5; }
-.auth__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--aica); box-shadow: 0 0 0 0 rgba(91, 132, 255, 0.6); animation: dot 2s var(--ease) infinite; }
-.auth__dot[data-mode='error'] { background: var(--orange); animation: none; }
+.auth__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--aica); box-shadow: 0 0 0 0 rgba(123, 189, 232, 0.6); animation: dot 2s var(--ease) infinite; }
+.auth__dot[data-mode='error'] { background: var(--danger-ink); animation: none; }
 .auth__dot[data-mode='ok'] { background: #8fd9b6; animation: none; }
-@keyframes dot { 70% { box-shadow: 0 0 0 8px rgba(91, 132, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(91, 132, 255, 0); } }
+@keyframes dot { 70% { box-shadow: 0 0 0 8px rgba(123, 189, 232, 0); } 100% { box-shadow: 0 0 0 0 rgba(123, 189, 232, 0); } }
 
 .auth__langs {
   display: flex;
@@ -86,11 +122,13 @@
 /* ---- paper ---- */
 
 .auth__panel {
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-rows: auto 1fr auto;
   min-height: 100dvh;
   padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 5vw, 4.5rem);
-  background: var(--bg);
+  background: transparent;
 }
 
 .auth__top { display: flex; justify-content: flex-end; min-height: 32px; }
@@ -115,8 +153,17 @@
 .auth__body {
   align-self: center;
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   margin: 2.5rem auto;
+  /* The form floats on a glass sheet. */
+  padding: clamp(1.4rem, 3vw, 2.25rem);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-panel);
+  background: var(--glass-3);
+  box-shadow: var(--hl), var(--sh-3);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.35);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.35);
+  animation: float-in 0.6s var(--out) backwards;
 }
 .auth__offline { margin-bottom: 1.5rem; }
 .auth__title {
@@ -137,7 +184,7 @@
   justify-content: space-between;
   gap: 0.5rem 1.5rem;
   width: 100%;
-  max-width: 420px;
+  max-width: 480px;
   margin-inline: auto;
   padding-top: 1.25rem;
   border-top: 1px solid var(--line);
@@ -166,9 +213,11 @@
 
   .auth__panel { min-height: 0; padding: 1rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
   .auth__top { justify-content: flex-start; }
-  .auth__body { align-self: start; margin: 1.75rem auto 2.5rem; }
+  .auth__body { align-self: start; margin: 1.25rem auto 2rem; border-radius: 22px; }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth__dot { animation: none !important; }
+  .auth__dot, .auth__orb { animation: none !important; }
 }
+

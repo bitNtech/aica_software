@@ -1,77 +1,93 @@
 /* ======================================================================
-   AICA by BitNTech — base.
-   Palette is bitntech.in's: near-black ground, cream paper, plum, the
-   orange accent and the footer's pink. AICA's own blue (the orb in its film)
-   is kept for one job only: it is the colour of AICA speaking. Orange is the
-   caller, the business, and every button.
+   AICA — the product page. Its own identity, not the parent site's: a
+   spatial interface floating in a deep-blue environment, built on seven
+   blues —
+
+     Deep Navy #001D39 · Ocean Blue #0A4174 · Steel Blue #49769F ·
+     Muted Teal #4E8EA2 · Soft Aqua #6EA2B3 · Sky Blue #7BBDE8 ·
+     Pale Ice #BDD8E9
+
+   Sky Blue is every action. Red, amber and green appear only where they
+   mean missed, waiting and done.
    ====================================================================== */
 
 :root {
-  --night: #05060a;
-  --coal: #0b0a0b;
-  --coal-2: #141214;
-  --coal-3: #1b181a;
-  --ivory: #f7f3ed;
-  --ivory-2: rgba(247, 243, 237, 0.78);
-  --ivory-3: rgba(247, 243, 237, 0.56);
-  --line-d: rgba(247, 243, 237, 0.13);
-  --line-d2: rgba(247, 243, 237, 0.26);
+  --navy: #001d39;
+  --ocean: #0a4174;
+  --steel: #49769f;
+  --teal: #4e8ea2;
+  --aqua: #6ea2b3;
+  --sky: #7bbde8;
+  --ice: #bdd8e9;
 
-  --cream: #f5efe3;
-  --cream-2: #ece4d4;
-  --plum: #220934;
-  --paper-text: #57534e;
-  --line-p: #e2d9c8;
+  --night: #00152b;
+  --coal: #032646;
+  --coal-2: #06305a;
+  --coal-3: #032646;
+  --ivory: #eef6fb;
+  --ivory-2: rgba(189, 216, 233, 0.86);
+  --ivory-3: rgba(189, 216, 233, 0.64);
+  --line-d: rgba(189, 216, 233, 0.13);
+  --line-d2: rgba(189, 216, 233, 0.26);
 
-  --orange: #ff6e42;
-  --orange-2: #ff8c66;
-  --orange-ink: #1d0c05;
-  --pink: #ed5565;
+  /* The action colour — historic name, Sky Blue value. */
+  --orange: var(--sky);
+  --orange-2: #a3d2f1;
+  --orange-ink: var(--navy);
+  --pink: var(--aqua);
+  --plum: var(--navy);
 
-  --aica: #5b84ff;
-  --aica-deep: #1b3fd0;
+  --aica: var(--aqua);
+  --aica-deep: var(--ocean);
   --ok: #3ccf91;
   --miss: #ff4d5e;
+
+  /* ---- glass ---- */
+  --glass: rgba(10, 65, 116, 0.28);
+  --glass-2: rgba(0, 29, 57, 0.5);
+  --glass-3: rgba(10, 65, 116, 0.4);
+  --glass-light: rgba(189, 216, 233, 0.16);
+  --glass-edge: rgba(189, 216, 233, 0.16);
+  --glass-edge-hi: rgba(189, 216, 233, 0.32);
+  --blur: 24px;
+  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.14);
+  --float: 0 20px 60px rgba(0, 8, 24, 0.35);
+  --float-lg: 0 40px 100px -20px rgba(0, 8, 24, 0.7);
+  --r-panel: 28px;
+  --r-card: 20px;
 
   --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
   --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: 'DM Mono', ui-monospace, Consolas, monospace;
   --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
 
-  /* One curve for every state change, as on bitntech.in. */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.36, 0.64, 1);
 
   --pad: clamp(1rem, 4vw, 4.5rem);
   --max: 1240px;
   --app-bottom-nav: env(safe-area-inset-bottom);
 
+  /* Surface tokens: the whole page lives in the dark blue environment. */
+  --bg: var(--navy);
+  --bg-2: var(--glass-2);
+  --card: var(--glass);
+  --ink: var(--ivory);
+  --text: var(--ivory-2);
+  --line: var(--line-d);
+
   color-scheme: dark;
 }
 
-/* Paper sections follow the visitor's theme; the dark ones are dark by design. */
-.paper {
-  --bg: var(--cream);
-  --bg-2: var(--cream-2);
-  --ink: var(--plum);
-  --text: var(--paper-text);
-  --line: var(--line-p);
-  --card: #fbf8f2;
-  background: var(--bg);
-  color: var(--text);
-  color-scheme: light;
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --glass: rgba(6, 48, 90, 0.94); --glass-3: rgba(8, 56, 102, 0.96); }
 }
-@media (prefers-color-scheme: dark) {
-  .paper {
-    --bg: #12100f;
-    --bg-2: #1a1716;
-    --ink: var(--ivory);
-    --text: rgba(247, 243, 237, 0.7);
-    --line: rgba(247, 243, 237, 0.12);
-    --card: #1c1918;
-    color-scheme: dark;
-  }
-}
+@media (max-width: 760px) { :root { --blur: 16px; } }
+
+/* Kept for the sections that used to be paper: now a slightly raised band
+   of the same environment, so the page reads as one continuous space. */
+.paper { color: var(--text); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -79,22 +95,49 @@ html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* The page edge was split by the scrollbar gutter on bitntech.in too. */
   scrollbar-width: none;
 }
 html::-webkit-scrollbar { display: none; }
 
 body {
   margin: 0;
-  background: var(--night);
+  background: var(--navy);
   color: var(--ivory-2);
   font: 400 1.0625rem/1.6 var(--sans);
-  letter-spacing: 0.005em;
+  letter-spacing: 0.003em;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-synthesis: none;
+}
+
+/* The environment: a fixed field of blue light behind every section, and
+   two soft lights drifting through it. */
+body::before, body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+}
+body::before {
+  inset: 0;
+  background:
+    radial-gradient(60vw 55vh at 8% 0%, rgba(10, 65, 116, 0.9), transparent 70%),
+    radial-gradient(50vw 50vh at 100% 30%, rgba(73, 118, 159, 0.4), transparent 70%),
+    radial-gradient(70vw 60vh at 50% 110%, rgba(78, 142, 162, 0.3), transparent 70%),
+    linear-gradient(180deg, #002448, var(--navy) 60%, var(--night));
+}
+body::after {
+  inset: -20vmax;
+  background:
+    radial-gradient(26vmax 26vmax at 30% 30%, rgba(123, 189, 232, 0.12), transparent 70%),
+    radial-gradient(22vmax 22vmax at 75% 70%, rgba(110, 162, 179, 0.14), transparent 70%);
+  animation: env-drift 40s var(--ease) infinite alternate;
+}
+@keyframes env-drift {
+  from { transform: translate3d(-3vmax, -2vmax, 0); }
+  to { transform: translate3d(3vmax, 3vmax, 0) rotate(6deg); }
 }
 
 [lang='ta'], .ta { font-family: var(--tamil); letter-spacing: 0; }
@@ -108,7 +151,7 @@ button { cursor: pointer; }
 a, button, label, summary, input, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--orange);
+  outline: 2px solid var(--sky);
   outline-offset: 3px;
 }
 
@@ -120,10 +163,10 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 .skip-link {
   position: fixed; top: 0; left: 0; z-index: 10000;
   padding: 0.85rem 1.25rem;
-  background: var(--plum); color: #fff;
+  background: var(--sky); color: var(--navy);
   font: 600 0.85rem var(--sans);
   text-decoration: none;
-  border-radius: 0 0 8px 0;
+  border-radius: 0 0 12px 0;
   transform: translateY(-120%);
   transition: transform 0.18s var(--ease);
 }
@@ -131,45 +174,67 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 
 .wrap { width: 100%; max-width: calc(var(--max) + 2 * var(--pad)); margin-inline: auto; padding-inline: var(--pad); }
 
-/* ---- labels: the site's mono kicker, "BITNTECH / PRODUCTS" ---- */
+/* ---- glass ---- */
+
+.glass {
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  box-shadow: var(--hl), var(--float);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.35);
+  backdrop-filter: blur(var(--blur)) saturate(1.35);
+}
+
+/* ---- section label: a small glass pill with a lit dot ---- */
 
 .label {
   display: inline-flex;
   align-items: center;
-  gap: 0.6em;
-  font: 500 0.7rem/1.4 var(--mono);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--orange);
+  gap: 0.55rem;
+  width: fit-content;
+  padding: 0.4rem 0.85rem 0.4rem 0.7rem;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass-2);
+  font: 600 0.78rem/1.2 var(--sans);
+  letter-spacing: 0.01em;
+  color: var(--ice);
 }
-.label i { font-style: normal; opacity: 0.55; color: currentColor; }
+.label::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sky);
+  box-shadow: 0 0 10px var(--sky);
+}
+.label i { font-style: normal; opacity: 0.5; }
 .label--quiet { color: var(--ivory-3); }
-.paper .label--quiet { color: var(--text); }
 
 /* ---- display type ---- */
 
 .display {
   font-family: var(--display);
-  font-weight: 800;
-  font-stretch: 100%;
-  letter-spacing: -0.045em;
-  line-height: 0.95;
+  font-weight: 760;
+  letter-spacing: -0.038em;
+  line-height: 1;
   color: var(--ivory);
   text-wrap: balance;
 }
-.paper .display { color: var(--ink); }
-.display em { font-style: normal; color: var(--orange); }
-
-.h2 { font-size: clamp(2.4rem, 1.2rem + 5vw, 5.4rem); }
-
-/* An outlined word: "Our" in "Our Products". */
-.ghost {
-  color: transparent !important;
-  -webkit-text-stroke: var(--stroke-w, 1.5px) var(--stroke, var(--ivory-2));
+.display em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--sky) 0%, var(--ice) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-.paper .ghost { --stroke: var(--ink); }
 
-/* ---- buttons: bitntech.in's pills ---- */
+.h2 { font-size: clamp(2.2rem, 1.2rem + 3.6vw, 4.2rem); }
+
+/* Formerly an outlined word; now a quieter tone of the same line. */
+.ghost { color: var(--ivory-3); }
+
+/* ---- buttons ---- */
 
 .btn {
   position: relative;
@@ -178,50 +243,52 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   justify-content: center;
   gap: 0.55rem;
   min-height: 52px;
-  padding: 0.85rem 1.6rem;
+  padding: 0.85rem 1.55rem;
   border: 1px solid transparent;
   border-radius: 999px;
-  font: 700 1rem/1.1 var(--sans);
+  font: 650 1rem/1.1 var(--sans);
   letter-spacing: -0.005em;
   text-decoration: none;
   white-space: nowrap;
-  overflow: hidden;
   isolation: isolate;
-  transition: transform 0.3s var(--out), border-color 0.25s var(--ease), color 0.25s var(--ease), background-color 0.25s var(--ease);
+  transition: transform 0.3s var(--out), box-shadow 0.3s var(--out), border-color 0.25s var(--ease), color 0.25s var(--ease), background-color 0.25s var(--ease);
 }
 .btn .arrow { display: inline-block; transition: transform 0.35s var(--out); }
 .btn:hover .arrow { transform: translate(2px, -2px); }
-.btn:active { transform: scale(0.98); }
+.btn:hover:not(:disabled) { transform: translateY(-2px); }
+.btn:active:not(:disabled) { transform: translateY(0) scale(0.98); transition-duration: 0.08s; }
 
-.btn--orange { background: var(--orange); color: var(--orange-ink); }
-/* A darker fill sweeps in from the left on hover. */
-.btn--orange::before {
-  content: '';
-  position: absolute; inset: 0; z-index: -1;
-  background: var(--orange-2);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s var(--out);
+.btn--orange {
+  background: linear-gradient(180deg, #a3d2f1, var(--sky));
+  color: var(--navy);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 21, 43, 0.3), 0 12px 30px -12px rgba(123, 189, 232, 0.8);
 }
-.btn--orange:hover::before { transform: scaleX(1); }
+.btn--orange:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 21, 43, 0.3), 0 18px 40px -12px rgba(123, 189, 232, 0.95); }
 
-.btn--white { background: #fff; color: #14161a; }
-.btn--white:hover { background: var(--ivory); }
+.btn--white { background: var(--ivory); color: var(--navy); }
+.btn--white:hover { background: #fff; }
 
-.btn--line { border-color: var(--line-d2); color: var(--ivory); background: transparent; }
-.btn--line:hover { border-color: var(--ivory); }
+.btn--line {
+  border-color: var(--glass-edge);
+  color: var(--ivory);
+  background: var(--glass);
+  box-shadow: var(--hl);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.btn--line:hover { border-color: var(--glass-edge-hi); background: var(--glass-light); }
 
 .btn--sm { min-height: 42px; padding: 0.6rem 1.15rem; font-size: 0.875rem; }
 
 /* ---- reveal ----
    Visible by default (the prerendered page shows everything); App marks what
-   is still below the fold as waiting, and lifts it in as it arrives. */
+   is still below the fold as waiting, and floats it in as it arrives. */
 
 .rise { transition: opacity 0.9s var(--out), transform 0.9s var(--out); transition-delay: calc(var(--d, 0) * 90ms); }
-.rise.is-waiting { opacity: 0; transform: translateY(32px); }
+.rise.is-waiting { opacity: 0; transform: translateY(28px) scale(0.985); }
 
-/* The phone bar is fixed over the foot of every screen; the last section and
-   the footer's bubbles need the room. */
+/* The phone bar is fixed over the foot of every screen; the last section
+   needs the room. */
 @media (max-width: 767px) {
   main > section:last-of-type { padding-bottom: 9rem; }
 }

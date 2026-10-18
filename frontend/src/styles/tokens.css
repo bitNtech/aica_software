@@ -1,41 +1,66 @@
 /* ======================================================================
-   AICA console — design tokens.
-   The palette, type and curves are aica.bitntech.in's (and so bitntech.in's):
-   near-black ground, cream paper, plum ink, the orange accent. AICA's blue
-   keeps the one job it has on the landing page — it is AICA itself (the
-   voice line, "AICA is listening"). Orange is every action and focus ring.
+   AICA console — design tokens. A spatial, frosted-glass system on one
+   seven-blue palette:
+
+     Deep Navy #001D39 · Ocean Blue #0A4174 · Steel Blue #49769F ·
+     Muted Teal #4E8EA2 · Soft Aqua #6EA2B3 · Sky Blue #7BBDE8 ·
+     Pale Ice #BDD8E9
+
+   Dark (the default look) floats translucent navy panels over a deep,
+   slowly lit navy field. Light floats milky ice-blue glass over a pale
+   field. Sky Blue is every action and focus ring.
+
+   Historical names are kept so the rest of the CSS keeps working:
+   --orange* is the action colour (now Sky Blue), --cream/--plum are the
+   light paper and ink, --aica is AICA's own voice colour.
 
    Brand tokens are fixed. Surface tokens (--bg, --ink, --text, --line, …)
-   are what components use; they flip with the theme. The `stage` surface is
-   dark by design, whatever the theme.
+   are what components use; they flip with the theme. The `stage` surface
+   is dark by design, whatever the theme.
    ====================================================================== */
 
 :root {
-  /* ---- brand ---- */
-  --night: #05060a;
-  --coal: #0b0a0b;
-  --coal-2: #141214;
-  --ivory: #f7f3ed;
-  --ivory-2: rgba(247, 243, 237, 0.78);
-  --ivory-3: rgba(247, 243, 237, 0.56);
-  --line-d: rgba(247, 243, 237, 0.13);
-  --line-d2: rgba(247, 243, 237, 0.26);
+  /* ---- the palette ---- */
+  --navy: #001d39;
+  --ocean: #0a4174;
+  --steel: #49769f;
+  --teal: #4e8ea2;
+  --aqua: #6ea2b3;
+  --sky: #7bbde8;
+  --ice: #bdd8e9;
 
-  --cream: #f5efe3;
-  --cream-2: #ece4d4;
-  --plum: #220934;
-  --paper-text: #57534e;
-  --line-p: #e2d9c8;
+  /* ---- brand, mapped onto the palette ---- */
+  --night: #00152b;
+  --night-2: #001d39;
+  --coal: #032646;
+  --coal-2: #06305a;
+  --ivory: #eef6fb;
+  --ivory-2: rgba(189, 216, 233, 0.86);
+  --ivory-3: rgba(189, 216, 233, 0.64);
+  --line-d: rgba(189, 216, 233, 0.13);
+  --line-d2: rgba(189, 216, 233, 0.26);
 
-  --orange: #ff6e42;
-  --orange-2: #ff8c66;
-  --orange-ink: #1d0c05;
+  --cream: #e9f2f8;
+  --cream-2: #dbe9f3;
+  --plum: #001d39;
+  --midnight: #001d39;
+  --paper-text: #1f4568;
+  --line-p: rgba(0, 29, 57, 0.1);
 
-  --aica: #5b84ff;
-  --aica-deep: #1b3fd0;
-  --ok: #1f9d68;
-  --danger: #c8283a;
-  --warn: #b26a00;
+  /* The action colour. Named orange for history; it is Sky Blue. */
+  --orange: var(--sky);
+  --orange-2: #a3d2f1;
+  --orange-ink: var(--navy);
+
+  --aica: var(--sky);
+  --aica-deep: var(--ocean);
+  --cyan: var(--ice);
+  --ok: #3fae84;
+  --danger: #c63f52;
+  --warn: #b77a14;
+
+  /* AICA's voice: its waveform and the ambient light. */
+  --voice: linear-gradient(90deg, var(--teal) 0%, var(--sky) 55%, var(--ice) 100%);
 
   /* ---- type ---- */
   --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
@@ -43,7 +68,7 @@
   --mono: 'DM Mono', ui-monospace, Consolas, monospace;
   --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
 
-  /* ---- space, shape ---- */
+  /* ---- space, shape: large panels, medium nests, compact controls ---- */
   --s-1: 0.25rem;
   --s-2: 0.5rem;
   --s-3: 0.75rem;
@@ -51,77 +76,136 @@
   --s-5: 1.5rem;
   --s-6: 2rem;
   --s-7: 3rem;
-  --r-field: 14px;
-  --r-card: 20px;
+  --r-panel: 26px;
+  --r-card: 18px;
+  --r-field: 12px;
   --r-pill: 999px;
-  --field-h: 52px;
+  --field-h: 48px;
+  --gap-float: 12px;
 
-  /* ---- motion: one curve for state changes, one for arrivals ---- */
+  /* ---- motion ---- */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --out: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --dur-1: 0.18s;
+  --dur-2: 0.28s;
+  --dur-3: 0.5s;
 
-  /* ---- surface: paper, light ---- */
-  --bg: var(--cream);
-  --bg-2: var(--cream-2);
-  --card: #fbf8f2;
-  --field: #fffdf9;
-  --ink: var(--plum);
-  --text: var(--paper-text);
-  --muted: #6b655e;
-  /* Orange for small text on paper: the brand orange is too light to read at 0.7rem. */
-  --orange-text: #b8400f;
-  --line: var(--line-p);
-  --line-strong: #c9bda7;
-  /* The edge of an unchecked checkbox, radio or switch: 3:1 or more on
-     paper and fields (WCAG 1.4.11). */
-  --control-border: #857a6b;
-  --danger-ink: var(--danger);
-  --danger-bg: #fbe9e7;
-  /* Darker than the brand green and amber, so small text on their tints
-     reaches 4.5:1. */
-  --ok-ink: #146c47;
-  --ok-bg: #e5f4ec;
-  --warn-ink: #8a5200;
-  --warn-bg: #fbf0dc;
-  --info-bg: #e8edff;
-  --info-ink: var(--aica-deep);
+  /* ---- glass: dark (default) ---- */
+  --blur: 22px;
+  --blur-lg: 34px;
+  /* primary: the floating panels */
+  --glass: rgba(73, 118, 159, 0.16);
+  /* secondary: nested groups, a little deeper than the panel */
+  --glass-2: rgba(0, 29, 57, 0.42);
+  /* elevated: menus, dialogs, the header */
+  --glass-3: rgba(10, 65, 116, 0.42);
+  /* light: selected states */
+  --glass-light: rgba(189, 216, 233, 0.18);
+  --glass-edge: rgba(189, 216, 233, 0.14);
+  --glass-edge-hi: rgba(189, 216, 233, 0.3);
+  /* A soft top highlight: light catching the panel's upper edge. */
+  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.12);
+  --sh-1: 0 1px 2px rgba(0, 10, 25, 0.25);
+  --sh-2: 0 2px 6px rgba(0, 10, 25, 0.22), 0 18px 40px -16px rgba(0, 10, 25, 0.6);
+  --sh-3: 0 4px 10px rgba(0, 10, 25, 0.3), 0 40px 90px -24px rgba(0, 10, 25, 0.8);
+  --glow: radial-gradient(60% 120% at 100% 0%, rgba(123, 189, 232, 0.12), transparent 70%);
 
-  color-scheme: light;
+  /* ---- surface: dark ---- */
+  --bg: var(--navy);
+  --bg-2: var(--glass-2);
+  --card: var(--glass);
+  /* Opaque twin of --card, for sticky headers that content scrolls under. */
+  --card-solid: #0b2f52;
+  --field: rgba(0, 29, 57, 0.5);
+  --ink: var(--ivory);
+  --text: rgba(189, 216, 233, 0.9);
+  --muted: rgba(189, 216, 233, 0.66);
+  --orange-text: var(--sky);
+  --line: var(--glass-edge);
+  --line-strong: rgba(189, 216, 233, 0.26);
+  --control-border: rgba(189, 216, 233, 0.5);
+  --danger-ink: #ff9aa6;
+  --danger-bg: rgba(198, 63, 82, 0.2);
+  --ok-ink: #79dcb2;
+  --ok-bg: rgba(63, 174, 132, 0.18);
+  --warn-ink: #f2c46d;
+  --warn-bg: rgba(183, 122, 20, 0.22);
+  --info-bg: rgba(123, 189, 232, 0.16);
+  --info-ink: var(--ice);
+
+  /* The field everything floats over: deep navy, lit from two sides. */
+  --atmos:
+    radial-gradient(60vw 50vh at 12% 8%, rgba(10, 65, 116, 0.85), transparent 70%),
+    radial-gradient(55vw 55vh at 92% 18%, rgba(73, 118, 159, 0.45), transparent 70%),
+    radial-gradient(70vw 60vh at 70% 105%, rgba(78, 142, 162, 0.32), transparent 70%),
+    linear-gradient(180deg, #002448 0%, var(--navy) 55%, #00152b 100%);
+
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12100f;
-    --bg-2: #1a1716;
-    --card: #1c1918;
-    --field: #161413;
-    --ink: var(--ivory);
-    --text: rgba(247, 243, 237, 0.72);
-    --muted: rgba(247, 243, 237, 0.56);
-    --orange-text: var(--orange);
-    --line: rgba(247, 243, 237, 0.13);
-    --line-strong: rgba(247, 243, 237, 0.28);
-    --control-border: rgba(247, 243, 237, 0.45);
-    --danger-ink: #ff8a8f;
-    --danger-bg: rgba(255, 77, 94, 0.12);
-    --ok-ink: #5fe0a8;
-    --ok-bg: rgba(60, 207, 145, 0.12);
-    --warn-ink: #ffc266;
-    --warn-bg: rgba(255, 176, 50, 0.12);
-    --info-bg: rgba(91, 132, 255, 0.14);
-    --info-ink: #9db6ff;
-    color-scheme: dark;
+/* Light: milky ice glass over a pale field. Kept for people who run their
+   device in light mode. */
+@media (prefers-color-scheme: light) {
+  :root:not(.stage) {
+    --glass: rgba(255, 255, 255, 0.5);
+    --glass-2: rgba(189, 216, 233, 0.32);
+    --glass-3: rgba(255, 255, 255, 0.66);
+    --glass-light: rgba(255, 255, 255, 0.86);
+    --glass-edge: rgba(255, 255, 255, 0.7);
+    --glass-edge-hi: rgba(255, 255, 255, 0.95);
+    --hl: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --sh-1: 0 1px 2px rgba(0, 29, 57, 0.06);
+    --sh-2: 0 2px 6px rgba(0, 29, 57, 0.05), 0 18px 40px -18px rgba(0, 29, 57, 0.2);
+    --sh-3: 0 4px 10px rgba(0, 29, 57, 0.06), 0 40px 90px -28px rgba(0, 29, 57, 0.35);
+    --glow: radial-gradient(60% 120% at 100% 0%, rgba(123, 189, 232, 0.22), transparent 70%);
+
+    --bg: var(--cream);
+    --bg-2: var(--glass-2);
+    --card: var(--glass);
+    --card-solid: #f2f8fc;
+    --field: rgba(255, 255, 255, 0.72);
+    --ink: var(--navy);
+    --text: var(--paper-text);
+    --muted: #3a6080;
+    --orange-text: var(--ocean);
+    --line: rgba(0, 29, 57, 0.09);
+    --line-strong: rgba(0, 29, 57, 0.18);
+    --control-border: #49769f;
+    --danger-ink: #a8283b;
+    --danger-bg: rgba(198, 63, 82, 0.12);
+    --ok-ink: #17694a;
+    --ok-bg: rgba(63, 174, 132, 0.16);
+    --warn-ink: #7f5100;
+    --warn-bg: rgba(183, 122, 20, 0.14);
+    --info-bg: rgba(123, 189, 232, 0.24);
+    --info-ink: var(--ocean);
+
+    --atmos:
+      radial-gradient(60vw 50vh at 10% 0%, rgba(123, 189, 232, 0.55), transparent 70%),
+      radial-gradient(55vw 55vh at 95% 20%, rgba(110, 162, 179, 0.35), transparent 70%),
+      radial-gradient(70vw 60vh at 60% 110%, rgba(73, 118, 159, 0.28), transparent 70%),
+      linear-gradient(180deg, #e3eff8 0%, #eef5fa 60%, #dcebf5 100%);
+
+    color-scheme: light;
   }
 }
 
-/* The dark stage: the landing page's night ground, in any theme. */
+/* The dark stage: deep navy, in any theme. */
 .stage {
   --bg: var(--night);
+  --bg-2: rgba(0, 29, 57, 0.5);
+  --card: rgba(73, 118, 159, 0.14);
+  --card-solid: #0b2f52;
+  --field: rgba(0, 29, 57, 0.5);
   --ink: var(--ivory);
   --text: var(--ivory-2);
   --muted: var(--ivory-3);
-  --orange-text: var(--orange);
+  --orange-text: var(--sky);
   --line: var(--line-d);
   --line-strong: var(--line-d2);
+  --glass: rgba(73, 118, 159, 0.16);
+  --glass-edge: rgba(189, 216, 233, 0.14);
+  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.12);
   color-scheme: dark;
 }

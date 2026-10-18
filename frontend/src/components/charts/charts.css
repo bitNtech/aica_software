@@ -1,21 +1,21 @@
-/* Charts. Series colours: the first three slots of the reference
-   categorical palette, validated (scripts/validate_palette.js) against this
-   app's card colours: light #fbf8f2 passes every check, with slot 3 under
-   3:1 contrast, so every chart also has labels or a table; dark #1c1918
-   passes every check. Fixed order: slot = identity, never rank. */
+/* Charts. Series colours come from the AICA palette: Ocean, Muted Teal
+   and Sky Blue on light glass; Sky Blue, Pale Ice and Muted Teal on dark.
+   Blues alone are close in hue, so every chart also carries a legend, value
+   labels or a table view - colour is never the only cue. Fixed order:
+   slot = identity, never rank. */
 
 :root {
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --chart-grid: rgba(43, 18, 51, 0.1);
+  --series-1: #0a4174;
+  --series-2: #4e8ea2;
+  --series-3: #7bbde8;
+  --chart-grid: rgba(0, 29, 57, 0.09);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --chart-grid: rgba(247, 243, 237, 0.1);
+    --series-1: #7bbde8;
+    --series-2: #bdd8e9;
+    --series-3: #4e8ea2;
+    --chart-grid: rgba(189, 216, 233, 0.1);
   }
 }
 
@@ -43,7 +43,7 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--card);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--sh-2);
   pointer-events: none;
   font-size: 0.82rem;
   color: var(--text);

@@ -59,7 +59,7 @@ export function OpsBar({ pendingCount }: { pendingCount?: number }) {
   const [leaving, setLeaving] = useState(false)
   if (!user?.platformRole) return null
   return (
-    <aside className="ops__sidebar">
+    <aside className="ops__sidebar stage">
       <div className="ops__hairline" aria-hidden="true" />
       <Link to="/ops" className="ops__brand" aria-label="AICA Ops — overview">
         <Wordmark by={false} />
