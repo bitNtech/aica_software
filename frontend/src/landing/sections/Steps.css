@@ -12,7 +12,7 @@
   position: absolute; inset: 0;
   border-radius: inherit;
   background: linear-gradient(180deg, var(--teal), var(--sky), var(--ice));
-  box-shadow: 0 0 14px rgba(123, 189, 232, 0.6);
+  box-shadow: 0 0 14px rgba(229, 138, 78, 0.6);
   transform-origin: top;
   transform: scaleY(var(--p, 0));
 }
@@ -65,7 +65,7 @@
   transition: opacity 0.3s var(--ease);
 }
 .steps__num b { position: relative; font-weight: 600; }
-.steps__item.is-on .steps__num { color: var(--navy); box-shadow: 0 0 24px rgba(123, 189, 232, 0.45); }
+.steps__item.is-on .steps__num { color: var(--navy); box-shadow: 0 0 24px rgba(229, 138, 78, 0.45); }
 .steps__item h3 { font: 760 clamp(1.3rem, 1rem + 1vw, 1.75rem)/1.15 var(--display); letter-spacing: -0.025em; color: var(--ivory); }
 .steps__item p { margin-top: 0.55rem; font-size: 1rem; color: var(--ivory-2); }
 

@@ -1,21 +1,21 @@
-/* Charts. Series colours come from the AICA palette: Ocean, Muted Teal
-   and Sky Blue on light glass; Sky Blue, Pale Ice and Muted Teal on dark.
-   Blues alone are close in hue, so every chart also carries a legend, value
-   labels or a table view - colour is never the only cue. Fixed order:
+/* Charts. Series colours come from the AICA palette and differ in hue,
+   not just shade: sage, lavender, burnt orange (darkened on light
+   surfaces for contrast). Every chart also carries a legend, value labels
+   or a table view, so colour is never the only cue. Fixed order:
    slot = identity, never rank. */
 
 :root {
-  --series-1: #0a4174;
-  --series-2: #4e8ea2;
-  --series-3: #7bbde8;
-  --chart-grid: rgba(0, 29, 57, 0.09);
+  --series-1: #4f6e62;
+  --series-2: #6b5c93;
+  --series-3: #b85f28;
+  --chart-grid: rgba(23, 25, 31, 0.09);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --series-1: #7bbde8;
-    --series-2: #bdd8e9;
-    --series-3: #4e8ea2;
-    --chart-grid: rgba(189, 216, 233, 0.1);
+    --series-1: #8fb0a3;
+    --series-2: #a99bcb;
+    --series-3: #e58a4e;
+    --chart-grid: rgba(242, 232, 216, 0.1);
   }
 }
 

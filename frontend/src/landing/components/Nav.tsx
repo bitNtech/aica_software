@@ -9,8 +9,8 @@ const LINKS = [
   { href: '#film', label: 'Film' },
   { href: '#meet', label: 'What it does' },
   { href: '#languages', label: 'Languages' },
-  { href: '#how', label: 'How it works' },
   { href: '#uses', label: 'Use cases' },
+  { href: '#how', label: 'How it works' },
 ] as const
 
 /**

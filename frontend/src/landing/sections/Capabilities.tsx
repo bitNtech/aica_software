@@ -25,7 +25,7 @@ export default function Capabilities() {
   }, [])
 
   return (
-    <section className="caps paper" id="meet" aria-labelledby="caps-title">
+    <section className="caps" id="meet" aria-labelledby="caps-title">
       <div className="wrap">
         <header className="caps__head rise">
           <p className="caps__meet display" aria-hidden="true">

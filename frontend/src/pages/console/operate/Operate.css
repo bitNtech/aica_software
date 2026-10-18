@@ -470,8 +470,8 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--sky);
-  box-shadow: 0 0 10px var(--sky);
+  background: var(--lavender);
+  box-shadow: 0 0 10px rgba(169, 155, 203, 0.7);
 }
 /* Nested sections inside a card don't get card styling */
 .op-report > .op-section .op-section { padding: 0; border: none; border-radius: 0; background: transparent; margin-bottom: 0; }
@@ -481,9 +481,9 @@
 
 /* Sequential encoding: one hue, low -> high, interpolated in oklab so the
    steps read as evenly spaced. Dark mode gets its own steps, not a flip. */
-.heatmap { display: grid; gap: 0.5rem; --heat-low: #e3eef6; --heat-high: #0a4174; }
+.heatmap { display: grid; gap: 0.5rem; --heat-low: #f4eee4; --heat-high: #b85f28; }
 @media (prefers-color-scheme: dark) {
-  .heatmap { --heat-low: rgba(10, 65, 116, 0.35); --heat-high: #7bbde8; }
+  .heatmap { --heat-low: rgba(242, 232, 216, 0.05); --heat-high: #e58a4e; }
 }
 
 .heatmap__summary { margin: 0; font-size: 0.85rem; color: var(--muted); }

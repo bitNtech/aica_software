@@ -58,7 +58,7 @@ export default function Languages() {
   }
 
   return (
-    <section className="langs" id="languages" ref={ref} aria-labelledby="langs-title">
+    <section className="langs paper" id="languages" ref={ref} aria-labelledby="langs-title">
       <div className="langs__glow" aria-hidden="true" />
       <div className="wrap">
         <p className="label">Languages</p>

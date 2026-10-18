@@ -9,8 +9,8 @@
   z-index: -1;
   height: 90%;
   background:
-    radial-gradient(40% 50% at 60% 40%, rgba(123, 189, 232, 0.2), transparent 70%),
-    radial-gradient(30% 40% at 20% 70%, rgba(10, 65, 116, 0.16), transparent 70%);
+    radial-gradient(40% 50% at 60% 40%, rgba(229, 138, 78, 0.2), transparent 70%),
+    radial-gradient(30% 40% at 20% 70%, rgba(34, 36, 44, 0.16), transparent 70%);
   pointer-events: none;
 }
 
@@ -48,7 +48,7 @@
   padding: clamp(1.25rem, 3vw, 2.25rem);
   border: 1px solid var(--glass-edge-hi);
   border-radius: var(--r-panel);
-  background: linear-gradient(160deg, rgba(189, 216, 233, 0.1), transparent 40%), var(--glass);
+  background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 40%), var(--glass);
   box-shadow: var(--hl), var(--float-lg);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.35);
   backdrop-filter: blur(var(--blur)) saturate(1.35);
@@ -83,13 +83,13 @@
   padding: 0.8rem 1rem;
   border: 1px solid var(--line-d2);
   border-radius: 12px;
-  background: rgba(0, 21, 43, 0.55);
+  background: rgba(14, 15, 19, 0.55);
   color: var(--ivory);
   font-size: 1.0625rem; /* over 16px: iOS does not zoom into the field */
   transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
 }
-.field input::placeholder { color: rgba(189, 216, 233, 0.3); }
-.field input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(123, 189, 232, 0.2); }
+.field input::placeholder { color: rgba(242, 232, 216, 0.3); }
+.field input:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgba(229, 138, 78, 0.2); }
 .field input[aria-invalid='true'] { border-color: var(--miss); }
 
 .choice { display: grid; gap: 0.6rem; border-radius: 12px; }
@@ -136,7 +136,7 @@
   gap: 0.8rem;
   padding: clamp(1.5rem, 4vw, 3rem);
   border-radius: inherit;
-  background: radial-gradient(80% 60% at 100% 0%, rgba(123, 189, 232, 0.25), transparent 60%), #032646;
+  background: radial-gradient(80% 60% at 100% 0%, rgba(229, 138, 78, 0.25), transparent 60%), #1d1f26;
   animation: done-in 0.6s var(--out);
 }
 @keyframes done-in { from { opacity: 0; transform: scale(0.98); } }

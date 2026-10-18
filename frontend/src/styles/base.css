@@ -27,8 +27,10 @@ body {
   font-synthesis: none;
 }
 
-/* ---- the atmosphere: a lit navy field behind everything, with two soft
-   lights drifting very slowly. Fixed, so panels glide over it. ---- */
+/* ---- the atmosphere: a charcoal field with a fine grain behind
+   everything, and two quiet lights drifting very slowly — warm and
+   lavender, never strong enough to tint the work. Fixed, so panels glide
+   over it. ---- */
 
 body::before, body::after {
   content: '';
@@ -36,12 +38,12 @@ body::before, body::after {
   z-index: -1;
   pointer-events: none;
 }
-body::before { inset: 0; background: var(--atmos); }
+body::before { inset: 0; background: var(--grain), var(--atmos); }
 body::after {
   inset: -20vmax;
   background:
-    radial-gradient(28vmax 28vmax at 30% 35%, rgba(123, 189, 232, 0.14), transparent 70%),
-    radial-gradient(24vmax 24vmax at 72% 68%, rgba(78, 142, 162, 0.16), transparent 70%);
+    radial-gradient(28vmax 28vmax at 30% 35%, rgba(229, 138, 78, 0.05), transparent 70%),
+    radial-gradient(24vmax 24vmax at 72% 68%, rgba(169, 155, 203, 0.06), transparent 70%);
   animation: atmos-drift 38s var(--ease) infinite alternate;
 }
 @keyframes atmos-drift {
@@ -67,11 +69,11 @@ body::after {
 /* No backdrop blur (older browsers, some low-power modes): the glass turns
    nearly opaque so text never sits on an unblurred busy background. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --glass: rgba(6, 48, 90, 0.92); --glass-3: rgba(3, 38, 70, 0.97); }
+  :root { --glass: rgba(34, 36, 44, 0.92); --glass-3: rgba(28, 30, 37, 0.97); }
 }
 @media (prefers-color-scheme: light) {
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    :root { --glass: rgba(250, 252, 254, 0.94); --glass-3: rgba(255, 255, 255, 0.97); }
+    :root { --glass: rgba(255, 253, 249, 0.94); --glass-3: rgba(255, 255, 255, 0.97); }
   }
 }
 /* Phones: lighter blur, cheaper to draw. */
@@ -179,11 +181,11 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 .btn--block { width: 100%; }
 
 .btn--orange {
-  background: linear-gradient(180deg, #9ad0f2, var(--sky));
+  background: linear-gradient(180deg, #eda373, var(--burnt));
   color: var(--orange-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(0, 29, 57, 0.25), 0 10px 26px -12px rgba(123, 189, 232, 0.75);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(23, 25, 31, 0.25), 0 10px 26px -12px rgba(229, 138, 78, 0.75);
 }
-.btn--orange:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(0, 29, 57, 0.25), 0 16px 34px -12px rgba(123, 189, 232, 0.9); }
+.btn--orange:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(23, 25, 31, 0.25), 0 16px 34px -12px rgba(229, 138, 78, 0.9); }
 /* A lighter fill sweeps in from the left on hover. */
 .btn--orange::before {
   content: '';

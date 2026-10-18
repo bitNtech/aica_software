@@ -8,8 +8,9 @@ import './Hero.css'
 
 /**
  * The opener: the promise on the left, AICA itself on the right — a
- * floating console replaying one example call, panel by panel. The one word
- * that changes (தமிழ் → English → Tanglish) is the proof under the promise.
+ * floating console replaying one example call, panel by panel. The
+ * headline's last word changes (தமிழ் → English → Tanglish): the languages
+ * are the promise.
  */
 
 const WORDS = [
@@ -64,12 +65,10 @@ export default function Hero() {
         <div className="hero__copy">
           <p className="label hero__label">{HERO.label}</p>
           <h1 className="hero__title display" id="hero-title">
-            Every call <em>answered.</em>
-            <span className="sr-only"> In your customer’s language — Tamil, English or Tanglish.</span>
+            <span className="hero__l1">Every call answered,</span>{' '}
+            <span className="hero__l2" aria-hidden="true">in <Rotator running={live} /></span>
+            <span className="sr-only">in your customer’s language — Tamil, English or Tanglish.</span>
           </h1>
-          <p className="hero__in" aria-hidden="true">
-            In <Rotator running={live} />, day and night.
-          </p>
 
           <p className="hero__lead">{HERO.lead}</p>
 
@@ -93,8 +92,8 @@ export default function Hero() {
           </div>
 
           <ul className="hero__facts" aria-label="At a glance">
-            <li><b lang="ta">தமிழ்</b> · English · Tanglish</li>
             <li><b>24/7</b> on every line</li>
+            <li><b>Books appointments</b> on the call</li>
             <li><b>Hands off</b> to your team</li>
           </ul>
         </div>

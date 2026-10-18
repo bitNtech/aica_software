@@ -30,7 +30,7 @@
   border: 1px solid var(--glass-edge-hi);
   border-radius: var(--r-panel);
   background:
-    linear-gradient(160deg, rgba(189, 216, 233, 0.12), transparent 40%),
+    linear-gradient(160deg, rgba(242, 232, 216, 0.12), transparent 40%),
     var(--glass);
   box-shadow: var(--hl), var(--float-lg);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
@@ -74,7 +74,7 @@
 .show__ring {
   position: absolute; inset: 8%;
   border-radius: 50%;
-  border: 1.5px solid rgba(123, 189, 232, 0.5);
+  border: 1.5px solid rgba(169, 155, 203, 0.55);
   animation: ripple 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
 }
 .show__status { display: grid; gap: 0.1rem; min-width: 0; }
@@ -88,7 +88,7 @@
   flex: 1;
   height: 100%;
   border-radius: 99px;
-  background: color-mix(in oklab, var(--teal) calc(100% - var(--i) * 2.8%), var(--ice));
+  background: color-mix(in oklab, var(--lavender) calc(100% - var(--i) * 2.8%), var(--champagne));
   transform: scaleY(calc(var(--h) * 0.14));
   transition: transform 0.5s var(--out);
 }
@@ -120,10 +120,10 @@
 .show__msg--aica {
   justify-self: end;
   border-radius: 16px 16px 6px 16px;
-  border-color: rgba(123, 189, 232, 0.35);
-  background: linear-gradient(160deg, rgba(123, 189, 232, 0.24), rgba(10, 65, 116, 0.4));
+  border-color: rgba(169, 155, 203, 0.35);
+  background: linear-gradient(160deg, rgba(169, 155, 203, 0.2), rgba(34, 36, 44, 0.5));
 }
-.show__msg--aica small { color: var(--sky); }
+.show__msg--aica small { color: var(--lavender); }
 @keyframes msg-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
 
 /* ---- the floating panels ---- */
@@ -132,7 +132,7 @@
   position: absolute;
   border: 1px solid var(--glass-edge-hi);
   border-radius: var(--r-card);
-  background: rgba(10, 65, 116, 0.45);
+  background: rgba(34, 36, 44, 0.45);
   box-shadow: var(--hl), var(--float);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
   backdrop-filter: blur(var(--blur)) saturate(1.4);
@@ -204,8 +204,14 @@
 @keyframes ripple { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
 @keyframes blink { 50% { opacity: 0.35; } }
 
-/* Narrow: the panels settle into the flow; nothing hangs off the edge. */
+/* Tablets: the same floating layout at a contained width, no tilt. */
 @media (max-width: 1039px) {
+  .show { width: 100%; max-width: 620px; }
+  .show__stage { transform: none; }
+}
+
+/* Phones: the panels settle into the flow; nothing hangs off the edge. */
+@media (max-width: 639px) {
   .show__stage { transform: none; padding: 0; display: grid; gap: 0.75rem; }
   .show__side { position: static; transform: none; animation: none; }
   .show__langs { order: -1; justify-self: start; }
@@ -213,8 +219,13 @@
   .show__done { display: none; }
 }
 @media (max-width: 560px) {
-  .show__main { padding: 0.9rem; border-radius: 22px; }
+  .show__main { gap: 0.85rem; padding: 0.9rem; border-radius: 22px; }
+  .show__orb { width: 60px; }
+  .show__status b { font-size: 1.02rem; }
+  .show__wave { height: 40px; }
   .show__msg { max-width: 92%; }
-  .show__talk { min-height: 7rem; }
+  /* Room for three messages, so the panel doesn't jump as they arrive. */
+  .show__talk { min-height: 9.5rem; align-content: start; }
+  .show__cap { text-align: left; }
 }
-@media (max-width: 1039px) { .show__main { padding-bottom: 1.25rem; } }
+@media (max-width: 639px) { .show__main { padding-bottom: 1.25rem; } }

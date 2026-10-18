@@ -12,7 +12,7 @@ export default function EndCard() {
   const signedIn = useSignedIn()
 
   return (
-    <section className="end paper" aria-label="AICA by BitNTech">
+    <section className="end" aria-label="AICA by BitNTech">
       <div className="end__rings" aria-hidden="true"><i /><i /><i /></div>
       <div className="wrap end__inner rise">
         <p className="end__mark display">AICA<em>.</em></p>
