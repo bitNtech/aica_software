@@ -61,6 +61,10 @@
   color: var(--ivory-3);
 }
 
+/* Phones: the brand across the top, the two link columns side by side. */
+.foot { grid-template-columns: 1fr 1fr; }
+.foot__brand { grid-column: 1 / -1; }
 @media (min-width: 760px) {
   .foot { grid-template-columns: 1.6fr 1fr 1fr; }
+  .foot__brand { grid-column: auto; }
 }

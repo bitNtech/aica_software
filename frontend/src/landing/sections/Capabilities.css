@@ -72,3 +72,12 @@
   }
   .caps__beat.is-active::before { transform: scaleX(1); }
 }
+
+/* Phones: the single column never grows past the screen, whatever the
+   call card inside a beat needs at its narrowest. */
+.caps__body { grid-template-columns: minmax(0, 1fr); }
+.caps__list, .caps__beat, .caps__inline, .caps__beat .cs { min-width: 0; }
+@media (max-width: 560px) {
+  .caps__beat { padding: 1.15rem 1rem 1.25rem; }
+  .caps__meet { font-size: clamp(3rem, 16vw, 4.2rem); }
+}

@@ -204,8 +204,14 @@
 @keyframes ripple { from { transform: scale(1); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
 @keyframes blink { 50% { opacity: 0.35; } }
 
-/* Narrow: the panels settle into the flow; nothing hangs off the edge. */
+/* Tablets: the same floating layout at a contained width, no tilt. */
 @media (max-width: 1039px) {
+  .show { width: 100%; max-width: 620px; }
+  .show__stage { transform: none; }
+}
+
+/* Phones: the panels settle into the flow; nothing hangs off the edge. */
+@media (max-width: 639px) {
   .show__stage { transform: none; padding: 0; display: grid; gap: 0.75rem; }
   .show__side { position: static; transform: none; animation: none; }
   .show__langs { order: -1; justify-self: start; }
@@ -213,8 +219,13 @@
   .show__done { display: none; }
 }
 @media (max-width: 560px) {
-  .show__main { padding: 0.9rem; border-radius: 22px; }
+  .show__main { gap: 0.85rem; padding: 0.9rem; border-radius: 22px; }
+  .show__orb { width: 60px; }
+  .show__status b { font-size: 1.02rem; }
+  .show__wave { height: 40px; }
   .show__msg { max-width: 92%; }
-  .show__talk { min-height: 7rem; }
+  /* Room for three messages, so the panel doesn't jump as they arrive. */
+  .show__talk { min-height: 9.5rem; align-content: start; }
+  .show__cap { text-align: left; }
 }
-@media (max-width: 1039px) { .show__main { padding-bottom: 1.25rem; } }
+@media (max-width: 639px) { .show__main { padding-bottom: 1.25rem; } }

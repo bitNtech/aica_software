@@ -89,6 +89,7 @@
 
 .nav__actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .nav__links + .nav__actions { margin-left: 0.25rem; }
+@media (max-width: 1080px) { .nav__links + .nav__actions { margin-left: auto; } }
 .nav__console {
   display: inline-flex;
   align-items: center;

@@ -3,6 +3,7 @@
 .end {
   position: relative;
   isolation: isolate;
+  overflow: clip;
   padding: clamp(4rem, 10vh, 6rem) 0 clamp(4rem, 10vh, 6rem);
   text-align: center;
 }

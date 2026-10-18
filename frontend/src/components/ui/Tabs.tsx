@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 
 export interface Tab<K extends string> {
   key: K
@@ -20,6 +20,16 @@ interface Props<K extends string> {
 export function Tabs<K extends string>({ label, tabs, value, onChange, children }: Props<K>) {
   const id = useId()
   const refs = useRef<(HTMLButtonElement | null)[]>([])
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // On a phone the tab row scrolls sideways: keep the selected tab in view.
+  useEffect(() => {
+    const list = listRef.current
+    const el = refs.current[tabs.findIndex((t) => t.key === value)]
+    if (!list || !el) return
+    const left = el.getBoundingClientRect().left - list.getBoundingClientRect().left
+    if (left < 0 || left + el.offsetWidth > list.clientWidth) list.scrollLeft += left - 16
+  }, [value, tabs])
 
   function onKey(e: KeyboardEvent, i: number) {
     const last = tabs.length - 1
@@ -32,7 +42,7 @@ export function Tabs<K extends string>({ label, tabs, value, onChange, children 
 
   return (
     <div className="tabs">
-      <div role="tablist" aria-label={label} className="tabs__list">
+      <div role="tablist" aria-label={label} className="tabs__list" ref={listRef}>
         {tabs.map((t, i) => {
           const selected = t.key === value
           return (

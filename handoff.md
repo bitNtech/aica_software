@@ -1,7 +1,7 @@
 # Project Handoff
 
 ## Status
-- Latest (2026-10-18, uncommitted, branch `feat/premium-redesign`): homepage rebuilt as AICA's own spatial product page, plus a page-by-page console pass, on top of the seven-blue glass system. See the homepage entry. Not committed or pushed.
+- Latest (2026-10-18, uncommitted, branch `feat/premium-redesign`): mobile/tablet pass on top of the homepage rebuild; homepage rebuilt as AICA's own spatial product page, plus a page-by-page console pass, on top of the seven-blue glass system. See the homepage entry. Not committed or pushed.
 - Previously: pushed to `main` directly (merged with `origin/main`'s PR #23) on 2026-10-18, then fixed the 5 CI test failures the push exposed; see the 2026-10-18 entry. The 2026-10-17 report/heatmap work and the 2026-10-16 permissions rework are both committed and on `main` now.
 - Phase: Auth backend (FastAPI + Firebase) built and connected to the console frontend. **Not yet run against the real Firebase project:** it's waiting on `backend/.env`, the service-account key and the Google OAuth client (see "Needed from the user").
 - Implementation approval:
@@ -18,6 +18,12 @@
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
+
+## Mobile and tablet pass (2026-10-18, branch `feat/premium-redesign`, uncommitted)
+- **Root cause of the "misaligned" phone view:** the landing page was 435px wide on a 390px phone (decorative glows past the edge). `overflow-x: hidden` on body doesn't stop phones widening the layout viewport, so the fixed nav stretched off-screen. Now `overflow-x: clip` on html and body (`landing/index.css`). Scan at 360/390/768: no element wider than the screen except clipped decoration.
+- Landing: nav actions pinned right when the chapter links are hidden; footer brand row + two link columns side by side; showcase tightened on phones (smaller orb and wave, fixed talk height so it doesn't jump), floating layout kept on tablets (640–1039px, 620px wide, no tilt), stacked below 640px; capabilities column can't grow past the screen (`minmax(0, 1fr)`, `min-width: 0`); end card clips its rings.
+- Console/ops on phones: tab bars, the ops nav and the ops organisation sub-nav are single rows that scroll sideways with an edge fade instead of wrapping into 3–4 rows; the shared `Tabs` now scrolls the selected tab into view (workspace tabs already did); ops bar is one compact floating row; Account bar is one compact row with the back link truncating.
+- **Verified:** `tsc -b`, `npm run build`, `vitest run` 269/269 (quiet machine; with the dev server running alongside, 19 timing-sensitive tests time out and all pass when rerun). Screenshots: every homepage section at 360/390/768, console and ops routes at 390.
 
 ## Homepage rebuilt + console page pass (2026-10-18, branch `feat/premium-redesign`, uncommitted)
 Approved 2026-10-18. Goal: AICA gets its own identity rather than bitntech.in's; every route consistent.

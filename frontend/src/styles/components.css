@@ -1060,3 +1060,20 @@
 }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none !important; } }
+
+/* Phones: tab bars stay one row and scroll sideways, fading at the edge,
+   rather than wrapping into a tall block. */
+@media (max-width: 640px) {
+  .tabs__list, .route-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
+  }
+  .tabs__list::-webkit-scrollbar, .route-tabs::-webkit-scrollbar { display: none; }
+  .tabs__tab, .route-tabs a { scroll-snap-align: start; white-space: nowrap; }
+  .tabs__list:has(> :last-child[aria-selected='true']), .route-tabs:has(> :last-child[aria-current='page']) { -webkit-mask-image: none; mask-image: none; }
+}

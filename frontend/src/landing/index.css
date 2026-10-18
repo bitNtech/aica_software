@@ -92,6 +92,9 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
+  /* clip, not hidden: phones widen the layout viewport to fit anything that
+     sticks out, which drags the fixed nav off the screen with it. */
+  overflow-x: clip;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -105,7 +108,7 @@ body {
   color: var(--ivory-2);
   font: 400 1.0625rem/1.6 var(--sans);
   letter-spacing: 0.003em;
-  overflow-x: hidden;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
