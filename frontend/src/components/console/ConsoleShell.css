@@ -137,7 +137,7 @@
   transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease), transform 0.3s var(--spring);
 }
 .console__link:hover .console__icon { color: var(--ink); }
-.console__link.active .console__icon { color: var(--navy); background: var(--sky); transform: scale(1.04); }
+.console__link.active .console__icon { color: var(--charcoal); background: var(--burnt); transform: scale(1.04); }
 
 /* user footer */
 .console__me {

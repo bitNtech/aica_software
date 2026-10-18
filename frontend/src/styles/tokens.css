@@ -1,66 +1,74 @@
 /* ======================================================================
-   AICA console — design tokens. A spatial, frosted-glass system on one
-   seven-blue palette:
+   AICA console — design tokens.
+   Midnight luxury, warm intelligence: a cinematic charcoal ground,
+   champagne type and surfaces, burnt orange for every action, and muted
+   lavender and sage used sparingly for depth and positive states.
 
-     Deep Navy #001D39 · Ocean Blue #0A4174 · Steel Blue #49769F ·
-     Muted Teal #4E8EA2 · Soft Aqua #6EA2B3 · Sky Blue #7BBDE8 ·
-     Pale Ice #BDD8E9
+     Midnight charcoal #17191F · Deep charcoal #22242C ·
+     Champagne ivory #F2E8D8 · Warm white #FAF8F4 ·
+     Burnt orange #E58A4E · Muted lavender #A99BCB · Soft sage #78958A
 
-   Dark (the default look) floats translucent navy panels over a deep,
-   slowly lit navy field. Light floats milky ice-blue glass over a pale
-   field. Sky Blue is every action and focus ring.
+   Contrast (WCAG): champagne on charcoal 14.5:1; secondary #B8B6B1 8.7:1;
+   orange on charcoal 6.8:1 (and charcoal text on an orange button 6.8:1);
+   lavender 6.9:1; sage 5.3:1. On warm white, accents darken: orange text
+   #A64F1C 5.2:1, lavender #6B5C93 5.5:1, sage #3F5E52 6.8:1.
 
    Historical names are kept so the rest of the CSS keeps working:
-   --orange* is the action colour (now Sky Blue), --cream/--plum are the
-   light paper and ink, --aica is AICA's own voice colour.
-
-   Brand tokens are fixed. Surface tokens (--bg, --ink, --text, --line, …)
-   are what components use; they flip with the theme. The `stage` surface
-   is dark by design, whatever the theme.
+   --orange* is the action colour; --sky is the accent (now burnt orange),
+   --ice the light highlight (champagne), --navy the deepest ground
+   (charcoal), --aqua/--aica lavender, --teal sage.
    ====================================================================== */
 
 :root {
   /* ---- the palette ---- */
-  --navy: #001d39;
-  --ocean: #0a4174;
-  --steel: #49769f;
-  --teal: #4e8ea2;
-  --aqua: #6ea2b3;
-  --sky: #7bbde8;
-  --ice: #bdd8e9;
+  --charcoal: #17191f;
+  --charcoal-2: #22242c;
+  --champagne: #f2e8d8;
+  --warm-white: #faf8f4;
+  --burnt: #e58a4e;
+  --lavender: #a99bcb;
+  --sage: #78958a;
+  --stone: #b8b6b1;
 
-  /* ---- brand, mapped onto the palette ---- */
-  --night: #00152b;
-  --night-2: #001d39;
-  --coal: #032646;
-  --coal-2: #06305a;
-  --ivory: #eef6fb;
-  --ivory-2: rgba(189, 216, 233, 0.86);
-  --ivory-3: rgba(189, 216, 233, 0.64);
-  --line-d: rgba(189, 216, 233, 0.13);
-  --line-d2: rgba(189, 216, 233, 0.26);
+  /* Older names, mapped onto the new palette. */
+  --navy: var(--charcoal);
+  --ocean: #2b2d36;
+  --steel: #6e6a73;
+  --teal: var(--sage);
+  --aqua: var(--lavender);
+  --sky: var(--burnt);
+  --ice: var(--champagne);
 
-  --cream: #e9f2f8;
-  --cream-2: #dbe9f3;
-  --plum: #001d39;
-  --midnight: #001d39;
-  --paper-text: #1f4568;
-  --line-p: rgba(0, 29, 57, 0.1);
+  --night: #0e0f13;
+  --night-2: var(--charcoal);
+  --coal: #1d1f26;
+  --coal-2: var(--charcoal-2);
+  --ivory: var(--warm-white);
+  --ivory-2: rgba(242, 232, 216, 0.86);
+  --ivory-3: rgba(242, 232, 216, 0.62);
+  --line-d: rgba(242, 232, 216, 0.12);
+  --line-d2: rgba(242, 232, 216, 0.24);
 
-  /* The action colour. Named orange for history; it is Sky Blue. */
-  --orange: var(--sky);
-  --orange-2: #a3d2f1;
-  --orange-ink: var(--navy);
+  --cream: var(--warm-white);
+  --cream-2: #f2ece1;
+  --plum: var(--charcoal);
+  --midnight: var(--charcoal);
+  --paper-text: #45413b;
+  --line-p: rgba(23, 25, 31, 0.1);
 
-  --aica: var(--sky);
-  --aica-deep: var(--ocean);
-  --cyan: var(--ice);
-  --ok: #3fae84;
-  --danger: #c63f52;
-  --warn: #b77a14;
+  --orange: var(--burnt);
+  --orange-2: #eda373;
+  --orange-ink: var(--charcoal);
 
-  /* AICA's voice: its waveform and the ambient light. */
-  --voice: linear-gradient(90deg, var(--teal) 0%, var(--sky) 55%, var(--ice) 100%);
+  --aica: var(--lavender);
+  --aica-deep: #6b5c93;
+  --cyan: var(--champagne);
+  --ok: var(--sage);
+  --danger: #c4554f;
+  --warn: #c9932f;
+
+  /* AICA's voice: lavender warming into champagne. */
+  --voice: linear-gradient(90deg, var(--lavender) 0%, #cdb9c0 50%, var(--champagne) 100%);
 
   /* ---- type ---- */
   --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
@@ -68,7 +76,7 @@
   --mono: 'DM Mono', ui-monospace, Consolas, monospace;
   --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
 
-  /* ---- space, shape: large panels, medium nests, compact controls ---- */
+  /* ---- space, shape: large panels, medium cards, compact controls ---- */
   --s-1: 0.25rem;
   --s-2: 0.5rem;
   --s-3: 0.75rem;
@@ -76,9 +84,9 @@
   --s-5: 1.5rem;
   --s-6: 2rem;
   --s-7: 3rem;
-  --r-panel: 26px;
-  --r-card: 18px;
-  --r-field: 12px;
+  --r-panel: 22px;
+  --r-card: 14px;
+  --r-field: 10px;
   --r-pill: 999px;
   --field-h: 48px;
   --gap-float: 12px;
@@ -91,121 +99,121 @@
   --dur-2: 0.28s;
   --dur-3: 0.5s;
 
-  /* ---- glass: dark (default) ---- */
+  /* ---- surfaces: dark (default) ----
+     Glass is reserved for floating layers (rail, header, dialogs, menus);
+     content cards are solid deep charcoal, so the two read differently. */
   --blur: 22px;
-  --blur-lg: 34px;
-  /* primary: the floating panels */
-  --glass: rgba(73, 118, 159, 0.16);
-  /* secondary: nested groups, a little deeper than the panel */
-  --glass-2: rgba(0, 29, 57, 0.42);
-  /* elevated: menus, dialogs, the header */
-  --glass-3: rgba(10, 65, 116, 0.42);
-  /* light: selected states */
-  --glass-light: rgba(189, 216, 233, 0.18);
-  --glass-edge: rgba(189, 216, 233, 0.14);
-  --glass-edge-hi: rgba(189, 216, 233, 0.3);
-  /* A soft top highlight: light catching the panel's upper edge. */
-  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.12);
-  --sh-1: 0 1px 2px rgba(0, 10, 25, 0.25);
-  --sh-2: 0 2px 6px rgba(0, 10, 25, 0.22), 0 18px 40px -16px rgba(0, 10, 25, 0.6);
-  --sh-3: 0 4px 10px rgba(0, 10, 25, 0.3), 0 40px 90px -24px rgba(0, 10, 25, 0.8);
-  --glow: radial-gradient(60% 120% at 100% 0%, rgba(123, 189, 232, 0.12), transparent 70%);
+  --blur-lg: 32px;
+  --glass: rgba(34, 36, 44, 0.62);
+  --glass-2: rgba(14, 15, 19, 0.42);
+  --glass-3: rgba(30, 32, 39, 0.74);
+  --glass-light: rgba(242, 232, 216, 0.1);
+  --glass-edge: rgba(242, 232, 216, 0.12);
+  --glass-edge-hi: rgba(242, 232, 216, 0.24);
+  --hl: inset 0 1px 0 rgba(242, 232, 216, 0.06);
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sh-2: 0 2px 6px rgba(0, 0, 0, 0.25), 0 18px 40px -16px rgba(0, 0, 0, 0.6);
+  --sh-3: 0 4px 10px rgba(0, 0, 0, 0.3), 0 40px 90px -24px rgba(0, 0, 0, 0.75);
+  --glow: radial-gradient(60% 120% at 100% 0%, rgba(229, 138, 78, 0.07), transparent 70%);
 
-  /* ---- surface: dark ---- */
-  --bg: var(--navy);
-  --bg-2: var(--glass-2);
-  --card: var(--glass);
+  --bg: var(--charcoal);
+  --bg-2: #262830;
+  --card: #1f2128;
   /* Opaque twin of --card, for sticky headers that content scrolls under. */
-  --card-solid: #0b2f52;
-  --field: rgba(0, 29, 57, 0.5);
-  --ink: var(--ivory);
-  --text: rgba(189, 216, 233, 0.9);
-  --muted: rgba(189, 216, 233, 0.66);
-  --orange-text: var(--sky);
+  --card-solid: #1f2128;
+  --field: #14161b;
+  --ink: var(--warm-white);
+  --text: rgba(242, 232, 216, 0.86);
+  --muted: var(--stone);
+  --orange-text: var(--burnt);
   --line: var(--glass-edge);
-  --line-strong: rgba(189, 216, 233, 0.26);
-  --control-border: rgba(189, 216, 233, 0.5);
-  --danger-ink: #ff9aa6;
-  --danger-bg: rgba(198, 63, 82, 0.2);
-  --ok-ink: #79dcb2;
-  --ok-bg: rgba(63, 174, 132, 0.18);
-  --warn-ink: #f2c46d;
-  --warn-bg: rgba(183, 122, 20, 0.22);
-  --info-bg: rgba(123, 189, 232, 0.16);
-  --info-ink: var(--ice);
+  --line-strong: rgba(242, 232, 216, 0.22);
+  --control-border: rgba(242, 232, 216, 0.46);
+  --danger-ink: #f2a196;
+  --danger-bg: rgba(196, 85, 79, 0.16);
+  --ok-ink: #a9c4b8;
+  --ok-bg: rgba(120, 149, 138, 0.18);
+  --warn-ink: #e8c27a;
+  --warn-bg: rgba(201, 147, 47, 0.16);
+  --info-bg: rgba(169, 155, 203, 0.14);
+  --info-ink: #cfc5e6;
 
-  /* The field everything floats over: deep navy, lit from two sides. */
+  /* The field everything sits on: charcoal with a low warm light from one
+     corner, a lavender one from the other, and a fine grain. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --atmos:
-    radial-gradient(60vw 50vh at 12% 8%, rgba(10, 65, 116, 0.85), transparent 70%),
-    radial-gradient(55vw 55vh at 92% 18%, rgba(73, 118, 159, 0.45), transparent 70%),
-    radial-gradient(70vw 60vh at 70% 105%, rgba(78, 142, 162, 0.32), transparent 70%),
-    linear-gradient(180deg, #002448 0%, var(--navy) 55%, #00152b 100%);
+    radial-gradient(55vw 45vh at 0% 0%, rgba(229, 138, 78, 0.1), transparent 70%),
+    radial-gradient(50vw 50vh at 100% 100%, rgba(169, 155, 203, 0.09), transparent 70%),
+    linear-gradient(180deg, #1a1c22 0%, var(--charcoal) 60%, #131418 100%);
 
   color-scheme: dark;
 }
 
-/* Light: milky ice glass over a pale field. Kept for people who run their
-   device in light mode. */
+/* Light: warm white paper, charcoal ink, the same accents darkened. */
 @media (prefers-color-scheme: light) {
   :root:not(.stage) {
-    --glass: rgba(255, 255, 255, 0.5);
-    --glass-2: rgba(189, 216, 233, 0.32);
-    --glass-3: rgba(255, 255, 255, 0.66);
-    --glass-light: rgba(255, 255, 255, 0.86);
-    --glass-edge: rgba(255, 255, 255, 0.7);
-    --glass-edge-hi: rgba(255, 255, 255, 0.95);
+    --glass: rgba(255, 253, 249, 0.72);
+    --glass-2: rgba(23, 25, 31, 0.035);
+    --glass-3: rgba(255, 253, 249, 0.82);
+    --glass-light: rgba(23, 25, 31, 0.06);
+    --glass-edge: rgba(23, 25, 31, 0.09);
+    --glass-edge-hi: rgba(23, 25, 31, 0.18);
     --hl: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    --sh-1: 0 1px 2px rgba(0, 29, 57, 0.06);
-    --sh-2: 0 2px 6px rgba(0, 29, 57, 0.05), 0 18px 40px -18px rgba(0, 29, 57, 0.2);
-    --sh-3: 0 4px 10px rgba(0, 29, 57, 0.06), 0 40px 90px -28px rgba(0, 29, 57, 0.35);
-    --glow: radial-gradient(60% 120% at 100% 0%, rgba(123, 189, 232, 0.22), transparent 70%);
+    --sh-1: 0 1px 2px rgba(23, 25, 31, 0.05);
+    --sh-2: 0 2px 6px rgba(23, 25, 31, 0.04), 0 18px 40px -18px rgba(23, 25, 31, 0.16);
+    --sh-3: 0 4px 10px rgba(23, 25, 31, 0.05), 0 40px 90px -28px rgba(23, 25, 31, 0.28);
+    --glow: radial-gradient(60% 120% at 100% 0%, rgba(229, 138, 78, 0.08), transparent 70%);
 
-    --bg: var(--cream);
-    --bg-2: var(--glass-2);
-    --card: var(--glass);
-    --card-solid: #f2f8fc;
-    --field: rgba(255, 255, 255, 0.72);
-    --ink: var(--navy);
+    --sky: #a64f1c;
+    --bg: var(--warm-white);
+    --bg-2: #f2ece1;
+    --card: #ffffff;
+    --card-solid: #ffffff;
+    --field: #ffffff;
+    --ink: var(--charcoal);
     --text: var(--paper-text);
-    --muted: #3a6080;
-    --orange-text: var(--ocean);
-    --line: rgba(0, 29, 57, 0.09);
-    --line-strong: rgba(0, 29, 57, 0.18);
-    --control-border: #49769f;
-    --danger-ink: #a8283b;
-    --danger-bg: rgba(198, 63, 82, 0.12);
-    --ok-ink: #17694a;
-    --ok-bg: rgba(63, 174, 132, 0.16);
-    --warn-ink: #7f5100;
-    --warn-bg: rgba(183, 122, 20, 0.14);
-    --info-bg: rgba(123, 189, 232, 0.24);
-    --info-ink: var(--ocean);
+    --muted: #5e5a53;
+    --orange-text: #a64f1c;
+    --line: rgba(23, 25, 31, 0.1);
+    --line-strong: rgba(23, 25, 31, 0.2);
+    --control-border: #7d776d;
+    --danger-ink: #a8323a;
+    --danger-bg: #f9e9e6;
+    --ok-ink: #3f5e52;
+    --ok-bg: #e8efeb;
+    --warn-ink: #8a5a00;
+    --warn-bg: #f8eedb;
+    --info-bg: #efebf6;
+    --info-ink: #6b5c93;
 
     --atmos:
-      radial-gradient(60vw 50vh at 10% 0%, rgba(123, 189, 232, 0.55), transparent 70%),
-      radial-gradient(55vw 55vh at 95% 20%, rgba(110, 162, 179, 0.35), transparent 70%),
-      radial-gradient(70vw 60vh at 60% 110%, rgba(73, 118, 159, 0.28), transparent 70%),
-      linear-gradient(180deg, #e3eff8 0%, #eef5fa 60%, #dcebf5 100%);
+      radial-gradient(55vw 45vh at 0% 0%, rgba(229, 138, 78, 0.08), transparent 70%),
+      radial-gradient(50vw 50vh at 100% 100%, rgba(169, 155, 203, 0.1), transparent 70%),
+      linear-gradient(180deg, #fbf9f5 0%, var(--warm-white) 60%, #f5f0e7 100%);
 
     color-scheme: light;
   }
 }
 
-/* The dark stage: deep navy, in any theme. */
+/* The dark stage: charcoal, in any theme. */
 .stage {
+  --sky: var(--burnt);
   --bg: var(--night);
-  --bg-2: rgba(0, 29, 57, 0.5);
-  --card: rgba(73, 118, 159, 0.14);
-  --card-solid: #0b2f52;
-  --field: rgba(0, 29, 57, 0.5);
-  --ink: var(--ivory);
+  --bg-2: rgba(14, 15, 19, 0.5);
+  --card: #1f2128;
+  --card-solid: #1f2128;
+  --field: #14161b;
+  --ink: var(--warm-white);
   --text: var(--ivory-2);
-  --muted: var(--ivory-3);
-  --orange-text: var(--sky);
+  --muted: var(--stone);
+  --orange-text: var(--burnt);
   --line: var(--line-d);
   --line-strong: var(--line-d2);
-  --glass: rgba(73, 118, 159, 0.16);
-  --glass-edge: rgba(189, 216, 233, 0.14);
-  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.12);
+  --glass: rgba(34, 36, 44, 0.62);
+  --glass-2: rgba(14, 15, 19, 0.42);
+  --glass-light: rgba(242, 232, 216, 0.1);
+  --glass-edge: rgba(242, 232, 216, 0.12);
+  --glass-edge-hi: rgba(242, 232, 216, 0.24);
+  --hl: inset 0 1px 0 rgba(242, 232, 216, 0.06);
   color-scheme: dark;
 }

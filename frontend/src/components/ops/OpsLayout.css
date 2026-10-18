@@ -23,9 +23,9 @@
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   background:
-    radial-gradient(160% 50% at 0% 0%, rgb(123 189 232 / 0.16), transparent 65%),
-    rgba(0, 21, 43, 0.82);
-  box-shadow: inset 0 1px 0 rgba(189, 216, 233, 0.12), 0 40px 90px -24px rgba(0, 10, 25, 0.8);
+    radial-gradient(160% 50% at 0% 0%, rgb(169 155 203 / 0.16), transparent 65%),
+    rgba(14, 15, 19, 0.82);
+  box-shadow: inset 0 1px 0 rgba(242, 232, 216, 0.12), 0 40px 90px -24px rgba(0, 0, 0, 0.8);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.35);
   backdrop-filter: blur(var(--blur-lg)) saturate(1.35);
   overflow-y: auto;
@@ -85,8 +85,8 @@
   white-space: nowrap;
   transition: color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-.ops__link:hover { color: var(--ink); background: rgb(189 216 233 / 0.07); }
-.ops__link.active { color: var(--ink); font-weight: 600; background: rgb(189 216 233 / 0.16); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 0 0 1px rgb(189 216 233 / 0.22); }
+.ops__link:hover { color: var(--ink); background: rgb(242 232 216 / 0.07); }
+.ops__link.active { color: var(--ink); font-weight: 600; background: rgb(242 232 216 / 0.16); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 0 0 1px rgb(242 232 216 / 0.22); }
 .ops__link.active::before { display: none;
   content: '';
   position: absolute;
@@ -96,7 +96,7 @@
   width: 3px;
   border-radius: 0 3px 3px 0;
   background: var(--orange);
-  box-shadow: 0 0 12px rgb(123 189 232 / 0.6);
+  box-shadow: 0 0 12px rgb(169 155 203 / 0.6);
   animation: nav-mark 0.35s var(--out) both;
 }
 @keyframes nav-mark { from { transform: scaleY(0); } to { transform: none; } }

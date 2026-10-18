@@ -1,5 +1,7 @@
-/* The opener: the promise on the left, the floating console on the right.
-   Phones stack them, promise first. */
+/* The opener: the promise on the left, the floating console on the right,
+   lit like a film set — a warm key light from above-right, a cool lavender
+   fill from below-left, charcoal everywhere else. Phones stack them,
+   promise first. */
 
 .hero {
   position: relative;
@@ -10,27 +12,31 @@
   padding: calc(7rem + env(safe-area-inset-top)) 0 clamp(3rem, 8vh, 5rem);
   overflow: hidden;
 }
-/* Light falling on the console from above-right. */
+/* Key light: a soft warm volume falling across the console. */
 .hero::before {
   content: '';
   position: absolute;
   z-index: -1;
-  inset: -10% -10% auto 35%;
-  height: 90%;
+  inset: -20% -15% auto 30%;
+  height: 110%;
   background:
-    radial-gradient(closest-side at 60% 45%, rgba(123, 189, 232, 0.22), transparent 70%),
-    radial-gradient(closest-side at 40% 70%, rgba(10, 65, 116, 0.5), transparent 75%);
-  filter: blur(10px);
+    radial-gradient(closest-side at 62% 40%, rgba(229, 138, 78, 0.16), transparent 72%),
+    radial-gradient(closest-side at 70% 30%, rgba(242, 232, 216, 0.06), transparent 60%);
+  filter: blur(12px);
   pointer-events: none;
+  animation: key-light 16s ease-in-out infinite alternate;
 }
-/* A fine horizon line under the composition. */
+@keyframes key-light { to { transform: translate3d(-2%, 2%, 0) scale(1.04); } }
+/* Fill light, low and to the left; and a fine horizon under it all. */
 .hero::after {
   content: '';
   position: absolute;
   z-index: -1;
-  left: 0; right: 0; bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(189, 216, 233, 0.22), transparent);
+  inset: auto auto -20% -15%;
+  width: 60%;
+  height: 70%;
+  background: radial-gradient(closest-side, rgba(169, 155, 203, 0.12), transparent 75%);
+  pointer-events: none;
 }
 
 .hero__inner {
@@ -39,28 +45,23 @@
   align-items: center;
 }
 
-.hero__copy { display: grid; justify-items: start; gap: 0; max-width: 36rem; }
+.hero__copy { display: grid; justify-items: start; gap: 0; max-width: 37rem; }
 .hero__copy > * { animation: hero-in 1s var(--out) both; }
 .hero__copy > :nth-child(2) { animation-delay: 0.08s; }
 .hero__copy > :nth-child(3) { animation-delay: 0.16s; }
 .hero__copy > :nth-child(4) { animation-delay: 0.24s; }
 .hero__copy > :nth-child(5) { animation-delay: 0.32s; }
-.hero__copy > :nth-child(6) { animation-delay: 0.4s; }
 
 .hero__title {
-  margin-top: 1.4rem;
-  font-size: clamp(3rem, 1.2rem + 5.4vw, 6.2rem);
-  line-height: 0.95;
+  margin-top: 1.5rem;
+  font-size: clamp(2.8rem, 1.1rem + 4.6vw, 5.6rem);
+  line-height: 0.98;
   letter-spacing: -0.045em;
+  color: var(--warm-white);
 }
-.hero__title em { display: inline-block; padding-bottom: 0.06em; }
-
-.hero__in {
-  margin-top: 0.9rem;
-  font: 500 clamp(1.25rem, 0.9rem + 1.2vw, 1.75rem)/1.25 var(--display);
-  letter-spacing: -0.02em;
-  color: var(--ivory-3);
-}
+.hero__l1 { display: block; }
+/* The changing word: burnt orange warming into champagne. */
+.hero__l2 { display: block; color: var(--stone); font-weight: 500; letter-spacing: -0.035em; }
 
 /* The slot the word changes in. Every word is stacked in one cell; the cell
    eases to the width of the one on show. */
@@ -69,8 +70,8 @@
   display: inline-grid;
   vertical-align: bottom;
   overflow: hidden;
-  padding-bottom: 0.1em;
-  margin-bottom: -0.1em;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
   text-align: left;
   transition: width 0.6s var(--out);
 }
@@ -78,22 +79,26 @@
   grid-area: 1 / 1;
   justify-self: start;
   width: max-content;
-  padding-right: 0.05em;
-  font-weight: 700;
-  color: var(--sky);
+  padding-right: 0.06em;
+  font-weight: 780;
+  background: linear-gradient(100deg, var(--burnt) 0%, #f0b892 60%, var(--champagne) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   opacity: 0;
   transform: translateY(100%);
   transition: transform 0.6s var(--out), opacity 0.4s var(--ease);
 }
-.rot__word[lang='ta'] { font-family: var(--tamil); font-weight: 600; letter-spacing: 0; }
+.rot__word[lang='ta'] { font-family: var(--tamil); font-weight: 700; letter-spacing: 0; }
 .rot__word.is-on { opacity: 1; transform: none; }
 .rot__word.is-off { transform: translateY(-100%); }
 
 .hero__lead {
-  max-width: 32rem;
-  margin-top: 1.4rem;
+  max-width: 33rem;
+  margin-top: 1.5rem;
   color: var(--ivory-2);
   font-size: 1.08rem;
+  line-height: 1.65;
 }
 
 .hero__ctas { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
@@ -106,30 +111,34 @@
   transition: background-color 0.3s var(--ease), color 0.3s var(--ease);
 }
 .hero__play svg { width: 14px; height: 14px; margin-left: 2px; fill: currentColor; }
-.hero__watch:hover .hero__play { background: var(--sky); color: var(--navy); }
-.hero__dur { font: 500 0.75rem var(--mono); font-style: normal; color: var(--ivory-3); }
+.hero__watch:hover .hero__play { background: var(--champagne); color: var(--charcoal); }
+.hero__dur { font: 500 0.75rem var(--mono); font-style: normal; color: var(--stone); }
 
 .hero__facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 2.25rem;
+  gap: 0.5rem 1.5rem;
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line-d);
 }
-.hero__facts li {
-  padding: 0.45rem 0.85rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: 999px;
-  background: var(--glass-2);
-  font-size: 0.85rem;
-  color: var(--ivory-3);
+.hero__facts li { font-size: 0.9rem; color: var(--stone); }
+.hero__facts li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 0.55rem;
+  vertical-align: 0.12em;
+  border-radius: 50%;
+  background: var(--sage);
 }
-.hero__facts b { font-weight: 650; color: var(--ivory); }
-.hero__facts [lang='ta'] { font-family: var(--tamil); }
+.hero__facts b { font-weight: 650; color: var(--champagne); }
 
 @keyframes hero-in { from { opacity: 0; transform: translateY(18px); } }
 
 @media (min-width: 1040px) {
-  .hero__inner { grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr); gap: 3rem; }
+  .hero__inner { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 3rem; }
 }
 
 @media (max-width: 1039px) {
@@ -137,8 +146,8 @@
   .hero__copy { max-width: 40rem; }
 }
 @media (max-width: 560px) {
-  .hero__title { font-size: clamp(2.6rem, 12vw, 3.4rem); }
+  .hero__title { font-size: clamp(2.35rem, 11vw, 3.1rem); }
   .hero__ctas { width: 100%; }
   .hero__ctas .btn { flex: 1 1 100%; }
-  .hero__facts { margin-top: 1.75rem; }
+  .hero__facts { flex-direction: column; gap: 0.5rem; margin-top: 2rem; }
 }

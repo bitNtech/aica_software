@@ -1,60 +1,77 @@
 /* ======================================================================
-   AICA — the product page. Its own identity, not the parent site's: a
-   spatial interface floating in a deep-blue environment, built on seven
-   blues —
+   AICA — the product page. Midnight luxury meets warm intelligence: a
+   cinematic charcoal foundation, champagne type and surfaces, burnt orange
+   for every action, lavender and sage used sparingly for depth.
 
-     Deep Navy #001D39 · Ocean Blue #0A4174 · Steel Blue #49769F ·
-     Muted Teal #4E8EA2 · Soft Aqua #6EA2B3 · Sky Blue #7BBDE8 ·
-     Pale Ice #BDD8E9
+     Midnight charcoal #17191F · Deep charcoal #22242C ·
+     Champagne ivory #F2E8D8 · Warm white #FAF8F4 ·
+     Burnt orange #E58A4E · Muted lavender #A99BCB · Soft sage #78958A
 
-   Sky Blue is every action. Red, amber and green appear only where they
+   Dark sections and warm-white editorial sections (.paper) alternate. On
+   warm white, accent text darkens to stay readable (orange #A64F1C 5.2:1,
+   lavender #6B5C93 5.5:1). Red, amber and green appear only where they
    mean missed, waiting and done.
+
+   Historical names are kept so the section CSS keeps working: --sky is
+   the accent (burnt orange), --ice the light highlight (champagne),
+   --navy the ground (charcoal), --aqua lavender, --teal sage.
    ====================================================================== */
 
 :root {
-  --navy: #001d39;
-  --ocean: #0a4174;
-  --steel: #49769f;
-  --teal: #4e8ea2;
-  --aqua: #6ea2b3;
-  --sky: #7bbde8;
-  --ice: #bdd8e9;
+  --charcoal: #17191f;
+  --charcoal-2: #22242c;
+  --champagne: #f2e8d8;
+  --warm-white: #faf8f4;
+  --burnt: #e58a4e;
+  --lavender: #a99bcb;
+  --sage: #78958a;
+  --stone: #b8b6b1;
 
-  --night: #00152b;
-  --coal: #032646;
-  --coal-2: #06305a;
-  --coal-3: #032646;
-  --ivory: #eef6fb;
-  --ivory-2: rgba(189, 216, 233, 0.86);
-  --ivory-3: rgba(189, 216, 233, 0.64);
-  --line-d: rgba(189, 216, 233, 0.13);
-  --line-d2: rgba(189, 216, 233, 0.26);
+  --navy: var(--charcoal);
+  --ocean: #2b2d36;
+  --steel: #6e6a73;
+  --teal: var(--sage);
+  --aqua: var(--lavender);
+  --sky: var(--burnt);
+  --ice: var(--champagne);
 
-  /* The action colour — historic name, Sky Blue value. */
-  --orange: var(--sky);
-  --orange-2: #a3d2f1;
-  --orange-ink: var(--navy);
-  --pink: var(--aqua);
-  --plum: var(--navy);
+  --night: #0e0f13;
+  --coal: #1d1f26;
+  --coal-2: var(--charcoal-2);
+  --coal-3: #1d1f26;
+  --ivory: var(--warm-white);
+  --ivory-2: rgba(242, 232, 216, 0.86);
+  --ivory-3: var(--stone);
+  --line-d: rgba(242, 232, 216, 0.14);
+  --line-d2: rgba(242, 232, 216, 0.26);
 
-  --aica: var(--aqua);
-  --aica-deep: var(--ocean);
-  --ok: #3ccf91;
-  --miss: #ff4d5e;
+  --orange: var(--burnt);
+  --orange-2: #eda373;
+  --orange-ink: var(--charcoal);
+  --pink: var(--lavender);
+  --plum: var(--charcoal);
 
-  /* ---- glass ---- */
-  --glass: rgba(10, 65, 116, 0.28);
-  --glass-2: rgba(0, 29, 57, 0.5);
-  --glass-3: rgba(10, 65, 116, 0.4);
-  --glass-light: rgba(189, 216, 233, 0.16);
-  --glass-edge: rgba(189, 216, 233, 0.16);
-  --glass-edge-hi: rgba(189, 216, 233, 0.32);
+  --aica: var(--lavender);
+  --aica-deep: #6b5c93;
+  --ok: #8fb0a3;
+  --miss: #e8776c;
+
+  /* ---- surfaces ----
+     Glass only for floating layers (nav, the hero console, overlays);
+     content surfaces are solid deep charcoal. */
+  --glass: rgba(34, 36, 44, 0.58);
+  --glass-2: rgba(14, 15, 19, 0.45);
+  --glass-3: rgba(30, 32, 39, 0.7);
+  --glass-light: rgba(242, 232, 216, 0.1);
+  --glass-edge: rgba(242, 232, 216, 0.14);
+  --glass-edge-hi: rgba(242, 232, 216, 0.26);
+  --solid: #1f2128;
   --blur: 24px;
-  --hl: inset 0 1px 0 rgba(189, 216, 233, 0.14);
-  --float: 0 20px 60px rgba(0, 8, 24, 0.35);
-  --float-lg: 0 40px 100px -20px rgba(0, 8, 24, 0.7);
-  --r-panel: 28px;
-  --r-card: 20px;
+  --hl: inset 0 1px 0 rgba(242, 232, 216, 0.08);
+  --float: 0 20px 60px rgba(0, 0, 0, 0.35);
+  --float-lg: 0 40px 100px -20px rgba(0, 0, 0, 0.7);
+  --r-panel: 24px;
+  --r-card: 16px;
 
   --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
   --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -69,11 +86,12 @@
   --max: 1240px;
   --app-bottom-nav: env(safe-area-inset-bottom);
 
-  /* Surface tokens: the whole page lives in the dark blue environment. */
-  --bg: var(--navy);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  --bg: var(--charcoal);
   --bg-2: var(--glass-2);
-  --card: var(--glass);
-  --ink: var(--ivory);
+  --card: var(--solid);
+  --ink: var(--warm-white);
   --text: var(--ivory-2);
   --line: var(--line-d);
 
@@ -81,13 +99,45 @@
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --glass: rgba(6, 48, 90, 0.94); --glass-3: rgba(8, 56, 102, 0.96); }
+  :root { --glass: rgba(34, 36, 44, 0.96); --glass-3: rgba(30, 32, 39, 0.97); }
 }
 @media (max-width: 760px) { :root { --blur: 16px; } }
 
-/* Kept for the sections that used to be paper: now a slightly raised band
-   of the same environment, so the page reads as one continuous space. */
-.paper { color: var(--text); }
+/* ---- warm-white editorial sections ----
+   The same components, re-tokened for paper: charcoal ink, warm surfaces,
+   darker accents. Product UI inside (call cards) stays dark — see .cs. */
+.paper {
+  --ivory: var(--charcoal);
+  --ivory-2: #45413b;
+  --ivory-3: #5e5a53;
+  --ice: var(--charcoal);
+  --navy: var(--warm-white);
+  --sky: #a64f1c;
+  --aqua: #6b5c93;
+  --line-d: rgba(23, 25, 31, 0.1);
+  --line-d2: rgba(23, 25, 31, 0.2);
+  --glass: #ffffff;
+  --glass-2: #f4efe6;
+  --glass-light: rgba(23, 25, 31, 0.06);
+  --glass-edge: rgba(23, 25, 31, 0.1);
+  --glass-edge-hi: rgba(23, 25, 31, 0.2);
+  --hl: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --float: 0 1px 2px rgba(23, 25, 31, 0.05), 0 18px 40px -18px rgba(23, 25, 31, 0.18);
+  --float-lg: 0 2px 6px rgba(23, 25, 31, 0.05), 0 40px 90px -30px rgba(23, 25, 31, 0.3);
+  --ink: var(--charcoal);
+  --text: #45413b;
+  --line: rgba(23, 25, 31, 0.1);
+  position: relative;
+  isolation: isolate;
+  color: var(--text);
+  background:
+    var(--grain),
+    radial-gradient(60% 50% at 100% 0%, rgba(229, 138, 78, 0.08), transparent 70%),
+    radial-gradient(50% 50% at 0% 100%, rgba(169, 155, 203, 0.1), transparent 70%),
+    var(--warm-white);
+  color-scheme: light;
+}
+.paper :focus-visible { outline-color: #a64f1c; }
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -104,7 +154,7 @@ html::-webkit-scrollbar { display: none; }
 
 body {
   margin: 0;
-  background: var(--navy);
+  background: var(--charcoal);
   color: var(--ivory-2);
   font: 400 1.0625rem/1.6 var(--sans);
   letter-spacing: 0.003em;
@@ -115,8 +165,8 @@ body {
   font-synthesis: none;
 }
 
-/* The environment: a fixed field of blue light behind every section, and
-   two soft lights drifting through it. */
+/* The environment: a charcoal field with fine grain, a low warm light and
+   a lavender one, drifting very slowly. */
 body::before, body::after {
   content: '';
   position: fixed;
@@ -126,16 +176,16 @@ body::before, body::after {
 body::before {
   inset: 0;
   background:
-    radial-gradient(60vw 55vh at 8% 0%, rgba(10, 65, 116, 0.9), transparent 70%),
-    radial-gradient(50vw 50vh at 100% 30%, rgba(73, 118, 159, 0.4), transparent 70%),
-    radial-gradient(70vw 60vh at 50% 110%, rgba(78, 142, 162, 0.3), transparent 70%),
-    linear-gradient(180deg, #002448, var(--navy) 60%, var(--night));
+    var(--grain),
+    radial-gradient(60vw 50vh at 0% 0%, rgba(229, 138, 78, 0.09), transparent 70%),
+    radial-gradient(50vw 50vh at 100% 40%, rgba(169, 155, 203, 0.08), transparent 70%),
+    linear-gradient(180deg, #1a1c22, var(--charcoal) 60%, var(--night));
 }
 body::after {
   inset: -20vmax;
   background:
-    radial-gradient(26vmax 26vmax at 30% 30%, rgba(123, 189, 232, 0.12), transparent 70%),
-    radial-gradient(22vmax 22vmax at 75% 70%, rgba(110, 162, 179, 0.14), transparent 70%);
+    radial-gradient(26vmax 26vmax at 30% 30%, rgba(229, 138, 78, 0.05), transparent 70%),
+    radial-gradient(22vmax 22vmax at 75% 70%, rgba(169, 155, 203, 0.06), transparent 70%);
   animation: env-drift 40s var(--ease) infinite alternate;
 }
 @keyframes env-drift {
@@ -154,7 +204,7 @@ button { cursor: pointer; }
 a, button, label, summary, input, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--sky);
+  outline: 2px solid var(--burnt);
   outline-offset: 3px;
 }
 
@@ -166,7 +216,7 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 .skip-link {
   position: fixed; top: 0; left: 0; z-index: 10000;
   padding: 0.85rem 1.25rem;
-  background: var(--sky); color: var(--navy);
+  background: var(--burnt); color: var(--charcoal);
   font: 600 0.85rem var(--sans);
   text-decoration: none;
   border-radius: 0 0 12px 0;
@@ -208,8 +258,8 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--sky);
-  box-shadow: 0 0 10px var(--sky);
+  background: var(--lavender);
+  box-shadow: 0 0 10px rgba(169, 155, 203, 0.7);
 }
 .label i { font-style: normal; opacity: 0.5; }
 .label--quiet { color: var(--ivory-3); }
@@ -226,11 +276,14 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 }
 .display em {
   font-style: normal;
-  background: linear-gradient(100deg, var(--sky) 0%, var(--ice) 100%);
+  /* Highlights are champagne into lavender; orange is kept for actions. */
+  background: linear-gradient(100deg, var(--champagne) 0%, #cdbfe0 55%, var(--lavender) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+
+.paper .display em { background: linear-gradient(100deg, #6b5c93 0%, #8a6a8e 100%); -webkit-background-clip: text; background-clip: text; }
 
 .h2 { font-size: clamp(2.2rem, 1.2rem + 3.6vw, 4.2rem); }
 
@@ -262,11 +315,11 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 .btn:active:not(:disabled) { transform: translateY(0) scale(0.98); transition-duration: 0.08s; }
 
 .btn--orange {
-  background: linear-gradient(180deg, #a3d2f1, var(--sky));
+  background: linear-gradient(180deg, #eda373, var(--burnt));
   color: var(--navy);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 21, 43, 0.3), 0 12px 30px -12px rgba(123, 189, 232, 0.8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -12px rgba(229, 138, 78, 0.55);
 }
-.btn--orange:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 21, 43, 0.3), 0 18px 40px -12px rgba(123, 189, 232, 0.95); }
+.btn--orange:hover:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 40px -12px rgba(229, 138, 78, 0.7); }
 
 .btn--white { background: var(--ivory); color: var(--navy); }
 .btn--white:hover { background: #fff; }
@@ -305,3 +358,7 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   }
   .rise.is-waiting { opacity: 1; transform: none; }
 }
+
+/* AICA's orb is a blue render. A light CSS grade warms it toward lavender
+   and champagne to sit in this palette; the file itself is untouched. */
+img[src*='aica-orb'] { filter: hue-rotate(38deg) saturate(0.55) brightness(1.06) contrast(1.02); }

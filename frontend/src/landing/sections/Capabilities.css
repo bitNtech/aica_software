@@ -9,7 +9,7 @@
   letter-spacing: -0.055em;
   white-space: nowrap;
 }
-.caps__meet { background: linear-gradient(180deg, var(--ivory) 20%, rgba(189, 216, 233, 0.2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.caps__meet { background: linear-gradient(180deg, var(--ivory) 20%, rgba(242, 232, 216, 0.2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .caps__meet .ghost { font-weight: 400; color: transparent; }
 .caps__meet em { -webkit-text-fill-color: var(--sky); }
 .caps__intro { display: grid; gap: 1rem; max-width: 44rem; }
@@ -59,7 +59,7 @@
   .caps__list { gap: 32vh; padding-block: 16vh; }
   .caps__beat { align-content: center; padding: 2rem 2rem 2.2rem; }
   .caps__beat:not(.is-active) { opacity: 0.38; }
-  .caps__beat.is-active { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(189, 216, 233, 0.1), transparent 45%), var(--glass); box-shadow: var(--hl), var(--float); }
+  .caps__beat.is-active { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 45%), var(--glass); box-shadow: var(--hl), var(--float); }
   .caps__beat::before {
     content: '';
     position: absolute; left: -1.75rem; top: 50%;

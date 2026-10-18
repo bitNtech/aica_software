@@ -8,10 +8,10 @@
   text-align: center;
 }
 .end__rings { position: absolute; left: 50%; top: 46%; z-index: -1; width: min(640px, 110vw); aspect-ratio: 1; transform: translate(-50%, -50%); }
-.end__rings i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(123, 189, 232, 0.16); animation: end-drift 22s linear infinite; }
-.end__rings i:first-child { background: radial-gradient(closest-side, rgba(123, 189, 232, 0.2), rgba(10, 65, 116, 0.18) 60%, transparent); border-color: transparent; }
+.end__rings i { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(229, 138, 78, 0.16); animation: end-drift 22s linear infinite; }
+.end__rings i:first-child { background: radial-gradient(closest-side, rgba(229, 138, 78, 0.2), rgba(34, 36, 44, 0.18) 60%, transparent); border-color: transparent; }
 .end__rings i:nth-child(2) { inset: 8%; border-radius: 48% 52% 50% 50%; animation-duration: 28s; animation-direction: reverse; }
-.end__rings i:nth-child(3) { inset: -6%; border-color: rgba(189, 216, 233, 0.1); border-radius: 52% 48% 49% 51%; animation-duration: 36s; }
+.end__rings i:nth-child(3) { inset: -6%; border-color: rgba(242, 232, 216, 0.1); border-radius: 52% 48% 49% 51%; animation-duration: 36s; }
 @keyframes end-drift { to { transform: rotate(360deg); } }
 
 .end__inner {
@@ -21,7 +21,7 @@
   padding: clamp(2.25rem, 6vw, 4rem) clamp(1.25rem, 4vw, 3rem);
   border: 1px solid var(--glass-edge-hi);
   border-radius: calc(var(--r-panel) + 8px);
-  background: linear-gradient(160deg, rgba(189, 216, 233, 0.12), transparent 45%), var(--glass);
+  background: linear-gradient(160deg, rgba(242, 232, 216, 0.12), transparent 45%), var(--glass);
   box-shadow: var(--hl), var(--float-lg);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
   backdrop-filter: blur(var(--blur)) saturate(1.4);
@@ -32,7 +32,7 @@
   font-weight: 800;
   line-height: 0.85;
   letter-spacing: -0.055em;
-  background: linear-gradient(180deg, #fff 20%, rgba(189, 216, 233, 0.45));
+  background: linear-gradient(180deg, #fff 20%, rgba(242, 232, 216, 0.45));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

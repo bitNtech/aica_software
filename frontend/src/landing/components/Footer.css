@@ -28,8 +28,8 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #eef6fb 0, var(--sky) 30%, var(--ocean) 75%);
-  box-shadow: 0 0 22px rgba(123, 189, 232, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  background: radial-gradient(circle at 35% 30%, #faf8f4 0, var(--sky) 30%, var(--ocean) 75%);
+  box-shadow: 0 0 22px rgba(229, 138, 78, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 .foot__line { color: var(--ivory-2); }
 .foot__by { font-size: 0.9rem; color: var(--ivory-3); }

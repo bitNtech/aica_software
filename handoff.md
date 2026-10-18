@@ -1,7 +1,7 @@
 # Project Handoff
 
 ## Status
-- Latest (2026-10-18, uncommitted, branch `feat/premium-redesign`): mobile/tablet pass on top of the homepage rebuild; homepage rebuilt as AICA's own spatial product page, plus a page-by-page console pass, on top of the seven-blue glass system. See the homepage entry. Not committed or pushed.
+- Latest (2026-10-18, uncommitted, branch `feat/premium-redesign`): warm charcoal/champagne/orange identity replacing the blue palette (see that entry). Earlier, committed: mobile/tablet pass on top of the homepage rebuild; homepage rebuilt as AICA's own spatial product page, plus a page-by-page console pass, on top of the seven-blue glass system. See the homepage entry. Not committed or pushed.
 - Previously: pushed to `main` directly (merged with `origin/main`'s PR #23) on 2026-10-18, then fixed the 5 CI test failures the push exposed; see the 2026-10-18 entry. The 2026-10-17 report/heatmap work and the 2026-10-16 permissions rework are both committed and on `main` now.
 - Phase: Auth backend (FastAPI + Firebase) built and connected to the console frontend. **Not yet run against the real Firebase project:** it's waiting on `backend/.env`, the service-account key and the Google OAuth client (see "Needed from the user").
 - Implementation approval:
@@ -18,6 +18,15 @@
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
+
+## Warm identity: charcoal, champagne, burnt orange (2026-10-18, branch `feat/premium-redesign`, uncommitted)
+Approved 2026-10-18: replace the all-blue look with charcoal #17191F / #22242C, champagne #F2E8D8, warm white #FAF8F4, burnt orange #E58A4E (actions only), lavender #A99BCB (depth, AICA's voice), sage #78958A (positive/live), secondary text #B8B6B1. Console: warm-white light theme + charcoal dark (device setting). Homepage: dark and warm-white sections alternate. Orb image warm-graded with a CSS filter (file untouched).
+- **Contrast (checked):** champagne/charcoal 14.5:1, #B8B6B1/charcoal 8.7:1, orange/charcoal and charcoal-on-orange 6.8:1, lavender 6.9:1, sage 5.3:1. On warm white accents darken: orange text #A64F1C 5.2:1, lavender #6B5C93 5.5:1, sage #3F5E52 6.8:1. Buttons always use the bright #E58A4E fill (charcoal text) — never the darkened text orange.
+- **Tokens:** `styles/tokens.css` and `landing/index.css` rewritten. Old names kept and remapped (`--sky` = accent orange, `--ice` = champagne, `--navy` = charcoal, `--aqua` = lavender, `--teal` = sage). New: `--charcoal`, `--champagne`, `--warm-white`, `--burnt`, `--lavender`, `--sage`, `--stone`, `--grain` (inline SVG noise). Content cards are solid charcoal (`--card`); glass only for floating layers.
+- **Homepage:** story order now hero → problem → film → what it does → languages → use cases → how it works → demo → end (App.tsx, nav links follow). `.paper` = warm-white editorial section with re-tokened colours (film, languages, steps). Hero headline "Every call answered, in [தமிழ்/English/Tanglish]" with the rotating word; facts strip; key/fill lighting. Heading highlights champagne→lavender (lavender on paper); orange reserved for CTAs, the hero word, timers.
+- **Console:** every hard-coded blue remapped; charts sage/lavender/orange (distinct hues); heatmap orange; light-mode selected tab is a charcoal pill; `theme-color` #17191F.
+- **Verified:** `tsc -b`, `npm run build` (incl. prerender), `vitest run` 269/269. Screenshots: homepage sections 1440 + 390, console home/agents/workspace/team/calls dark + light, sign-in, ops.
+- **Not verified:** real devices/Safari, live backend.
 
 ## Mobile and tablet pass (2026-10-18, branch `feat/premium-redesign`, uncommitted)
 - **Root cause of the "misaligned" phone view:** the landing page was 435px wide on a 390px phone (decorative glows past the edge). `overflow-x: hidden` on body doesn't stop phones widening the layout viewport, so the fixed nav stretched off-screen. Now `overflow-x: clip` on html and body (`landing/index.css`). Scan at 360/390/768: no element wider than the screen except clipped decoration.

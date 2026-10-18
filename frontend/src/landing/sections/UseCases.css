@@ -15,9 +15,9 @@
   transition: border-color 0.35s var(--ease), background-color 0.35s var(--ease), transform 0.4s var(--out);
 }
 @media (hover: hover) {
-  .use:not(.is-open):hover { border-color: var(--glass-edge-hi); background: rgba(10, 65, 116, 0.36); transform: translateY(-2px); }
+  .use:not(.is-open):hover { border-color: var(--glass-edge-hi); background: rgba(34, 36, 44, 0.36); transform: translateY(-2px); }
 }
-.use.is-open { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(189, 216, 233, 0.1), transparent 45%), var(--glass); }
+.use.is-open { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 45%), var(--glass); }
 .use h3 { position: relative; font-size: inherit; }
 .use__row {
   display: flex;
@@ -48,7 +48,7 @@
 .use__name { font: 760 clamp(1.4rem, 1rem + 1.8vw, 2.4rem)/1.05 var(--display); letter-spacing: -0.03em; }
 .use__tag {
   padding: 0.3rem 0.7rem;
-  border: 1px solid rgba(123, 189, 232, 0.45);
+  border: 1px solid rgba(229, 138, 78, 0.45);
   border-radius: 99px;
   font: 500 0.66rem var(--mono);
   letter-spacing: 0.12em;
@@ -60,7 +60,7 @@
 .use__plus::before, .use__plus::after { content: ''; position: absolute; top: 50%; left: 30%; width: 40%; height: 2px; margin-top: -1px; border-radius: 2px; background: currentColor; transition: transform 0.45s var(--out); }
 .use__plus::after { transform: rotate(90deg); }
 .use.is-open .use__plus::after { transform: rotate(0deg); }
-.use.is-open .use__plus { color: var(--sky); border-color: rgba(123, 189, 232, 0.5); }
+.use.is-open .use__plus { color: var(--sky); border-color: rgba(229, 138, 78, 0.5); }
 
 /* Opens to its own height with no measuring: a 0fr → 1fr grid row. */
 .use__panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.55s var(--out); }

@@ -22,15 +22,15 @@
   padding: 8px 8px 8px 18px;
   border: 1px solid var(--glass-edge);
   border-radius: 999px;
-  background: rgba(0, 29, 57, 0.42);
-  box-shadow: var(--hl), 0 12px 40px -12px rgba(0, 8, 24, 0.6);
+  background: rgba(23, 25, 31, 0.74);
+  box-shadow: var(--hl), 0 12px 40px -12px rgba(0, 0, 0, 0.6);
   -webkit-backdrop-filter: blur(22px) saturate(1.5);
   backdrop-filter: blur(22px) saturate(1.5);
   overflow: hidden;
   pointer-events: auto;
   transition: background-color 0.4s var(--ease), border-color 0.4s var(--ease);
 }
-.is-scrolled .nav__bar { background: rgba(0, 29, 57, 0.66); border-color: var(--glass-edge-hi); }
+.is-scrolled .nav__bar { background: rgba(23, 25, 31, 0.86); border-color: var(--glass-edge-hi); }
 
 .nav__brand {
   display: inline-flex;
@@ -50,13 +50,13 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #eef6fb 0, var(--sky) 30%, var(--ocean) 75%);
-  box-shadow: 0 0 18px rgba(123, 189, 232, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  background: radial-gradient(circle at 35% 30%, #faf8f4 0, var(--sky) 30%, var(--ocean) 75%);
+  box-shadow: 0 0 18px rgba(229, 138, 78, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 .nav__mark i {
   position: absolute;
   inset: -4px;
-  border: 1px solid rgba(123, 189, 232, 0.35);
+  border: 1px solid rgba(229, 138, 78, 0.35);
   border-radius: 50%;
   animation: mark-pulse 3.2s var(--ease) infinite;
 }
@@ -70,7 +70,7 @@
   margin-left: auto;
   padding: 3px;
   border-radius: 999px;
-  background: rgba(0, 21, 43, 0.4);
+  background: rgba(14, 15, 19, 0.4);
 }
 .nav__link {
   display: inline-flex;
@@ -110,18 +110,18 @@
   min-height: 44px;
   padding: 0 1.15rem;
   border-radius: 999px;
-  background: linear-gradient(180deg, #a3d2f1, var(--sky));
+  background: linear-gradient(180deg, #eda373, var(--sky));
   color: var(--navy);
   font: 700 0.875rem var(--sans);
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 22px -10px rgba(123, 189, 232, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 8px 22px -10px rgba(229, 138, 78, 0.9);
   transition: transform 0.3s var(--out), box-shadow 0.3s var(--out);
 }
 .nav__cta:hover { transform: translateY(-1px); }
 
 /* Reading progress: a hairline along the bar's foot. */
-.nav__progress { position: absolute; left: 22px; right: 22px; bottom: 0; height: 1px; background: rgba(189, 216, 233, 0.08); }
+.nav__progress { position: absolute; left: 22px; right: 22px; bottom: 0; height: 1px; background: rgba(242, 232, 216, 0.08); }
 .nav__progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--sky), var(--ice)); transform: scaleX(0); transform-origin: left; }
 
 @media (max-width: 1080px) { .nav__links { display: none; } }
