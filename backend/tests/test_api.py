@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app import ratelimit
 from app.main import create_app
 from app.sessions import COOKIE
 from app.store import OrgDoc, UserDoc
@@ -16,7 +15,6 @@ PW = "river-lamp-2026-blue"
 
 @pytest.fixture()
 def env():
-    ratelimit.reset()
     svc, fb, store, mailer = make_services()
     client = TestClient(create_app(svc.settings, svc), base_url="http://localhost:5173")
     with client:
@@ -77,7 +75,7 @@ def test_login_sets_httponly_cookie_and_returns_session(env):
     assert "Max-Age" not in set_cookie  # browser-session cookie without "keep me signed in"
     body = r.json()
     assert body["user"]["memberships"][0] == {
-        "orgSlug": "arogya", "orgName": "Arogya", "city": "Coimbatore", "role": "owner", "orgStatus": "active", "statusReason": None,
+        "orgSlug": "arogya", "orgName": "Arogya", "city": "Coimbatore", "role": "owner", "permissions": None, "orgStatus": "active", "statusReason": None,
     }
     assert client.get("/api/auth/session").json()["user"]["email"] == "owner@arogya.in"
 
@@ -134,7 +132,6 @@ def test_cors_refuses_other_origins(env):
 
 
 def test_samesite_follows_settings():
-    ratelimit.reset()
     svc, fb, store, _ = make_services(cookie_samesite="none", cookie_secure=True)
     seed_org(fb, store)
     with TestClient(create_app(svc.settings, svc), base_url="https://api.example") as client:
@@ -143,7 +140,6 @@ def test_samesite_follows_settings():
 
 
 def test_google_returns_to_the_frontend_from_a_separate_api():
-    ratelimit.reset()
     svc, fb, store, _ = make_services(api_url="http://localhost:8000")
     assert svc.settings.google_redirect_uri == "http://localhost:8000/api/auth/google/callback"
     fb.google_users["gtok"] = {"email": "doc@gmail.com", "name": "Dr. Priya"}
@@ -434,7 +430,6 @@ def test_demo_request_is_emailed_to_the_team(env):
 
 
 def test_demo_request_recipients_come_from_settings():
-    ratelimit.reset()
     svc, _, _, mailer = make_services(demo_request_to="sales@bitntech.in, support@bitntech.in")
     with TestClient(create_app(svc.settings, svc), base_url="http://localhost:5173") as client:
         assert post(client, "/api/leads/demo", demo_body()).status_code == 204

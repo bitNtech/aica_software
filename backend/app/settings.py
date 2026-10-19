@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     invite_days: int = 7
     # How long a master admin's "act as" session lasts.
     act_as_minutes: int = Field(30, ge=5, le=120)
+    # "text" for a terminal, "json" for log search (the default on Vercel).
+    log_format: Literal["text", "json"] = "text"
 
     # Vercel system variables (hostnames, no scheme), set only on Vercel.
     # Only production deployments exist (see docs/cicd.md).
@@ -64,7 +66,7 @@ class Settings(BaseSettings):
         """The frontend and this API are deployed separately, so on Vercel
         APP_URL must be set: this deployment's own address is the API's, not
         the frontend's. API_URL defaults to the project's production address,
-        and cookies to Secure. Explicitly set values always win."""
+        cookies to Secure and logs to JSON. Explicitly set values always win."""
         if self.vercel_url:
             if "app_url" not in self.model_fields_set:
                 raise ValueError("APP_URL must be set on Vercel: the frontend's public URL, e.g. https://aica.bitntech.in")
@@ -73,6 +75,8 @@ class Settings(BaseSettings):
                 self.api_url = f"https://{own}"
             if "cookie_secure" not in self.model_fields_set:
                 self.cookie_secure = True
+            if "log_format" not in self.model_fields_set:
+                self.log_format = "json"
         if self.cookie_samesite == "none" and not self.cookie_secure:
             raise ValueError("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
         return self

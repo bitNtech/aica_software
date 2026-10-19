@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { useConsole } from '../../console/ConsoleProvider'
+import type { ConsoleSection } from '../../console/types'
 import { useOrg } from '../../console/useOrg'
 
 interface Props {
@@ -12,6 +13,9 @@ interface Props {
   docTitle: string
   /** Buttons beside the title (below the lede on a phone), e.g. "New agent". */
   actions?: ReactNode
+  /** The section the page shows, when it can be served by the API: no demo
+   * note once that section is live. */
+  section?: ConsoleSection
   children: ReactNode
 }
 
@@ -22,7 +26,7 @@ interface Props {
  * new page rather than on <body>. Tabs within a page keep the same
  * ConsolePage mounted, so switching tabs doesn't move focus.
  */
-export function ConsolePage({ kicker, title, lede, docTitle, actions, children }: Props) {
+export function ConsolePage({ kicker, title, lede, docTitle, actions, section, children }: Props) {
   const { org } = useOrg()
   const client = useConsole()
   const location = useLocation()
@@ -47,7 +51,7 @@ export function ConsolePage({ kicker, title, lede, docTitle, actions, children }
         </h1>
         {actions && <div className="console__actions">{actions}</div>}
         {lede && <div className="console__lede">{lede}</div>}
-        {client.isDemo && (
+        {client.isDemo && !(section && client.isLive?.(section)) && (
           <p className="console__demo">
             <span className="demo-chip">Demo data</span>
             <span>Sample data for trying AICA, not your organisation's real setup. Changes stay in this browser tab until you close it.</span>

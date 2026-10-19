@@ -25,8 +25,9 @@ type Errors = Partial<Record<'name' | 'city' | 'languages' | `hours-${number}` |
 function check(f: OrgSettingsInput): Errors {
   const e: Errors = {}
   const name = f.name.trim()
-  if (name.length < 2 || name.length > 80) e.name = 'Give the organisation a name of 2 to 80 characters.'
-  if (f.city.trim().length < 2) e.city = 'Give the city, e.g. Coimbatore.'
+  // The same rules as the server (backend/app/routes/org/settings.py); the name's are sign-up's.
+  if (name.length < 3 || name.length > 120) e.name = 'Give the organisation a name of 3 to 120 characters.'
+  if (f.city.trim().length < 2 || f.city.trim().length > 80) e.city = 'Give the city, e.g. Coimbatore.'
   if (f.languages.length === 0) e.languages = 'Choose at least one language callers use.'
   f.hours.forEach((h, i) => {
     if (h.open && (!h.from || !h.to || h.from >= h.to)) e[`hours-${i}`] = `${DAYS[i]}: opening time must be before closing time.`
@@ -50,6 +51,7 @@ export default function OrgSettingsPage() {
 
   return (
     <ConsolePage
+      section="settings"
       kicker="Manage"
       title="Organisation settings"
       docTitle="Organisation settings"
@@ -154,8 +156,8 @@ function SettingsForm({ settings, onSaved }: { settings: OrgSettings; onSaved(s:
         </h2>
         <p className="lib__sub">Callers hear the name in the agents’ greetings.</p>
         <div className="set-pair">
-          <TextField label="Name" value={form.name} maxLength={80} error={errors.name} onChange={(e) => set('name', e.target.value)} />
-          <TextField label="City" value={form.city} maxLength={60} error={errors.city} onChange={(e) => set('city', e.target.value)} />
+          <TextField label="Name" value={form.name} maxLength={120} error={errors.name} onChange={(e) => set('name', e.target.value)} />
+          <TextField label="City" value={form.city} maxLength={80} error={errors.city} onChange={(e) => set('city', e.target.value)} />
         </div>
         <ChoiceGroup<Language>
           legend="Languages callers use"

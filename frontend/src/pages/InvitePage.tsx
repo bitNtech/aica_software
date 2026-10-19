@@ -20,10 +20,12 @@ function daysLeft(iso: string): string {
 }
 
 /** /invite/:token — states the organisation and the role, in plain words,
- * before asking for anything. */
+ * before asking for anything. A new person chooses a name and password;
+ * someone who already has an AICA account signs in with the invited
+ * address and joins with it. */
 export default function InvitePage() {
   const { token = '' } = useParams()
-  const { client, acceptInvite } = useAuth()
+  const { client, acceptInvite, joinInvite, status, user, signOut } = useAuth()
   const navigate = useNavigate()
   const [load, setLoad] = useState<Load>({ state: 'loading' })
   const [name, setName] = useState('')
@@ -63,6 +65,19 @@ export default function InvitePage() {
     setError(null)
     try {
       const session = await acceptInvite(token, { name: name.trim(), password })
+      navigate(homeFor(session.user), { replace: true })
+    } catch (err) {
+      setError(asAuthError(err))
+      setBusy(false)
+    }
+  }
+
+  async function onJoin() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const session = await joinInvite(token)
       navigate(homeFor(session.user), { replace: true })
     } catch (err) {
       setError(asAuthError(err))
@@ -124,6 +139,72 @@ export default function InvitePage() {
   }
 
   const inv = load.invite
+  const details = (
+    <section className="invite" aria-label="Your invitation">
+      <div className="invite__row">
+        <span className="label label--quiet">Your role</span>
+        <span className="chip">{ROLE_LABEL[inv.role]}</span>
+      </div>
+      <p className="invite__plain">{ROLE_PLAIN[inv.role]}</p>
+      <p className="invite__meta">
+        Invited by {inv.invitedBy} <i aria-hidden="true">·</i> expires {daysLeft(inv.expiresAt)}
+      </p>
+    </section>
+  )
+
+  if (inv.hasAccount) {
+    const signedIn = status === 'signedIn' && !!user
+    const same = signedIn && user.email.toLowerCase() === inv.email.toLowerCase()
+    return (
+      <AuthLayout
+        kicker="Invitation"
+        docTitle={`Join ${inv.orgName}`}
+        voice={busy ? 'busy' : error ? 'error' : undefined}
+        title={
+          <>
+            Join {inv.orgName}
+            <em>.</em>
+          </>
+        }
+      >
+        {details}
+        {error && (
+          <Alert tone="error" ref={alertRef} className="form__alert" title="We couldn't add you">
+            <p>{error.message}</p>
+          </Alert>
+        )}
+        <div className="form">
+          {same ? (
+            <>
+              <p className="form__after">You're signed in as {inv.email}.</p>
+              <Button block arrow busy={busy} busyLabel="Joining…" onClick={() => void onJoin()}>
+                Join {inv.orgName}
+              </Button>
+            </>
+          ) : signedIn ? (
+            <>
+              <Alert tone="warn" title="You're signed in with another address">
+                <p>
+                  This invitation is for {inv.email}, and you're signed in as {user.email}. Sign out, then sign in with {inv.email}.
+                </p>
+              </Alert>
+              <Button block variant="line" onClick={() => void signOut()}>
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="form__after">{inv.email} already has an AICA account. Sign in with it to accept; you'll come back here.</p>
+              <Link className="btn btn--block btn--orange" to="/login" state={{ from: `/invite/${token}`, email: inv.email }}>
+                <span>Sign in to accept</span>
+              </Link>
+            </>
+          )}
+        </div>
+      </AuthLayout>
+    )
+  }
+
   return (
     <AuthLayout
       kicker="Invitation"
@@ -136,16 +217,7 @@ export default function InvitePage() {
         </>
       }
     >
-      <section className="invite" aria-label="Your invitation">
-        <div className="invite__row">
-          <span className="label label--quiet">Your role</span>
-          <span className="chip">{ROLE_LABEL[inv.role]}</span>
-        </div>
-        <p className="invite__plain">{ROLE_PLAIN[inv.role]}</p>
-        <p className="invite__meta">
-          Invited by {inv.invitedBy} <i aria-hidden="true">·</i> expires {daysLeft(inv.expiresAt)}
-        </p>
-      </section>
+      {details}
 
       {error && (
         <Alert tone="error" ref={alertRef} className="form__alert" title="We couldn't set up your account">

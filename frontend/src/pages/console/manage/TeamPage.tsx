@@ -73,6 +73,7 @@ export default function TeamPage() {
 
   return (
     <ConsolePage
+      section="team"
       kicker="Manage"
       title="Team"
       docTitle="Team"

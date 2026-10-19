@@ -1,4 +1,4 @@
-# AICA console auth API. Python 3.12+.
+# AICA console API. Python 3.12+ (syntax-checked on 3.12); CI and local dev run 3.14 from .python-version.
 fastapi>=0.118,<1
 uvicorn[standard]>=0.37,<1
 pydantic>=2.11,<3

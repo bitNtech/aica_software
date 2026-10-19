@@ -34,6 +34,10 @@ export interface AgentSummary {
   builtBy?: string
 }
 
+/** The parts of the console that move from demo data to the API one at a
+ * time (docs/backend-workflow.md). */
+export type ConsoleSection = 'team' | 'settings' | 'activity'
+
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
  * written for the person using the console. Pages show it as-is, so a real
  * client must map its failures to one too. */
@@ -41,6 +45,9 @@ export interface ConsoleClient {
   /** True while every console page runs on built-in sample data. The UI
    * labels it, so nobody mistakes it for their real configuration. */
   readonly isDemo: boolean
+  /** True for a section served by the API while the rest is still demo
+   * data. Its pages drop the "Demo data" note. Absent: nothing is live. */
+  isLive?(section: ConsoleSection): boolean
   /** Published agents, plus drafts still being built (with `setupStep`). */
   listAgents(orgSlug: string): Promise<AgentSummary[]>
 

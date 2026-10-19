@@ -1219,8 +1219,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       // Check everything first: a refused change changes nothing.
       const name = input.name.trim()
       const city = input.city.trim()
-      if (name.length < 2 || name.length > 80) throw new AuthError('invalid_input', 'Give the organisation a name of 2 to 80 characters.')
-      if (city.length < 2 || city.length > 60) throw new AuthError('invalid_input', 'Give the city, e.g. Coimbatore.')
+      if (name.length < 3 || name.length > 120) throw new AuthError('invalid_input', 'Give the organisation a name of 3 to 120 characters.')
+      if (city.length < 2 || city.length > 80) throw new AuthError('invalid_input', 'Give the city, e.g. Coimbatore.')
       const languages = [...new Set(input.languages)].filter((l) => l in LANGUAGE_LABEL)
       if (languages.length === 0) throw new AuthError('invalid_input', 'Choose at least one language callers use.')
       if (input.hours.length !== 7) throw new AuthError('invalid_input', 'Give hours for each day of the week.')

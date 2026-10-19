@@ -1,4 +1,5 @@
-"""Invite a bitNtech staff member (until the Ops staff page exists). From backend/:
+"""Invite a bitNtech staff member from the command line. The usual way is the
+Ops People page (master admins); this is for when nobody can sign in yet. From backend/:
 
     .venv/bin/python -m app.scripts.invite_staff someone@bitntech.in --by "Support"
 

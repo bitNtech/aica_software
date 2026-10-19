@@ -8,11 +8,14 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic.alias_generators import to_camel
 
+from .access import ALL_PERMISSIONS
+
 Role = Literal["owner", "admin", "supervisor", "front_desk", "viewer"]
 PlatformRole = Literal["master_admin", "staff"]
 OrgStatus = Literal["pending_review", "active", "declined", "suspended"]
 BusinessType = Literal["hospital", "clinic", "diagnostics", "other"]
 Language = Literal["tamil", "english", "tanglish"]
+ActivityArea = Literal["team", "agents", "library", "settings", "billing", "access"]
 
 
 class Camel(BaseModel):
@@ -90,6 +93,53 @@ class RoleChangeIn(Camel):
     reason: str = Field(min_length=10, max_length=500)
 
 
+# ---- organisation requests (/api/orgs/{slug}/…)
+
+
+class InviteMemberIn(Camel):
+    email: EmailStr
+    role: Role
+
+
+class MemberRoleIn(Camel):
+    role: Role
+
+
+class MemberPermissionsIn(Camel):
+    """None: back to the role's defaults."""
+
+    permissions: list[Annotated[str, Field(max_length=40)]] | None = Field(..., max_length=len(ALL_PERMISSIONS))
+
+    @field_validator("permissions")
+    @classmethod
+    def known(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None and any(p not in ALL_PERMISSIONS for p in v):
+            raise ValueError("unknown permission")
+        return v
+
+
+class DayHoursIn(Camel):
+    open: bool
+    from_: str = Field(alias="from", max_length=5)
+    to: str = Field(max_length=5)
+
+
+class ClosedDayIn(Camel):
+    date: str = Field(max_length=10)
+    label: str = Field(max_length=200)
+
+
+class OrgSettingsIn(Camel):
+    """Lengths here only cap the size; the route checks each value and says
+    what's wrong in words."""
+
+    name: str = Field(max_length=500)
+    city: str = Field(max_length=500)
+    languages: list[Language] = Field(max_length=10)
+    hours: list[DayHoursIn] = Field(max_length=14)
+    closed: list[ClosedDayIn] = Field(max_length=200)
+
+
 # The landing page's demo form. snake_case on the wire, as the form sends it;
 # the choices match frontend/src/landing/content.ts (INDUSTRIES, VOLUMES).
 Industry = Literal["Hospital / clinic", "Mobility / logistics", "Retail / services", "Education", "Real estate", "Other"]
@@ -136,6 +186,8 @@ class MembershipOut(Camel):
     org_name: str
     city: str
     role: Role
+    # Changed from the role's defaults; None when it has them.
+    permissions: list[str] | None = None
     org_status: OrgStatus
     status_reason: str | None = None
 
@@ -174,6 +226,9 @@ class InviteOut(Camel):
     role: str
     invited_by: str
     expires_at: str
+    # The address already has an AICA account: they sign in and join
+    # instead of choosing a password. Only shown to holders of the link.
+    has_account: bool = False
 
 
 class OwnerOut(Camel):
@@ -234,5 +289,55 @@ class AuditEntryOut(Camel):
 
 class AuditPageOut(Camel):
     entries: list[AuditEntryOut]
+    # Pass as `before` for the next page; None on the last page.
+    next_before: str | None = None
+
+
+class MemberOut(Camel):
+    id: str
+    name: str
+    email: str
+    role: Role
+    permissions: list[str] | None = None
+    last_active_at: str | None = None
+    status: Literal["active", "invited", "disabled"]
+    invited_at: str | None = None
+    invited_by: str | None = None
+
+
+class DayHoursOut(Camel):
+    open: bool
+    from_: str = Field(serialization_alias="from")
+    to: str
+
+
+class ClosedDayOut(Camel):
+    date: str
+    label: str
+
+
+class OrgSettingsOut(Camel):
+    name: str
+    city: str
+    languages: list[Language]
+    hours: list[DayHoursOut]
+    closed: list[ClosedDayOut]
+    updated_at: str
+    updated_by: str
+
+
+class ActivityEntryOut(Camel):
+    id: str
+    at: str
+    actor: str
+    actor_kind: Literal["member", "bitntech", "aica"]
+    actor_id: str | None = None
+    area: ActivityArea
+    text: str
+    detail: str | None = None
+
+
+class ActivityPageOut(Camel):
+    entries: list[ActivityEntryOut]
     # Pass as `before` for the next page; None on the last page.
     next_before: str | None = None
