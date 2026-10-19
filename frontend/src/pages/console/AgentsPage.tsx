@@ -4,6 +4,7 @@ import { LANGUAGE_LABEL } from '../../auth/roles'
 import { asAuthError } from '../../auth/types'
 import { can } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
+import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../console/flowPatternConfig'
 import { BUILDER_STEPS, type AgentStatus, type AgentSummary } from '../../console/types'
 import { STEP_META, stepIndex } from './builder/steps'
 import { useOrg } from '../../console/useOrg'
@@ -37,6 +38,22 @@ export default function AgentsPage() {
   const search = useRef<HTMLInputElement>(null)
   const canCreate = can(access, 'agent.create')
   const canRequest = can(access, 'request.create')
+  const [patternAgentIds, setPatternAgentIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!canSeeFlowPatterns(access)) return
+    let live = true
+    client.listNewFlowPatterns(org.orgSlug, { windowSize: FLOW_PATTERN_WINDOW }).then(
+      (found) => {
+        if (live) setPatternAgentIds(new Set(found.map((p) => p.agentId)))
+      },
+      () => {
+        if (live) setPatternAgentIds(new Set())
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [client, org.orgSlug, access])
   // Set by the builder after publishing. Shown once: it's cleared from the
   // history entry so a reload or Back doesn't show it again.
   const location = useLocation()
@@ -205,7 +222,7 @@ export default function AgentsPage() {
           ) : (
             <ul className="rows" aria-label="Agents">
               {shown.map((a) => (
-                <AgentRow key={a.id} agent={a} base={`${base}/agents`} canBuild={canCreate} />
+                <AgentRow key={a.id} agent={a} base={`${base}/agents`} canBuild={canCreate} newPattern={patternAgentIds.has(a.id)} callsHref={`${base}/calls?agent=${a.id}`} />
               ))}
             </ul>
           )}
@@ -215,7 +232,7 @@ export default function AgentsPage() {
   )
 }
 
-function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: string; canBuild: boolean }) {
+function AgentRow({ agent: a, base, canBuild, newPattern, callsHref }: { agent: AgentSummary; base: string; canBuild: boolean; newPattern: boolean; callsHref: string }) {
   return (
     <li className="agent-row">
       <div className="agent-row__main">
@@ -231,6 +248,12 @@ function AgentRow({ agent: a, base, canBuild }: { agent: AgentSummary; base: str
         <span className="row__meta">
           {a.useCase} <i aria-hidden="true">·</i> {a.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}
         </span>
+        {newPattern && (
+          <Link className="agent-row__pattern" to={callsHref} aria-label={`New call flow pattern detected for ${a.name}. View in call history.`}>
+            <span className="agent-row__pattern-dot" aria-hidden="true" />
+            New pattern detected
+          </Link>
+        )}
         {a.hasChanges && <span className="agent-row__setup">Unpublished changes</span>}
         {a.setupStep && (
           <span className="agent-row__setup">

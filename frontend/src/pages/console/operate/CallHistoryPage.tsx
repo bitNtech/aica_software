@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { asAuthError } from '../../../auth/types'
 import { useConsole } from '../../../console/ConsoleProvider'
-import type { AgentSummary, CallLogPage, CallOutcome, CallQuery } from '../../../console/types'
+import type { AgentSummary, CallLogPage, CallOutcome, CallQuery, DetectedFlowPattern } from '../../../console/types'
 import { can, pageAccess } from '../../../console/access'
+import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../../console/flowPatternConfig'
 import { useOrg } from '../../../console/useOrg'
 import { ConsolePage } from '../../../components/console/ConsolePage'
 import { SegFilter, useSettled } from '../../../components/console/ListTools'
+import { DetectedFlowBanner } from '../../../components/console/DetectedFlowBanner'
+import { DetectedFlowChart } from '../../../components/console/DetectedFlowChart'
 import { Alert } from '../../../components/ui/Alert'
 import { SelectField, TextField } from '../../../components/ui/Field'
 import { Spinner } from '../../../components/ui/Spinner'
+import { Modal } from '../../../components/ui/Dialog'
+import { useAnnouncer } from './LiveBits'
 import { duration, OUTCOME_LABEL } from './shared'
 import './Operate.css'
 
@@ -31,8 +36,9 @@ export default function CallHistoryPage() {
   const client = useConsole()
   const own = pageAccess(access, 'calls') === 'own'
   const personal = can(access, 'call.personal')
+  const [searchParams] = useSearchParams()
   const [days, setDays] = useState<Days>(7)
-  const [agentId, setAgentId] = useState('')
+  const [agentId, setAgentId] = useState(() => searchParams.get('agent') ?? '')
   const [outcome, setOutcome] = useState<CallOutcome | ''>('')
   const [query, setQuery] = useState('')
   const [q, setQ] = useState('')
@@ -49,11 +55,34 @@ export default function CallHistoryPage() {
   const [error, setError] = useState<unknown>(null)
   const [tick, setTick] = useState(0)
   const search = useRef<HTMLInputElement>(null)
+  const canSeePatterns = canSeeFlowPatterns(access)
+  const [pattern, setPattern] = useState<DetectedFlowPattern | null>(null)
+  const [showFlow, setShowFlow] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [requestError, setRequestError] = useState<string | null>(null)
+  const [flowSaid, say] = useAnnouncer()
 
   useEffect(() => {
     if (own) return
     client.listAgents(org.orgSlug).then((a) => setAgents(a.filter((x) => !x.setupStep)), () => setAgents([]))
   }, [client, org.orgSlug, own])
+
+  useEffect(() => {
+    setPattern(null)
+    if (own || !canSeePatterns || !agentId) return
+    let live = true
+    client.detectNewFlowPatterns(org.orgSlug, agentId, { windowSize: FLOW_PATTERN_WINDOW }).then(
+      (found) => {
+        if (live) setPattern(found[0] ?? null)
+      },
+      () => {
+        if (live) setPattern(null)
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [client, org.orgSlug, agentId, own, canSeePatterns])
 
   // Search once typing pauses.
   useEffect(() => {
@@ -92,6 +121,27 @@ export default function CallHistoryPage() {
   const said = useSettled(page ? `${page.total.toLocaleString('en-IN')} ${page.total === 1 ? 'call' : 'calls'} found.` : '', !loading && !!page, 400)
   const filtered = !!(agentId || outcome || q)
 
+  async function requestFlow() {
+    if (!pattern) return
+    setRequesting(true)
+    setRequestError(null)
+    try {
+      await client.createChangeRequest(org.orgSlug, {
+        kind: 'flow_change',
+        agentId: pattern.agentId,
+        title: 'New call flow pattern detected',
+        detail: `${pattern.occurrences} of the last ${pattern.windowSize} calls to ${pattern.agentName} followed this step sequence, which isn't part of its current flow:\n${pattern.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nCalls: ${pattern.callIds.join(', ')}`,
+        urgency: 'normal',
+      })
+      setShowFlow(false)
+      say(`Asked bitNtech to build this flow for ${pattern.agentName}.`)
+    } catch (err) {
+      setRequestError(asAuthError(err).message)
+    } finally {
+      setRequesting(false)
+    }
+  }
+
   return (
     <ConsolePage
       kicker="Operate"
@@ -128,6 +178,21 @@ export default function CallHistoryPage() {
       <p className="sr-only" aria-live="polite">
         {said}
       </p>
+      <p className="sr-only" role="status">
+        {flowSaid}
+      </p>
+
+      {pattern && <DetectedFlowBanner pattern={pattern} onView={() => setShowFlow(true)} />}
+      {pattern && (
+        <Modal open={showFlow} title="Detected call flow pattern" onClose={() => setShowFlow(false)} side="right">
+          <DetectedFlowChart pattern={pattern} onRequestFlow={() => void requestFlow()} busy={requesting} />
+          {requestError && (
+            <p className="field__error" role="alert">
+              {requestError}
+            </p>
+          )}
+        </Modal>
+      )}
 
       {error ? (
         <Alert tone="error" title="Couldn't load calls">

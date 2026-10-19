@@ -116,6 +116,15 @@
 .console__icon { flex: none; color: var(--muted); }
 .console__link.active .console__icon { color: var(--orange-text); }
 
+.console__badge-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--danger-ink, #e5484d);
+}
+
 /* user footer */
 .console__me {
   display: flex;

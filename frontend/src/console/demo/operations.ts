@@ -216,7 +216,26 @@ export function callLog(ctx: LogContext, days: number): CallSummary[] {
   const t = today()
   const out: CallSummary[] = []
   for (let d = t - days + 1; d <= t; d++) out.push(...callsOn(ctx.orgSlug, d, ctx.pauses))
-  return out.reverse()
+  const reversed = out.reverse()
+  forceReportPatternDemo(ctx.orgSlug, reversed)
+  return reversed
+}
+
+/** Demo-only: the 5 most recent "Lab report status" calls all get handed
+ * over after the same steps, so the new-flow-pattern detection has
+ * something to surface (that agent's path already isn't fully in its
+ * designed flow, see extraction.ts REPORTS). */
+function forceReportPatternDemo(orgSlug: string, calls: CallSummary[]) {
+  if (orgSlug !== 'arogya-demo') return
+  const intent = AGENTS.find((a) => a.id === 'agt_reports')!.intents[0]
+  let forced = 0
+  for (const c of calls) {
+    if (c.agentId !== 'agt_reports') continue
+    c.intent = intent.label
+    c.outcome = 'handed_over'
+    c.handledBy = deskFor(c.id).name
+    if (++forced === 5) break
+  }
 }
 
 /** Who took a handed-over call over, by id, from the call's own seed. */

@@ -179,6 +179,11 @@ export interface ConsoleClient {
   getCallRecord(orgSlug: string, id: string): Promise<CallRecord>
   addCallNote(orgSlug: string, callId: string, text: string): Promise<CallNote>
   getReport(orgSlug: string, query: ReportQuery): Promise<Report>
+  /** Looks at the agent's last `windowSize` calls for a step sequence
+   * repeated outside its current design. */
+  detectNewFlowPatterns(orgSlug: string, agentId: string, opts: { windowSize: number }): Promise<DetectedFlowPattern[]>
+  /** Same, across every agent in the org (for nav/agents-list badges). */
+  listNewFlowPatterns(orgSlug: string, opts: { windowSize: number }): Promise<DetectedFlowPattern[]>
 
   // ---- people
   /** The organisation's team, for assigning work (and the Team page). */
@@ -884,6 +889,22 @@ export interface CallRecord extends CallSummary {
   handledById: string | null
   analysis: CallAnalysis
   metrics: CallMetrics
+}
+
+/** A step sequence repeated across an agent's recent calls that isn't part
+ * of its designed flow (FlowNode tree). Demo-only: a templated summary, not
+ * a real analysis. */
+export interface DetectedFlowPattern {
+  id: string
+  agentId: string
+  agentName: string
+  steps: string[]
+  occurrences: number
+  windowSize: number
+  callIds: string[]
+  firstSeenAt: string
+  lastSeenAt: string
+  summary: string
 }
 
 /** What AICA noted once the call ended (AnalysisSettings). */

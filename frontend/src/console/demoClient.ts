@@ -33,6 +33,7 @@ import type {
 import { seedAgents } from './demo/agents'
 import { seedCalls, topicFor, transcriptFor } from './demo/calls'
 import { defaultGlobalFlows, extractAttributes, extractFlow } from './demo/extraction'
+import { detectFlowPatterns } from './demo/flowPatterns'
 import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
@@ -258,6 +259,17 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     const a = org(o).agents.find((x) => x.id === id)
     if (!a) throw notFound('agent')
     return a
+  }
+
+  const patternsForAgent = (o: string, agentId: string, windowSize: number) => {
+    const agent = findAgent(o, agentId)
+    const flow = recordOf(o, agentId).working.flow
+    // Enough days to gather `windowSize` calls for a normal week's volume.
+    const calls = callLog(logContext(o), 90)
+      .filter((c) => c.agentId === agentId)
+      .slice(0, windowSize)
+      .map((c) => ({ id: c.id, path: callRecord(c).path }))
+    return detectFlowPatterns({ agentId, agentName: agent.name, calls, knownFlow: flow, windowSize, now: new Date().toISOString() })
   }
 
   /** The agent's record, seeded the first time it's opened. */
@@ -1480,6 +1492,16 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     async getReport(o, q) {
       await wait()
       return copy(report(logContext(o), q.days, q.agentId))
+    },
+
+    async detectNewFlowPatterns(o, agentId, opts) {
+      await wait()
+      return copy(patternsForAgent(o, agentId, opts.windowSize))
+    },
+
+    async listNewFlowPatterns(o, opts) {
+      await wait()
+      return copy(org(o).agents.flatMap((a) => patternsForAgent(o, a.id, opts.windowSize)))
     },
 
     // ---- requests to bitNtech

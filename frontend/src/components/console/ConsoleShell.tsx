@@ -3,6 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { ROLE_LABEL } from '../../auth/roles'
 import { navFor, type PageKey } from '../../console/access'
+import { useConsole } from '../../console/ConsoleProvider'
+import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../console/flowPatternConfig'
 import { useOrg } from '../../console/useOrg'
 import { initials } from '../../pages/ChooseOrgPage'
 import { Wordmark } from '../ui/Wordmark'
@@ -21,13 +23,31 @@ const NARROW = '(max-width: 899px)'
  */
 export function ConsoleShell() {
   const { user, org, access } = useOrg()
+  const client = useConsole()
   const { signOut } = useAuth()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [hasNewFlowPattern, setHasNewFlowPattern] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const topBar = useRef<HTMLElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!canSeeFlowPatterns(access)) return
+    let live = true
+    client.listNewFlowPatterns(org.orgSlug, { windowSize: FLOW_PATTERN_WINDOW }).then(
+      (found) => {
+        if (live) setHasNewFlowPattern(found.length > 0)
+      },
+      () => {
+        if (live) setHasNewFlowPattern(false)
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [client, org.orgSlug, access])
 
   // A new page closes the menu.
   useEffect(() => {
@@ -133,6 +153,9 @@ export function ConsoleShell() {
                     <NavLink to={item.path ? `${base}/${item.path}` : base} end={!item.path} className="console__link">
                       <NavIcon page={item.page} />
                       <span>{item.label}</span>
+                      {item.page === 'calls' && hasNewFlowPattern && (
+                        <span className="console__badge-dot" aria-label="New call flow pattern detected" />
+                      )}
                     </NavLink>
                   </li>
                 ))}
