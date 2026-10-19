@@ -7,6 +7,7 @@ import { createHttpAuthClient } from './auth/httpClient'
 import { createMockAuthClient } from './auth/mockClient'
 import { ConsoleProvider } from './console/ConsoleProvider'
 import { createDemoConsoleClient } from './console/demoClient'
+import { createHttpConsoleClient } from './console/httpConsoleClient'
 import { createDemoOpsClient } from './ops/demoOpsClient'
 import { OpsDataProvider } from './ops/OpsDataProvider'
 import { ErrorBoundary } from './pages/SystemPage'
@@ -17,9 +18,12 @@ import './styles/components.css'
 // The FastAPI backend by default. VITE_AUTH_MODE=demo (npm run dev:demo) runs
 // every page against the in-browser mock instead, labelled "Demo mode".
 const client = import.meta.env.VITE_AUTH_MODE === 'demo' ? createMockAuthClient() : createHttpAuthClient()
-// Organisation pages run on sample data until their API exists; every page
-// labels it "Demo data".
-const consoleClient = createDemoConsoleClient()
+// Organisation pages: VITE_CONSOLE_MODE=live serves the sections the API
+// has (Team, Settings, Activity) from it and the rest from sample data, each
+// page labelled "Demo data" until its section is live. Anything else, or the
+// auth demo, keeps every page on sample data. Set it per environment.
+const liveConsole = import.meta.env.VITE_CONSOLE_MODE === 'live' && import.meta.env.VITE_AUTH_MODE !== 'demo'
+const consoleClient = liveConsole ? createHttpConsoleClient() : createDemoConsoleClient()
 // The same for the Ops pages that have no API yet.
 const opsClient = createDemoOpsClient()
 

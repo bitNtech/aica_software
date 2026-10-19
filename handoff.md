@@ -1,6 +1,8 @@
 # Project Handoff
 
 ## Status
+- Latest (2026-10-19, on branch `feat/detected-flow-patterns`, **uncommitted**): backend Foundations and Phase 1 from `docs/backend-workflow.md` are built: org access guard, shared permission table, transactional store layer, shared rate limiter, JSON logs, and the Team / Settings / Activity endpoints with revocable invites and a signed-in join path. The frontend has `httpConsoleClient` (`VITE_CONSOLE_MODE=live`), a per-section "Demo data" label and the invite page's existing-account path. **Not yet run against the real Firebase project.**
+- Next recommended action: do the manual rollout steps in `docs/backend-workflow.md` → "Follow-ups from Foundations and Phase 1" (indexes, TTL policy, `.env.example` line), try it on staging, then plan Phase 2 (Requests to bitNtech).
 - Latest: `main` was restored to exactly this commit's state (PR #25, `2101d6c`) on 2026-10-18, discarding PR #26 and PR #27 ("premium redesign" — warm charcoal/champagne palette, homepage rebuild, mobile pass) by explicit request, via a new commit whose tree matches `2101d6c` byte for byte (`git checkout 2101d6c -- .` + removing two files PR #27 added), not a reset or force-push. Those commits stay in `main`'s history; this just moves the tip's content back to what PR #25 shipped. If the premium redesign is wanted again, it needs to be re-applied — it isn't recoverable by simply moving the branch pointer forward again, since this restore is itself a new commit on top of it.
 - Previously: pushed to `main` directly (merged with `origin/main`'s PR #23) on 2026-10-18, then fixed the 5 CI test failures the push exposed; see the 2026-10-18 entry. The 2026-10-17 report/heatmap work and the 2026-10-16 permissions rework are both committed and on `main` now.
 - Phase: Auth backend (FastAPI + Firebase) built and connected to the console frontend. **Not yet run against the real Firebase project:** it's waiting on `backend/.env`, the service-account key and the Google OAuth client (see "Needed from the user").
@@ -18,6 +20,15 @@
   - Backend: `pytest` 22/22 against in-memory fakes; startup fails fast with a clear message when the key is missing.
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
+
+
+## Backend Foundations and Phase 1 (2026-10-19, approved "proceed", all defaults chosen by the user's delegation)
+
+- **Built:** see `docs/backend-workflow.md` (items ticked, decisions table, follow-ups). New backend: `app/access.py`, `app/permissions.json`, `app/orgs.py`, `app/logs.py`, `app/routes/org/{team,settings,activity}.py`, `app/scripts/backfill_members.py`; changed `store.py`, `ratelimit.py`, `routes/invites.py`, `accounts.py`, `models.py`, `main.py`, `settings.py`, `sessions.py`, `identity.py`, `firestore.indexes.json`, README. New frontend: `console/httpConsoleClient.ts`, per-section `isLive`, `joinInvite`, invite page path, settings limits aligned.
+- **Verified (against fakes only):** backend pytest 198 passed / 3 skipped (after fixing 3 findings from an independent review); frontend `tsc -b` clean, vitest 309 passed, `npm run build` ok; a local uvicorn run on fakes exercised CORS, CSRF, login, invite, accept, activity and settings over real HTTP, and its JSON logs held no emails, names, tokens or passwords.
+- **Not verified:** anything against real Firebase/Firestore (transactions, `Increment`, `start_after`, `get_users`, index behaviour), Resend, a browser session, or Vercel's Python version.
+- **Manual steps:** create the `activity` indexes; add a TTL policy on `ratelimits.expiresAt`; add `LOG_FORMAT=` to `backend/.env.example` (this session couldn't read `.env*`); optional backfill script; set `VITE_CONSOLE_MODE=live` per environment.
+- **Known limitations:** Callbacks/Live-calls pages (demo data) get the real team list in live mode; Ops org writes overwrite the whole org doc; `/ops/audit` can skip same-timestamp entries; demo client doesn't enforce "only grant what you hold".
 
 ## Pushed to main; CI's 5 test failures were real, now fixed (2026-10-18)
 - **What happened:** the user committed all uncommitted frontend work (2026-10-16 permissions rework + 2026-10-17 report/heatmap work) as one commit, "frontend layout". Asked to push to `main` and open a PR; this environment has no GitHub credentials (no stored HTTPS token, no `gh` CLI, no SSH key for GitHub), so the user ran `git push` themselves after I prepared the branch/merge locally. `main` and `origin/main` had diverged (`origin/main` had PR #23, timetable fullscreen mode, unrelated); merged clean (`origin/main`'s tree was actually already an ancestor of our commit — the merge was a content no-op) and the user pushed `main` directly, skipping a PR per their explicit instruction.

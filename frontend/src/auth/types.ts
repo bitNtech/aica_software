@@ -111,6 +111,9 @@ export interface Invite {
   invitedBy: string
   /** ISO timestamp. */
   expiresAt: string
+  /** The address already has an AICA account: they sign in and join
+   * (joinInvite) instead of choosing a password. */
+  hasAccount?: boolean
 }
 
 export interface AcceptInviteInput {
@@ -235,6 +238,9 @@ export interface AuthClient {
   resetPassword(token: string, password: string): Promise<void>
   getInvite(token: string): Promise<Invite>
   acceptInvite(token: string, input: AcceptInviteInput): Promise<Session>
+  /** Joins the invitation's organisation with the signed-in account, whose
+   * email must be the invited one. Absent: the client can't (demo). */
+  joinInvite?(token: string): Promise<Session>
 
   /* ---- bitNtech only. The server must check the caller's platform role;
      the UI hiding a button is not access control. ---- */

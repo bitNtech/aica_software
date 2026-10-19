@@ -1,0 +1,29 @@
+{
+  "$comment": "Role defaults and who may hold each permission. The backend enforces this table (app/access.py); frontend/src/console/access.ts must match it, and a test on each side fails when they drift. Labels and descriptions live in the frontend.",
+  "roles": ["owner", "admin", "supervisor", "front_desk", "viewer"],
+  "permissions": {
+    "agents.view": { "defaults": ["owner", "admin", "supervisor", "viewer"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "agents.configure": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor"] },
+    "agents.publish": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor"] },
+    "agents.test": { "defaults": ["owner", "admin", "supervisor"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "requests.create": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "library.knowledge": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "library.uploads": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor"] },
+    "library.numbers": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor"] },
+    "library.secrets": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin"] },
+    "desk.bot": { "defaults": ["owner", "admin", "supervisor", "front_desk"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "desk.notices": { "defaults": ["owner", "admin", "supervisor", "front_desk"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "calls.take": { "defaults": ["owner", "admin", "supervisor", "front_desk"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "callbacks.assign": { "defaults": ["owner", "admin", "supervisor"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "appointments.manage": { "defaults": ["owner", "admin", "supervisor", "front_desk"], "grantable": ["owner", "admin", "supervisor", "front_desk"] },
+    "calls.viewAll": { "defaults": ["owner", "admin", "supervisor", "viewer"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "calls.personal": { "defaults": ["owner", "admin", "supervisor", "front_desk"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "calls.recordings": { "defaults": ["owner", "admin", "supervisor"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "reports.view": { "defaults": ["owner", "admin", "supervisor", "viewer"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "reports.export": { "defaults": ["owner", "admin", "supervisor"], "grantable": ["owner", "admin", "supervisor", "front_desk", "viewer"] },
+    "team.manage": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin"] },
+    "settings.manage": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin"] },
+    "activity.view": { "defaults": ["owner", "admin"], "grantable": ["owner", "admin", "supervisor"] }
+  },
+  "platformStaff": ["agents.view", "agents.test", "calls.viewAll", "reports.view"]
+}

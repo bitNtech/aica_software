@@ -22,6 +22,7 @@ from fastapi import Depends, Request, Response
 
 from .errors import forbidden, unauthenticated
 from .identity import InvalidSession
+from .logs import note
 from .services import Services, get_services
 from .store import ImpersonationDoc, hash_key, now
 
@@ -148,6 +149,8 @@ def current_caller(request: Request, svc: Services = Depends(get_services)) -> C
     caller = read_session(request, svc)
     if not caller:
         raise unauthenticated()
+    # The person in control of the session: the master admin while acting.
+    note(request, uid=caller.impersonator.uid if caller.impersonator else caller.uid)
     return caller
 
 

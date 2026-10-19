@@ -24,7 +24,10 @@ import { apiBase, apiCredentials, apiUrl } from '../lib/api'
 
 const NETWORK = () => new AuthError('network', "We couldn't reach AICA. Check your connection and try again.")
 
-async function request<T>(base: string, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+/** One call to the AICA API under /api, with the session cookie. Failures
+ * become an AuthError whose message is written for the person using the
+ * console. Shared with the console's HTTP client. */
+export async function request<T>(base: string, method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
   let res: Response
   try {
     res = await fetch(apiUrl(`/api${path}`, base), {
@@ -76,6 +79,7 @@ export function createHttpAuthClient(base = apiBase()): AuthClient {
 
     getInvite: (token) => call<Invite>('GET', `/invites/${encodeURIComponent(token)}`),
     acceptInvite: (token, input: AcceptInviteInput) => call<Session>('POST', `/invites/${encodeURIComponent(token)}/accept`, input),
+    joinInvite: (token) => call<Session>('POST', `/invites/${encodeURIComponent(token)}/join`),
 
     listSignupRequests: () => call<SignupRequest[]>('GET', '/ops/signup-requests'),
     reviewSignup: (slug, decision, reason) =>

@@ -1,5 +1,5 @@
 import { createContext, startTransition, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AcceptInviteInput, AuthClient, Impersonator, Session, SignInInput, User } from './types'
+import { AuthError, type AcceptInviteInput, type AuthClient, type Impersonator, type Session, type SignInInput, type User } from './types'
 
 type Status = 'restoring' | 'signedOut' | 'signedIn'
 
@@ -16,6 +16,8 @@ interface AuthValue {
   endReason: EndReason
   signIn(input: SignInInput): Promise<Session>
   acceptInvite(token: string, input: AcceptInviteInput): Promise<Session>
+  /** Signed in already: join the invitation's organisation with this account. */
+  joinInvite(token: string): Promise<Session>
   signOut(): Promise<void>
   /** Master admin only: become `userId` until endActing() or expiry.
    * `go` runs before the new session applies, so the caller can leave a
@@ -106,6 +108,13 @@ export function AuthProvider({
     (token: string, input: AcceptInviteInput) => client.acceptInvite(token, input).then(take),
     [client, take],
   )
+  const joinInvite = useCallback(
+    (token: string) =>
+      client.joinInvite
+        ? client.joinInvite(token).then(take)
+        : Promise.reject(new AuthError('unknown', 'Joining with an existing account needs the AICA server. It isn’t available in demo mode.')),
+    [client, take],
+  )
   const signOut = useCallback(() => end('signedOut'), [end])
   const swap = useCallback(
     (go: (s: Session) => void) => (s: Session) => {
@@ -136,13 +145,14 @@ export function AuthProvider({
       endReason,
       signIn,
       acceptInvite,
+      joinInvite,
       signOut,
       actAs,
       endActing,
       setSession: take,
       clearEndReason,
     }),
-    [client, status, session, endReason, signIn, acceptInvite, signOut, actAs, endActing, take, clearEndReason],
+    [client, status, session, endReason, signIn, acceptInvite, joinInvite, signOut, actAs, endActing, take, clearEndReason],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

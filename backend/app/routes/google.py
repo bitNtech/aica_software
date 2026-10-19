@@ -17,7 +17,7 @@ import secrets
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from ..accounts import ensure_profile, link
+from ..accounts import ensure_profile, link, mark_active
 from ..errors import ApiError
 from ..identity import pkce_pair
 from ..services import Services, get_services
@@ -88,6 +88,7 @@ def callback(request: Request, svc: Services = Depends(get_services)):
         r = _back_to_login(svc)  # /login sends a signed-in person on to their home
         start_session(svc, r, result["idToken"], remember=False, request=request)
         svc.store.audit(uid, "login", uid, "google")
+        mark_active(svc, uid, force=True)
         return r
     except ApiError as e:
         log.warning("google sign-in failed: %s", e.code)

@@ -114,6 +114,7 @@ export default function ActivityPage() {
 
   return (
     <ConsolePage
+      section="activity"
       kicker="Manage"
       title="Organisation activity"
       docTitle="Organisation activity"

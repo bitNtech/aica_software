@@ -75,6 +75,15 @@ class FirebaseAdmin:
         except self._auth.UserNotFoundError:
             return None
 
+    def get_users(self, uids: list[str]) -> dict[str, AuthUser]:
+        """Many accounts at once (Firebase takes up to 100 per call). Missing ones are left out."""
+        out: dict[str, AuthUser] = {}
+        ids = list(dict.fromkeys(uids))
+        for i in range(0, len(ids), 100):
+            found = self._auth.get_users([self._auth.UidIdentifier(u) for u in ids[i : i + 100]], app=self._app)
+            out.update({rec.uid: self._to_user(rec) for rec in found.users})
+        return out
+
     def get_user_by_email(self, email: str) -> AuthUser | None:
         try:
             return self._to_user(self._auth.get_user_by_email(email, app=self._app))

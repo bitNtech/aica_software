@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from ..accounts import create_org_for, ensure_profile, link, session_out
+from ..accounts import create_org_for, ensure_profile, link, mark_active, session_out
 from ..errors import ApiError, bad_input
 from ..identity import EmailExists
 from ..models import BusinessIn, CodeIn, EmailIn, EmailOut, LoginIn, ResetIn, SessionOut, SignupIn
@@ -27,6 +27,9 @@ def get_session(request: Request, svc: Services = Depends(get_services)):
     caller = read_session(request, svc)
     if not caller:
         raise ApiError(401, "unauthenticated", "Not signed in.")
+    if not caller.impersonator:  # acting as someone isn't them being active
+        doc = svc.store.get_user(caller.uid)
+        mark_active(svc, caller.uid, doc.lastActiveAt if doc else None)
     return session_out(svc, caller)
 
 
@@ -63,6 +66,7 @@ def login(body: LoginIn, request: Request, response: Response, svc: Services = D
 
     svc.store.clear_attempts(key)
     start_session(svc, response, result["idToken"], body.remember, request)
+    mark_active(svc, user.uid, force=True)
     caller = Caller(
         uid=user.uid,
         email=user.email,

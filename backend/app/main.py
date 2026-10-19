@@ -9,8 +9,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from . import logs
 from .errors import ApiError, api_error_handler, validation_handler
-from .routes import auth, google, invites, leads, ops
+from .routes import auth, google, invites, leads, ops, org
 from .services import Services, build_services
 from .settings import Settings, get_settings
 
@@ -45,6 +46,9 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
             response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
+    # Added after the origin check, so it wraps it: refusals get a log line too.
+    app.middleware("http")(logs.log_requests)
+
     # The frontend is deployed on its own origin (APP_URL), so the browser
     # calls this API cross-origin with the session cookie. Added after the
     # check above, so it wraps it: refusals carry CORS headers too and the
@@ -55,6 +59,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         allow_credentials=True,
         allow_methods=["GET", "POST"],
         allow_headers=["Accept", "Content-Type"],
+        expose_headers=[logs.REQUEST_ID_HEADER],
         max_age=600,
     )
 
@@ -75,8 +80,10 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.include_router(invites.router)
     app.include_router(leads.router)
     app.include_router(ops.router)
+    for r in org.routers:
+        app.include_router(r)
     return app
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logs.configure(get_settings().log_format)
 app = create_app()

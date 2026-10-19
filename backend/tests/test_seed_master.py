@@ -43,10 +43,8 @@ def test_new_account_always_gets_email_even_with_no_email():
 def test_promoted_account_can_sign_in_to_ops():
     from fastapi.testclient import TestClient
 
-    from app import ratelimit
     from app.main import create_app
 
-    ratelimit.reset()
     svc, fb, _, _ = make_services()
     fb.add("admin@bitntech.in", PW)
     seed(svc, "admin@bitntech.in", send_email=False)

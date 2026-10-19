@@ -11,7 +11,7 @@ from app.errors import ApiError
 from app.identity import AuthUser, EmailExists, InvalidSession
 from app.services import Services
 from app.settings import Settings
-from app.store import AuditEntry, InviteDoc, OrgDoc, SlugTaken, UserDoc, now
+from app.store import ActivityDoc, AuditEntry, InviteDoc, MemberDoc, OrgDoc, SlugTaken, UserDoc, new_id, now, window_of
 
 
 @dataclass
@@ -53,6 +53,9 @@ class FakeFirebase:
 
     def list_users(self):
         return [copy.deepcopy(a.user) for a in self.accounts.values()]
+
+    def get_users(self, uids):
+        return {u: copy.deepcopy(self.accounts[u].user) for u in uids if u in self.accounts}
 
     def get_user_by_email(self, email):
         a = self.by_email(email)
@@ -155,9 +158,64 @@ class MemoryStore:
         self.audits: list[tuple] = []
         self.audit_log: list[AuditEntry] = []
         self.impersonations: dict = {}
+        self.members: dict[str, dict[str, MemberDoc]] = {}  # slug → id → member
+        self.activity: dict[str, list[ActivityDoc]] = {}
+        self.hits: dict[str, int] = {}
+        # Seconds the fake clock is moved on, for rate-limit windows.
+        self.clock_offset = 0.0
 
     def get_user(self, uid):
         return copy.deepcopy(self.users.get(uid))
+
+    def get_users(self, uids):
+        return {u: copy.deepcopy(self.users[u]) for u in uids if u in self.users}
+
+    def users_in_org(self, slug, roles):
+        return [u.uid for u in self.users.values() if any(m.orgSlug == slug and m.role in roles for m in u.memberships)]
+
+    def set_last_active(self, uid, at):
+        if uid in self.users:
+            self.users[uid].lastActiveAt = at
+
+    def get_member(self, slug, member_id):
+        return copy.deepcopy(self.members.get(slug, {}).get(member_id))
+
+    def list_members(self, slug):
+        return [copy.deepcopy(m) for m in self.members.get(slug, {}).values()]
+
+    def save_member(self, slug, member):
+        self.members.setdefault(slug, {})[member.id] = copy.deepcopy(member)
+
+    def list_activity(self, slug, limit, after_id=None, area=None, actor_id=None, include_owner_only=False):
+        rows = sorted(self.activity.get(slug, []), key=lambda e: (e.at, e.id), reverse=True)
+        rows = [e for e in rows if (include_owner_only or not e.ownerOnly) and (not area or e.area == area) and (not actor_id or e.actorId == actor_id)]
+        if after_id:
+            ids = [e.id for e in rows]
+            if after_id not in ids:
+                return []
+            rows = rows[ids.index(after_id) + 1 :]
+        return copy.deepcopy(rows[:limit])
+
+    def add_activity(self, slug, entry):
+        entry = copy.deepcopy(entry)
+        entry.id = entry.id or new_id("act")
+        log = self.activity.setdefault(slug, [])
+        # Strictly increasing, as with the audit log.
+        if log and entry.at <= max(e.at for e in log):
+            entry.at = max(e.at for e in log) + timedelta(microseconds=1)
+        log.append(entry)
+
+    def transact(self, fn):
+        tx = MemoryTx(self)
+        result = fn(tx)
+        tx.commit()
+        return result
+
+    def hit(self, key, limit, window_seconds):
+        start, left = window_of(now() + timedelta(seconds=self.clock_offset), window_seconds)
+        k = f"{key}|{start}"
+        self.hits[k] = self.hits.get(k, 0) + 1
+        return left if self.hits[k] > limit else None
 
     def save_user(self, user):
         self.users[user.uid] = copy.deepcopy(user)
@@ -215,6 +273,69 @@ class MemoryStore:
 
     def save_impersonation(self, key, doc):
         self.impersonations[key] = copy.deepcopy(doc)
+
+
+class MemoryTx:
+    """Reads see the store; writes wait for commit, and a function that
+    raises leaves the store as it was, as in a Firestore transaction. Reads
+    after a write are refused, as Firestore refuses them."""
+
+    def __init__(self, store: "MemoryStore"):
+        self.s = store
+        self.writes: list = []
+
+    def _read(self):
+        if self.writes:
+            raise AssertionError("Firestore transactions must read before they write")
+
+    def get_org(self, slug):
+        self._read()
+        return self.s.get_org(slug)
+
+    def get_user(self, uid):
+        self._read()
+        return self.s.get_user(uid)
+
+    def get_invite(self, h):
+        self._read()
+        return self.s.get_invite(h)
+
+    def get_member(self, slug, member_id):
+        self._read()
+        return self.s.get_member(slug, member_id)
+
+    def list_members(self, slug):
+        self._read()
+        return self.s.list_members(slug)
+
+    def save_org(self, org):
+        self.writes.append(lambda o=copy.deepcopy(org): self.s.save_org(o))
+
+    def update_org(self, slug, fields):
+        def apply(f=copy.deepcopy(fields)):
+            for k, v in f.items():
+                setattr(self.s.orgs[slug], k, v)
+
+        self.writes.append(apply)
+
+    def save_user(self, user):
+        self.writes.append(lambda u=copy.deepcopy(user): self.s.save_user(u))
+
+    def save_invite(self, h, inv):
+        self.writes.append(lambda i=copy.deepcopy(inv): self.s.save_invite(h, i))
+
+    def save_member(self, slug, member):
+        self.writes.append(lambda m=copy.deepcopy(member): self.s.save_member(slug, m))
+
+    def delete_member(self, slug, member_id):
+        self.writes.append(lambda: self.s.members.get(slug, {}).pop(member_id, None))
+
+    def add_activity(self, slug, entry):
+        self.writes.append(lambda e=copy.deepcopy(entry): self.s.add_activity(slug, e))
+
+    def commit(self):
+        for w in self.writes:
+            w()
 
 
 @dataclass
