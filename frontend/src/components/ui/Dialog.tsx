@@ -89,12 +89,14 @@ interface ModalProps {
   children: ReactNode
   /** Wider, for content like transcripts. */
   wide?: boolean
+  /** Docked to the right half of the screen instead of centred, e.g. for a diagram with its own pan/zoom. */
+  side?: 'right'
 }
 
 /** A dialog to read or work in (not a yes/no question): a native modal
  * <dialog> with a Close button. Escape closes it; focus goes back to the
  * button that opened it. */
-export function Modal({ open, title, onClose, children, wide }: ModalProps) {
+export function Modal({ open, title, onClose, children, wide, side }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const close = useRef<HTMLButtonElement>(null)
   const id = useId()
@@ -112,7 +114,7 @@ export function Modal({ open, title, onClose, children, wide }: ModalProps) {
   return (
     <dialog
       ref={ref}
-      className={`dialog${wide ? ' dialog--wide' : ''}`}
+      className={`dialog${wide ? ' dialog--wide' : ''}${side === 'right' ? ' dialog--right' : ''}`}
       aria-labelledby={`${id}-title`}
       onCancel={(e) => {
         e.preventDefault()

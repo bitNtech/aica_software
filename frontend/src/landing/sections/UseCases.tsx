@@ -10,10 +10,10 @@ import './UseCases.css'
 export default function UseCases() {
   const [open, setOpen] = useState<string>(USES[0].key)
   return (
-    <section className="uses" id="uses" aria-labelledby="uses-title">
+    <section className="uses" aria-labelledby="uses-title">
       <div className="wrap">
         <header className="uses__head rise">
-          <p className="label">Use cases</p>
+          <p className="label">05 <i>/</i> Use cases</p>
           <h2 className="display uses__title" id="uses-title">
             Built for businesses that <em>live on the phone.</em>
           </h2>

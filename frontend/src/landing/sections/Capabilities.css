@@ -3,15 +3,14 @@
 .caps__head { display: grid; gap: 2rem; margin-bottom: clamp(2.5rem, 7vh, 5rem); }
 /* The film's title card, set as type: "Meet AICA." */
 .caps__meet {
-  font-size: clamp(3.6rem, 1rem + 10vw, 11rem);
-  font-weight: 800;
-  line-height: 0.85;
-  letter-spacing: -0.055em;
+  font-size: clamp(4.2rem, 1rem + 13vw, 15rem);
+  font-weight: 900;
+  font-stretch: 108%;
+  line-height: 0.82;
+  letter-spacing: -0.06em;
   white-space: nowrap;
 }
-.caps__meet { background: linear-gradient(180deg, var(--ivory) 20%, rgba(242, 232, 216, 0.2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.caps__meet .ghost { font-weight: 400; color: transparent; }
-.caps__meet em { -webkit-text-fill-color: var(--sky); }
+.caps__meet .ghost { --stroke-w: 2px; font-weight: 300; font-stretch: 90%; }
 .caps__intro { display: grid; gap: 1rem; max-width: 44rem; }
 .caps__title { font-size: clamp(2rem, 1rem + 3.4vw, 3.6rem); }
 .caps__lede { font-size: 1.1rem; }
@@ -19,24 +18,21 @@
 .caps__body { display: grid; gap: 2rem; }
 
 .caps__list { display: grid; }
-.caps__list { gap: 0.75rem; }
 .caps__beat {
   position: relative;
   display: grid;
   gap: 0.5rem;
-  padding: 1.5rem 1.5rem 1.6rem;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-card);
-  background: var(--glass-2);
-  transition: opacity 0.5s var(--ease), border-color 0.5s var(--ease), background-color 0.5s var(--ease);
+  padding: 2rem 0;
+  border-top: 1px solid var(--line);
 }
-.caps__at { width: fit-content; padding: 0.25rem 0.6rem; border-radius: 99px; background: var(--glass-light); font: 500 0.72rem var(--mono); letter-spacing: 0.12em; color: var(--sky); }
+.caps__beat:last-child { border-bottom: 1px solid var(--line); }
+.caps__at { font: 500 0.75rem var(--mono); letter-spacing: 0.14em; color: var(--orange); }
 .caps__beat h3 {
   display: flex;
   align-items: baseline;
   gap: 0.8rem;
-  font: 760 clamp(1.5rem, 1.1rem + 1.4vw, 2.3rem)/1.05 var(--display);
-  letter-spacing: -0.03em;
+  font: 800 clamp(1.7rem, 1.1rem + 2vw, 2.8rem)/1.02 var(--display);
+  letter-spacing: -0.04em;
   color: var(--ink);
 }
 .caps__n { font: 500 0.8rem var(--mono); letter-spacing: 0.1em; color: var(--text); opacity: 0.7; }
@@ -56,28 +52,16 @@
   .caps__sticky { position: sticky; top: calc(50vh - 220px); }
   .caps__sticky .cs { height: 420px; }
   .caps__inline { display: none; }
-  .caps__list { gap: 32vh; padding-block: 16vh; }
-  .caps__beat { align-content: center; padding: 2rem 2rem 2.2rem; }
-  .caps__beat:not(.is-active) { opacity: 0.38; }
-  .caps__beat.is-active { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 45%), var(--glass); box-shadow: var(--hl), var(--float); }
+  .caps__beat { min-height: 62vh; align-content: center; padding: 3rem 0; transition: opacity 0.5s var(--ease); }
+  .caps__beat:not(.is-active) { opacity: 0.32; }
   .caps__beat::before {
     content: '';
-    position: absolute; left: -1.75rem; top: 50%;
-    width: 1rem; height: 2px;
-    background: var(--sky);
-    box-shadow: 0 0 10px var(--sky);
+    position: absolute; left: -2.5rem; top: 50%;
+    width: 1.5rem; height: 2px;
+    background: var(--orange);
     transform: scaleX(0);
     transform-origin: left;
     transition: transform 0.5s var(--out);
   }
   .caps__beat.is-active::before { transform: scaleX(1); }
-}
-
-/* Phones: the single column never grows past the screen, whatever the
-   call card inside a beat needs at its narrowest. */
-.caps__body { grid-template-columns: minmax(0, 1fr); }
-.caps__list, .caps__beat, .caps__inline, .caps__beat .cs { min-width: 0; }
-@media (max-width: 560px) {
-  .caps__beat { padding: 1.15rem 1rem 1.25rem; }
-  .caps__meet { font-size: clamp(3rem, 16vw, 4.2rem); }
 }

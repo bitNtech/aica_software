@@ -1,83 +1,76 @@
-/* Use cases: one glass panel per business, the open one expanded. */
-.uses { position: relative; padding: clamp(5rem, 12vh, 8.5rem) 0; }
-.uses__head { display: grid; gap: 1rem; justify-items: start; margin-bottom: clamp(2rem, 6vh, 3rem); }
-.uses__title { max-width: 16ch; font-size: clamp(2.4rem, 1rem + 4.4vw, 4.8rem); }
+.uses {
+  padding: clamp(5rem, 12vh, 8.5rem) 0;
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, rgba(255, 110, 66, 0.1), transparent 70%),
+    var(--coal);
+}
+.uses__head { display: grid; gap: 1rem; margin-bottom: clamp(2rem, 6vh, 3.5rem); }
+.uses__title { max-width: 14ch; font-size: clamp(2.6rem, 1rem + 5vw, 5.6rem); }
 
-.uses__list { display: grid; gap: 0.75rem; }
-.use {
-  position: relative;
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--r-card);
-  background: var(--glass);
-  box-shadow: var(--hl), var(--float);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.35);
-  backdrop-filter: blur(var(--blur)) saturate(1.35);
-  transition: border-color 0.35s var(--ease), background-color 0.35s var(--ease), transform 0.4s var(--out);
+.uses__list { border-top: 1px solid var(--line-d); }
+.use { position: relative; border-bottom: 1px solid var(--line-d); }
+/* An orange sweep under the row as you point at it, like a line lighting up. */
+.use::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--orange);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.55s var(--out);
+  pointer-events: none;
 }
 @media (hover: hover) {
-  .use:not(.is-open):hover { border-color: var(--glass-edge-hi); background: rgba(34, 36, 44, 0.36); transform: translateY(-2px); }
+  .use:not(.is-open):hover::before { transform: scaleY(1); }
+  .use:not(.is-open):hover .use__row { color: var(--orange-ink); }
+  .use:not(.is-open):hover .use__n, .use:not(.is-open):hover .use__tag { color: var(--orange-ink); border-color: rgba(29, 12, 5, 0.3); }
 }
-.use.is-open { border-color: var(--glass-edge-hi); background: linear-gradient(160deg, rgba(242, 232, 216, 0.1), transparent 45%), var(--glass); }
 .use h3 { position: relative; font-size: inherit; }
 .use__row {
   display: flex;
   align-items: center;
-  gap: clamp(0.75rem, 2vw, 1.5rem);
+  gap: clamp(0.75rem, 2vw, 2rem);
   width: 100%;
-  padding: clamp(1.1rem, 2.5vh, 1.5rem) clamp(1.1rem, 2.5vw, 1.75rem);
+  padding: clamp(1.1rem, 2.5vh, 1.75rem) 0.25rem;
   border: 0;
-  border-radius: inherit;
   background: none;
   color: var(--ivory);
   text-align: left;
+  transition: color 0.35s var(--ease);
 }
-.use__row:focus-visible { outline-offset: -3px; }
-.use__n {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 2.4rem;
-  height: 2.4rem;
-  border: 1px solid var(--glass-edge-hi);
-  border-radius: 50%;
-  font: 600 0.75rem var(--mono);
-  color: var(--ivory-3);
-  transition: background-color 0.35s var(--ease), color 0.35s var(--ease);
-}
-.use.is-open .use__n { background: var(--sky); border-color: var(--sky); color: var(--navy); }
-.use__name { font: 760 clamp(1.4rem, 1rem + 1.8vw, 2.4rem)/1.05 var(--display); letter-spacing: -0.03em; }
+.use__n { flex: none; width: 2.2rem; font: 500 0.75rem var(--mono); letter-spacing: 0.1em; color: var(--orange); transition: color 0.35s var(--ease); }
+.use__name { font: 800 clamp(1.75rem, 1rem + 3.4vw, 4.4rem)/1 var(--display); letter-spacing: -0.045em; }
 .use__tag {
   padding: 0.3rem 0.7rem;
-  border: 1px solid rgba(229, 138, 78, 0.45);
+  border: 1px solid rgba(255, 110, 66, 0.45);
   border-radius: 99px;
-  font: 500 0.66rem var(--mono);
-  letter-spacing: 0.12em;
+  font: 500 0.64rem var(--mono);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--sky);
+  color: var(--orange);
   white-space: nowrap;
+  transition: color 0.35s var(--ease), border-color 0.35s var(--ease);
 }
-.use__plus { position: relative; flex: none; width: 36px; height: 36px; margin-left: auto; border: 1px solid var(--glass-edge); border-radius: 50%; }
-.use__plus::before, .use__plus::after { content: ''; position: absolute; top: 50%; left: 30%; width: 40%; height: 2px; margin-top: -1px; border-radius: 2px; background: currentColor; transition: transform 0.45s var(--out); }
+.use__plus { position: relative; flex: none; width: 22px; height: 22px; margin-left: auto; }
+.use__plus::before, .use__plus::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 2px; margin-top: -1px; background: currentColor; transition: transform 0.45s var(--out); }
 .use__plus::after { transform: rotate(90deg); }
 .use.is-open .use__plus::after { transform: rotate(0deg); }
-.use.is-open .use__plus { color: var(--sky); border-color: rgba(229, 138, 78, 0.5); }
+.use.is-open .use__plus { color: var(--orange); }
 
 /* Opens to its own height with no measuring: a 0fr → 1fr grid row. */
 .use__panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.55s var(--out); }
 .use.is-open .use__panel { grid-template-rows: 1fr; }
-.use__panel-in { position: relative; overflow: hidden; display: grid; gap: 1rem 3rem; padding-inline: clamp(1.1rem, 2.5vw, 1.75rem); padding-left: calc(clamp(1.1rem, 2.5vw, 1.75rem) + 2.4rem + clamp(0.75rem, 2vw, 1.5rem)); }
-.use.is-open .use__panel-in { padding-bottom: 1.5rem; }
+.use__panel-in { position: relative; overflow: hidden; display: grid; gap: 1rem 3rem; padding-left: calc(2.2rem + clamp(0.75rem, 2vw, 2rem)); }
+.use.is-open .use__panel-in { padding-bottom: 2rem; }
 .use__panel-in > p { max-width: 26rem; color: var(--ivory-2); font-size: 1.05rem; }
 .use__calls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-content: start; }
 .use__calls li {
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--glass-edge);
+  border: 1px solid var(--line-d2);
   border-radius: 99px;
-  background: var(--glass-2);
   color: var(--ivory);
   font-size: 0.92rem;
 }
-.use__calls li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.55rem; vertical-align: 0.12em; border-radius: 50%; background: var(--sky); box-shadow: 0 0 8px var(--sky); }
+.use__calls li::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 0.55rem; vertical-align: 0.12em; border-radius: 50%; background: var(--orange); }
 
 @media (min-width: 900px) {
   .use__panel-in { grid-template-columns: 0.8fr 1.2fr; }
@@ -86,5 +79,5 @@
 @media (max-width: 560px) {
   .use__row .use__tag { display: none; }
   .use__tag--inline { display: inline-block; }
-  .use__panel-in { padding-left: clamp(1.1rem, 2.5vw, 1.75rem); }
+  .use__panel-in { padding-left: 0; }
 }

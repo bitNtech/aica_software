@@ -14,10 +14,9 @@ import Demo from './sections/Demo'
 import EndCard from './sections/EndCard'
 
 /**
- * One page, one goal: book a demo. The story: what AICA is and the problem
- * it solves, the film, how it handles a call, the languages it speaks, who
- * it's for, how it's set up — then the demo. Dark cinematic sections and
- * warm-white editorial ones (.paper) alternate.
+ * One page, one goal: book a demo. The order follows the film — the calls keep
+ * coming, nobody picks up, meet AICA, what it does, the languages it speaks —
+ * and then how to get it.
  */
 export default function App() {
   /* Section headings rise in as they arrive. Everything is visible in the
@@ -43,12 +42,12 @@ export default function App() {
       <Nav />
       <main id="main">
         <Hero />
-        <Problem />
         <Film />
+        <Problem />
         <Capabilities />
         <Languages />
-        <UseCases />
         <Steps />
+        <UseCases />
         <Demo />
         <EndCard />
       </main>
