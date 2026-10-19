@@ -51,6 +51,12 @@ class OrgContext:
     def slug(self) -> str:
         return self.org.slug
 
+    @property
+    def member_id(self) -> str | None:
+        """The member doing this: the person acted as while acting, None for bitNtech.
+        For records that say whose something is (handled by, asked by)."""
+        return self.member.id if self.member else None
+
     def is_self(self, member: MemberDoc) -> bool:
         return self.member is not None and member.id == self.member.id
 

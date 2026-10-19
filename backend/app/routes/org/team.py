@@ -10,7 +10,8 @@ Rules, checked here on every request (the console only hides buttons):
 - Someone who isn't an owner can only hand out permissions they hold
   themselves, whether by role or one at a time.
 - Every change is written to the organisation's activity in the same
-  transaction.
+  transaction. Someone who can no longer take calls has their open
+  callbacks unassigned in it too.
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ from ...services import Services, get_services
 from ...sessions import PLATFORM_CLAIM
 from ...store import MemberDoc, Tx, new_id, now
 from ..invites import new_invite, send_invite
+from .callbacks import unassign_open
 
 router = APIRouter(prefix="/api/orgs/{slug}/members", tags=["org"])
 
@@ -176,10 +178,14 @@ def change_role(member_id: str, body: MemberRoleIn, ctx: OrgContext = Depends(MA
         if beyond_own(ctx.access, set(default_permissions(role)) - set(permissions_for(m.role, m.permissions))):
             raise forbidden(GRANT)
         user = tx.get_user(m.uid) if m.status == "active" and m.uid else None
+        # Callbacks they can no longer take go back to nobody.
+        freed = unassign_open(tx, ctx.slug, m.id) if m.status == "active" and "calls.take" not in default_permissions(role) else []
         was = m.role
         # A new role starts from its own defaults.
         m.role, m.permissions = role, None
         tx.save_member(ctx.slug, m)
+        for c in freed:
+            tx.save_record(ctx.slug, "callback", c)
         if user:
             for x in user.memberships:
                 if x.orgSlug == ctx.slug:
@@ -192,7 +198,6 @@ def change_role(member_id: str, body: MemberRoleIn, ctx: OrgContext = Depends(MA
         return m
 
     m = svc.store.transact(run)
-    # Phase 3: a viewer can't take callbacks; unassign their open ones here.
     ctx.audit_acting("org_member_role_changed", f"{member_id} → {role}")
     return _members_out(svc, [m])[0]
 
@@ -216,14 +221,16 @@ def set_permissions(member_id: str, body: MemberPermissionsIn, ctx: OrgContext =
             return m
         if beyond_own(ctx.access, set(after) - set(before)):
             raise forbidden(GRANT)
+        freed = unassign_open(tx, ctx.slug, m.id) if m.status == "active" and "calls.take" not in after else []
         m.permissions = stored
         tx.save_member(ctx.slug, m)
+        for c in freed:
+            tx.save_record(ctx.slug, "callback", c)
         who = m.email if m.status == "invited" else m.name
         ctx.log(tx, "team", f"Changed what {who} can do" if stored is not None else f"Gave {who} the {ROLE_LABEL[m.role].lower()} defaults again")
         return m
 
     m = svc.store.transact(run)
-    # Phase 3: if they lost calls.take, unassign their open callbacks here.
     ctx.audit_acting("org_member_permissions_changed", member_id)
     return _members_out(svc, [m])[0]
 
@@ -246,7 +253,10 @@ def remove_member(member_id: str, ctx: OrgContext = Depends(MANAGE), svc: Servic
             raise ApiError(409, "invalid_input", "The organisation needs at least one owner.")
         user = tx.get_user(m.uid) if m.uid else None
         inv = tx.get_invite(m.inviteHash) if m.status == "invited" and m.inviteHash else None
+        freed = unassign_open(tx, ctx.slug, m.id) if m.status == "active" else []
         tx.delete_member(ctx.slug, m.id)
+        for c in freed:
+            tx.save_record(ctx.slug, "callback", c)
         if user:
             user.memberships = [x for x in user.memberships if x.orgSlug != ctx.slug]
             tx.save_user(user)
@@ -257,6 +267,5 @@ def remove_member(member_id: str, ctx: OrgContext = Depends(MANAGE), svc: Servic
         return m
 
     svc.store.transact(run)
-    # Phase 3: unassign their open callbacks here.
     ctx.audit_acting("org_member_removed", member_id)
     return Response(status_code=204)

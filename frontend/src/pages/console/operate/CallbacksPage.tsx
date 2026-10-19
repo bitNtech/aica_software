@@ -58,6 +58,7 @@ export default function CallbacksPage() {
 
   return (
     <ConsolePage
+      section="callbacks"
       kicker="Operate"
       title="Callbacks"
       docTitle="Callbacks"

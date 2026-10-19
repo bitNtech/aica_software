@@ -7,4 +7,6 @@ interface ImportMetaEnv {
   readonly VITE_API_URL?: string
   /** "live": organisation pages use the API where it exists (Team, Settings, Activity). Anything else: sample data. */
   readonly VITE_CONSOLE_MODE?: string
+  /** With VITE_CONSOLE_MODE=live: the live sections, comma-separated, e.g. "team,settings,activity,requests,calls". Empty: team, settings, activity, requests. */
+  readonly VITE_CONSOLE_LIVE?: string
 }

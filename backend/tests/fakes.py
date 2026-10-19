@@ -11,7 +11,7 @@ from app.errors import ApiError
 from app.identity import AuthUser, EmailExists, InvalidSession
 from app.services import Services
 from app.settings import Settings
-from app.store import ActivityDoc, AuditEntry, InviteDoc, MemberDoc, OrgDoc, SlugTaken, UserDoc, new_id, now, window_of
+from app.store import RECORDS, ActivityDoc, AuditEntry, InviteDoc, MemberDoc, OrgDoc, SlugTaken, UserDoc, new_id, now, window_of
 
 
 @dataclass
@@ -163,6 +163,59 @@ class MemoryStore:
         self.hits: dict[str, int] = {}
         # Seconds the fake clock is moved on, for rate-limit windows.
         self.clock_offset = 0.0
+        self.records: dict[tuple[str, str], dict] = {}  # (slug, kind) → id → record
+        self.notes: dict[tuple[str, str], list] = {}  # (slug, call id) → notes
+
+    # ---- Phase 2 and 3 records
+    def _recs(self, slug, kind):
+        assert kind in RECORDS
+        return self.records.setdefault((slug, kind), {})
+
+    def get_record(self, slug, kind, record_id):
+        return copy.deepcopy(self._recs(slug, kind).get(record_id))
+
+    def save_record(self, slug, kind, rec):
+        self._recs(slug, kind)[rec.id] = copy.deepcopy(rec)
+
+    def all_records(self, slug, kind):
+        return [copy.deepcopy(r) for r in self._recs(slug, kind).values()]
+
+    def list_requests(self, slug, limit=200):
+        return sorted(self.all_records(slug, "request"), key=lambda r: r.createdAt, reverse=True)[:limit]
+
+    def list_requests_everywhere(self, since, limit=500):
+        out = []
+        for (slug, kind), recs in self.records.items():
+            if kind == "request":
+                out += [(slug, copy.deepcopy(r)) for r in recs.values() if r.status in ("open", "in_progress") or r.updatedAt >= since]
+        return out[:limit]
+
+    def list_callbacks(self, slug, closed_since):
+        return [r for r in self.all_records(slug, "callback") if r.status == "open" or r.requestedAt >= closed_since]
+
+    def list_appointments(self, slug, date_from, date_to, limit=1000):
+        return sorted((r for r in self.all_records(slug, "appointment") if date_from <= r.date <= date_to), key=lambda r: r.date)[:limit]
+
+    def list_handoffs(self, slug, since):
+        return [r for r in self.all_records(slug, "handoff") if r.status == "waiting" or r.waitingSince >= since]
+
+    def list_calls(self, slug, f, limit):
+        rows = [
+            c for c in self.all_records(slug, "call")
+            if c.startedAt >= f.since
+            and (not f.agent_id or c.agentId == f.agent_id)
+            and (not f.outcome or c.outcome == f.outcome)
+            and (not f.handled_by_id or c.handledById == f.handled_by_id)
+            and (not f.tokens or set(f.tokens) & set(c.searchTokens))
+        ]
+        rows.sort(key=lambda c: c.startedAt, reverse=True)
+        return rows[:limit], len(rows)
+
+    def list_notes(self, slug, call_id):
+        return sorted(copy.deepcopy(self.notes.get((slug, call_id), [])), key=lambda n: n.at)
+
+    def add_note(self, slug, call_id, note):
+        self.notes.setdefault((slug, call_id), []).append(copy.deepcopy(note))
 
     def get_user(self, uid):
         return copy.deepcopy(self.users.get(uid))
@@ -333,6 +386,17 @@ class MemoryTx:
     def add_activity(self, slug, entry):
         self.writes.append(lambda e=copy.deepcopy(entry): self.s.add_activity(slug, e))
 
+    def get_record(self, slug, kind, record_id):
+        self._read()
+        return self.s.get_record(slug, kind, record_id)
+
+    def open_callbacks_of(self, slug, member_id):
+        self._read()
+        return [c for c in self.s.all_records(slug, "callback") if c.status == "open" and c.assignedToId == member_id]
+
+    def save_record(self, slug, kind, rec):
+        self.writes.append(lambda r=copy.deepcopy(rec): self.s.save_record(slug, kind, r))
+
     def commit(self):
         for w in self.writes:
             w()
@@ -360,6 +424,9 @@ class FakeMailer:
 
     def signup_decided(self, to, org_name, approved, reason, url):
         return self._rec("approved" if approved else "declined", to, url)
+
+    def change_request(self, to, org_name, title, event, by, url):
+        return self._rec(f"request-{event}", ",".join(to) if isinstance(to, list) else to, url)
 
     def master_admin_added(self, to, who, by, invited, url):
         return self._rec("master-alert", ",".join(to), url)

@@ -36,7 +36,7 @@ export interface AgentSummary {
 
 /** The parts of the console that move from demo data to the API one at a
  * time (docs/backend-workflow.md). */
-export type ConsoleSection = 'team' | 'settings' | 'activity'
+export type ConsoleSection = 'team' | 'settings' | 'activity' | 'requests' | 'calls' | 'callbacks' | 'appointments' | 'handoffs'
 
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
  * written for the person using the console. Pages show it as-is, so a real
@@ -126,6 +126,9 @@ export interface ConsoleClient {
   withdrawChangeRequest(orgSlug: string, id: string): Promise<ChangeRequest>
   /** Master admin: moves a request on, with a note to the hospital. */
   updateChangeRequest(orgSlug: string, id: string, patch: ChangeRequestPatch): Promise<ChangeRequest>
+  /** bitNtech: every organisation's open requests and recent ones, in one
+   * call. Absent: Ops asks each organisation in turn. */
+  listAllChangeRequests?(): Promise<(ChangeRequest & { orgName: string })[]>
 
   // ---- bot desk (front desk run the agents day to day)
   getDesk(orgSlug: string): Promise<Desk>

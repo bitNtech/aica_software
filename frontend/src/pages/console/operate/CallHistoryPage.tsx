@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { asAuthError } from '../../../auth/types'
 import { useConsole } from '../../../console/ConsoleProvider'
+import { flowRequestDetail } from '../../../console/flowRequest'
 import type { AgentSummary, CallLogPage, CallOutcome, CallQuery, DetectedFlowPattern } from '../../../console/types'
 import { can, pageAccess } from '../../../console/access'
 import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../../console/flowPatternConfig'
@@ -130,7 +131,7 @@ export default function CallHistoryPage() {
         kind: 'flow_change',
         agentId: pattern.agentId,
         title: 'New call flow pattern detected',
-        detail: `${pattern.occurrences} of the last ${pattern.windowSize} calls to ${pattern.agentName} followed this step sequence, which isn't part of its current flow:\n${pattern.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nCalls: ${pattern.callIds.join(', ')}`,
+        detail: flowRequestDetail(pattern),
         urgency: 'normal',
       })
       setShowFlow(false)
@@ -144,6 +145,7 @@ export default function CallHistoryPage() {
 
   return (
     <ConsolePage
+      section="calls"
       kicker="Operate"
       title={own ? 'Calls you handled' : 'Call history'}
       docTitle="Call history"

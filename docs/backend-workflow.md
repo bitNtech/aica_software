@@ -1,6 +1,6 @@
 # Backend workflow: what to build, and how to connect it
 
-**Status:** written 2026-10-19 from a read-only audit of `backend/` and `frontend/`. **Updated 2026-10-19: Foundations (§3) and Phase 1 (§4) are built and tested; see [Decisions](#decisions-made-while-building-foundations-and-phase-1) and [Follow-ups](#follow-ups-from-foundations-and-phase-1).** Phases 2–8 are still plans.
+**Status:** written 2026-10-19 from a read-only audit of `backend/` and `frontend/`. **Updated 2026-10-19: Foundations (§3) and Phases 1–3 (§4) are built and tested; see [Decisions](#decisions-made-while-building-foundations-and-phase-1), [Phase 2 and 3 decisions](#decisions-made-while-building-phases-2-and-3) and the follow-ups.** Phases 4–8 are still plans.
 **Scope:** everything the backend still needs **except** the AI, LLM, voice-pipeline and agent-runtime work. That work is listed under [Out of scope](#out-of-scope-ai-llm-and-agent-work) so it isn't forgotten, but it isn't planned here.
 
 Endpoint paths and collection names marked *proposed* don't exist yet. Agree on them before building.
@@ -17,16 +17,16 @@ Endpoint paths and collection names marked *proposed* don't exist yet. Agree on 
 | **Sessions** | Live. The `aica_session` cookie is HttpOnly and holds a Firebase session cookie, checked on every request. Lifetime is 8 hours, or 14 days with "remember me". |
 | **Ops (bitNtech)** | Live. Signup review, org suspend/restore, staff invites, people management, act-as with an audit trail. |
 | **Invites** | Live. Staff invitations, and organisation invitations from the Team page: revoked when resent or cancelled, accepted with a new account or, signed in, with an existing one (`POST /api/invites/{token}/join`). |
-| **Organisations** | Live for Phase 1: `/api/orgs/{slug}/members…`, `/settings`, `/activity`, behind `org_member` / `org_permission`. |
+| **Organisations** | Live for Phases 1–3: members, settings, activity, requests to bitNtech, calls and notes, callbacks, appointments and handoffs under `/api/orgs/{slug}/…`, behind `org_member` / `org_permission`. Calls and handoffs have no way in from the pipeline yet (§5); a seed script fills staging. |
 | **Leads** | Live. `POST /api/leads/demo` emails the request and stores nothing. |
 | **Storage** | Firestore through `firebase-admin`, behind a `Store` Protocol (`app/store.py`). Collections: `users`, `orgs`, `invites`, `login_attempts`, `audit`, `impersonations`. |
 | **Security baseline** | A CSRF guard (same-origin check on writes), `no-store` and `nosniff` headers, CORS with exact origins, per-route rate limits shared across instances (Firestore), JSON request logs without personal data. |
-| **Tests** | 198 pytest tests (3 skipped by design) on in-memory fakes, so no credentials are needed; 309 frontend tests. (This audit first said 82; there were 90 before Phase 1.) |
+| **Tests** | 317 pytest tests (3 skipped by design) on in-memory fakes, so no credentials are needed; 314 frontend tests. (This audit first said 82; there were 90 before Phase 1.) |
 | **CI/CD** | GitHub Actions to Vercel. Pull requests run CI; `main` runs CI, deploys the backend, then the frontend, then a smoke test. |
 
 ### What doesn't exist
 
-- **Org endpoints beyond Phase 1.** Agents, desk, calls, callbacks, appointments, reports, billing and requests still run on the in-browser demo client, `frontend/src/console/demoClient.ts`.
+- **Org endpoints beyond Phase 3.** Agents, the desk, live calls, reports, the library and billing still run on the in-browser demo client, `frontend/src/console/demoClient.ts`.
 - **No HTTP `OpsClient`.** `createDemoOpsClient()` still serves the Ops pages that have no API.
 - **No "My account" endpoints** (profile, devices, notification preferences). They are optional on `AuthClient`, and the UI shows them as unavailable.
 
@@ -147,12 +147,16 @@ These unlock real multi-user orgs.
 | `listChangeRequests` | `GET /requests` |
 | `createChangeRequest` | `POST /requests` (`requests.create`) |
 | `replyChangeRequest` | `POST /requests/{id}/reply` |
-| `withdrawChangeRequest` | `POST /requests/{id}/withdraw` (creator or `requests.create`) |
+| `withdrawChangeRequest` | `POST /requests/{id}/withdraw` (creator or ~~`requests.create`~~ **`team.manage`**, as the UI and demo already did) |
 | `updateChangeRequest` | `POST /requests/{id}/update` (**master admin only**) |
-| `requestNumber` | creates a request of kind `number` |
+| `requestNumber` | `POST /requests/number` (`library.numbers` or `requests.create`): a request of kind `number` |
 
-- [ ] Add an Ops view across all orgs, for `OpsChangesPage` and `/ops/orgs/:slug/requests`.
-- [ ] Send email through `app/mailer.py` (Resend) when a request is created or replied to.
+**Status: built** (`backend/app/routes/org/requests.py`, `tests/test_org_requests.py`). Validation messages, rules and activity entries match the demo client. Reading needs `requests.create` or `agents.view`; bitNtech can always read. bitNtech never creates requests, and bitNtech staff who aren't the master admin read but don't reply.
+
+- [x] Add an Ops view across all orgs, for `OpsChangesPage` and `/ops/orgs/:slug/requests`. *`GET /api/ops/change-requests` (bitNtech): open requests and any updated in 90 days, in one collection-group query. `OpsChangesPage` uses it (`listAllChangeRequests`) instead of one call per org. `/ops/orgs/:slug/requests` already uses the org route.*
+- [x] Send email through `app/mailer.py` (Resend) when a request is created or replied to. *A new request or a hospital reply goes to `CHANGE_REQUESTS_TO` (default `support@bitntech.in`). A bitNtech reply or status change goes to the person who asked, if they're still in the team. Emails hold only the title and a link.*
+- [x] **Agents aren't on the server yet** (Phase 6). The console sends the agent's name with `agentId`, and the server stores it for display without checking it.
+- [x] A request from a detected call pattern could go over the 2,000-character limit. `frontend/src/console/flowRequest.ts` cuts the call list short (`… and N more`).
 
 ### Phase 3: Operations data (callbacks, appointments, call log, notes)
 
@@ -167,10 +171,18 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `addCallNote` | `POST /calls/{id}/notes` | any member who can see the call |
 | `listHandoffs` / `takeHandoff` / `handoffToCallback` | `GET /handoffs`, `POST /handoffs/{id}/take`, `/to-callback` | `calls.take` |
 
-- [ ] **Front desk sees only calls they handled.** Enforce this server-side, not in the UI.
-- [ ] **Mask phone numbers and names** without `calls.personal`, matching the UI rules.
-- [ ] **Recordings:** return signed, short-lived URLs only with `calls.recordings`. Never return a public bucket path.
-- [ ] **Search:** Firestore can't do free-text search. Store a normalized search field (last digits of the number, intent) or add a search service later.
+**Status: built** for storage, reading and updating (`backend/app/routes/org/{calls,callbacks,appointments,handoffs}.py`, `tests/test_org_operations.py`). There is **no way in for the pipeline yet**: call records and handoffs come from `app/scripts/seed_operations.py` on staging until §5's contracts are agreed. Live calls (`listLiveCalls`, take over, whisper, transfer) stay on sample data.
+
+- [x] **Front desk sees only calls they handled.** Enforce this server-side, not in the UI. *Matched by `handledById` (the demo matched by name). Taking a handoff marks its call as handled by that person.*
+- [x] **Mask phone numbers and names** without `calls.personal`, matching the UI rules. *`app/redact.py`. Callers' numbers on calls and handoffs are always masked (`+91 ••••• 43210`), as the console shows them. Without `calls.personal`, the server removes callers' names, personal details, personal values in transcripts and the summary, and analysis fields with a personal label. Callbacks carry the full number, because the person calling back needs it. Appointments show the phone only with `appointments.manage`, and the patient's name only with `calls.personal`.*
+- [ ] **Recordings:** return signed, short-lived URLs only with `calls.recordings`. Never return a public bucket path. *Not built: no recording storage has been agreed (§5). The API returns `hasRecording` only.*
+- [x] **Search:** Firestore can't do free-text search. Store a normalized search field (last digits of the number, intent) or add a search service later. *`searchTokens` on each call: 3–5 digit runs of the number's last five digits, intent and agent words, and name words (prefixed, matched only for people with `calls.personal`). A search of several words uses its longest word. Totals use Firestore's count query.*
+- [x] **Phase 1's deferred hooks:** someone who is removed, made a viewer, or loses `calls.take` has their open callbacks unassigned in the same transaction.
+- [x] **Rules settled where the demo was looser:**
+  - listing appointments needs `appointments.manage` or `calls.viewAll`;
+  - callbacks can only be given to someone who holds `calls.take`, not merely a non-viewer;
+  - notes can't be added by viewers or by bitNtech staff.
+- Operations changes don't write activity entries, as in the demo: they're day-to-day work, not configuration.
 
 ### Phase 4: Reports
 
@@ -286,8 +298,8 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 
 1. ~~Foundations (§3): access dependency, permission parity test, store layer, conventions.~~ **Done.**
 2. ~~Phase 1, Team and settings: the first real multi-user value.~~ **Done**, apart from the manual rollout steps in Follow-ups.
-3. Phase 2, Requests to bitNtech: small, and it's already used by the detected-flow feature.
-4. Phase 3, Operations data, seeded by a script, while the pipeline contracts (§5) are agreed in parallel.
+3. ~~Phase 2, Requests to bitNtech: small, and it's already used by the detected-flow feature.~~ **Done.**
+4. ~~Phase 3, Operations data, seeded by a script, while the pipeline contracts (§5) are agreed in parallel.~~ **Done** for storage, reading and updating; pipeline ingestion waits on §5.
 5. Phase 4, Reports, on rollups.
 6. Phase 5, Library, then Phase 6, Agents CRUD, then Phase 7, Desk.
 7. Phase 8, Billing, My account and Ops extras.
@@ -312,6 +324,38 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 | Demo label | Per section (`isLive`) | Mixed demo/live pages must say which is which |
 | Default hours | Mon–Sat 09:00–18:00, Sunday closed | Applies until an organisation saves its own |
 
+## Decisions made while building Phases 2 and 3
+
+| Question | Decision |
+|---|---|
+| Withdrawing a request | The person who asked, or `team.manage` (the doc said `requests.create`; the UI and demo said `team.manage`) |
+| bitNtech staff and requests | Read only; only the master admin replies and moves them on |
+| Long detected-pattern requests | Trim the call list on the frontend; the 2,000-character limit stays |
+| Operations data in production | `VITE_CONSOLE_LIVE` lists live sections; the default is Team, Settings, Activity and Requests, so the operations pages stay on sample data until an environment opts in (they'd be empty without the pipeline) |
+| Activity for operations changes | None, as in the demo |
+| Seed data | Only for orgs whose name or slug says test or demo (or `--force`), only with `--yes`, every record marked `seeded: true` |
+
+## Follow-ups from Phases 2 and 3
+
+**Manual steps:**
+1. Create the new composite indexes and the two collection-group field overrides in `backend/firestore.indexes.json` (calls, callbacks, changeRequests).
+2. Optionally set `CHANGE_REQUESTS_TO` on the backend's Vercel project.
+3. On staging: `python -m app.scripts.seed_operations --org <test-org> --yes`, then set `VITE_CONSOLE_LIVE=team,settings,activity,requests,calls,callbacks,appointments,handoffs` and check those pages in a browser. Not yet done against real Firestore.
+
+**Found by the independent review and fixed:**
+- The call-log count wasn't ordered like the list, so every filtered call log (including every front-desk user's) would have needed indexes that don't exist. It now counts the same ordered query, and a test checks the query shape.
+- Callbacks showed callers' names to people without `calls.personal`.
+- Tool-call summaries and analysis text weren't scrubbed.
+- An assignee removed at the same moment could still be given a callback.
+- Work done while acting as a member wasn't recorded as theirs.
+- The Ops list included suspended organisations.
+
+**Known limitations:**
+- No pipeline ingestion: calls, handoffs and agent-booked appointments can't arrive until §5 is agreed. Recordings aren't served.
+- A call-log search matches one word (the longest), not a phrase.
+- Request emails go to a fixed list, not to each master admin's account.
+- In live mode, demo pages that create requests (Agents, the agent workspace) send demo agent ids, stored as given until Phase 6.
+
 ## Follow-ups from Foundations and Phase 1
 
 **Manual steps before turning `VITE_CONSOLE_MODE=live` on in an environment:**
@@ -324,7 +368,7 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 **Found by the independent review and fixed:** older members who hadn't signed in were invisible on the Team page and couldn't be removed (now `sync_members`); `/join` could replace an older member's role (now refused); a lost reply after a committed accept could delete the new account (now kept). **Accepted as designed:** owners can hand out any permission, including ones another owner restricted on them.
 
 **Known limitations:**
-- In live mode the Callbacks and Live calls pages (still sample data) receive the **real** team list, so assigning a demo callback to a real person is refused. This lasts until Phase 3 moves callbacks to the server.
+- ~~In live mode the Callbacks and Live calls pages (still sample data) receive the real team list.~~ Resolved once `callbacks` is in `VITE_CONSOLE_LIVE`: callbacks are on the server since Phase 3. Live calls (sample data) still get the real team for transfers.
 - Ops' suspend, restore and approve still overwrite the whole org document. A settings save made at the same instant could be undone by one of them. Settings themselves write only their own fields. Move the Ops writes to field updates when convenient.
 - `/ops/audit` pages by timestamp alone, so entries with the same timestamp can be skipped. Use the activity cursor approach there too.
 - `orgs/{slug}.ownerUid` still names the sign-up owner after ownership changes. Ops uses it for the owner's email.

@@ -32,7 +32,7 @@ export default function CallDetailPage() {
 
   if (call.state !== 'ready') {
     return (
-      <ConsolePage kicker={back} title="Call" docTitle="Call">
+      <ConsolePage section="calls" kicker={back} title="Call" docTitle="Call">
         {call.state === 'loading' ? (
           <div className="loading-row" role="status">
             <Spinner />
@@ -62,6 +62,7 @@ export default function CallDetailPage() {
 
   return (
     <ConsolePage
+      section="calls"
       kicker={back}
       title={redact ? 'A caller' : (c.callerName ?? c.callerPhone)}
       docTitle={`Call at ${timeOfDay(c.startedAt)}`}

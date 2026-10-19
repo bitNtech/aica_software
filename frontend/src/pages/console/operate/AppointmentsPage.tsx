@@ -149,6 +149,7 @@ export default function AppointmentsPage() {
 
   return (
     <ConsolePage
+      section="appointments"
       kicker="Operate"
       title="Appointments"
       docTitle="Appointments"

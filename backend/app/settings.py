@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     email_from: str = "AICA <onboarding@resend.dev>"
     # Who gets the landing page's demo requests. Comma-separated.
     demo_request_to: str = "support@bitntech.in"
+    # Who at bitNtech hears about new requests and hospitals' replies. Comma-separated.
+    change_requests_to: str = "support@bitntech.in"
 
     google_client_id: str = ""
     google_client_secret: str = ""
@@ -92,6 +94,10 @@ class Settings(BaseSettings):
     @property
     def demo_recipients(self) -> list[str]:
         return [a.strip() for a in self.demo_request_to.split(",") if a.strip()]
+
+    @property
+    def change_request_recipients(self) -> list[str]:
+        return [a.strip() for a in self.change_requests_to.split(",") if a.strip()]
 
     @property
     def firestore_database_id(self) -> str | None:

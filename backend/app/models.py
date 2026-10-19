@@ -341,3 +341,190 @@ class ActivityPageOut(Camel):
     entries: list[ActivityEntryOut]
     # Pass as `before` for the next page; None on the last page.
     next_before: str | None = None
+
+
+# ---- Phase 2: requests to bitNtech (frontend/src/console/types.ts ChangeRequest)
+
+
+class NewChangeRequestIn(Camel):
+    """Sizes only cap the body; the route checks each value and says what's wrong."""
+
+    kind: str = Field(max_length=40)
+    agent_id: str | None = Field(None, max_length=128)
+    # The agent's name as the console shows it. Agents aren't on the server
+    # until Phase 6, so it's taken as given (and only for display).
+    agent_name: str | None = Field(None, max_length=120)
+    title: str = Field(max_length=1000)
+    detail: str = Field(max_length=10000)
+    urgency: str = Field(max_length=20)
+
+
+class ReplyIn(Camel):
+    text: str = Field(max_length=10000)
+
+
+class NumberRequestIn(Camel):
+    note: str = Field("", max_length=10000)
+
+
+class ChangeRequestPatchIn(Camel):
+    status: Literal["open", "in_progress", "done", "declined"] | None = None
+    reply: str | None = Field(None, max_length=10000)
+
+
+class ChangeReplyOut(Camel):
+    id: str
+    by: str
+    by_kind: Literal["member", "bitntech"]
+    at: str
+    text: str
+
+
+class ChangeRequestOut(Camel):
+    id: str
+    org_slug: str
+    kind: Literal["new_agent", "flow_change", "integration", "number", "other"]
+    agent_id: str | None
+    agent_name: str | None
+    title: str
+    detail: str
+    urgency: Literal["normal", "soon", "urgent"]
+    status: Literal["open", "in_progress", "done", "declined", "withdrawn"]
+    created_at: str
+    created_by: str
+    created_by_id: str | None
+    updated_at: str
+    replies: list[ChangeReplyOut]
+
+
+class OpsChangeRequestOut(ChangeRequestOut):
+    org_name: str
+
+
+# ---- Phase 3: operations data
+
+
+CallOutcome = Literal["resolved", "booked", "handed_over", "callback", "dropped", "emergency"]
+AppointmentStatus = Literal["needs_check", "booked", "confirmed", "cancelled"]
+
+
+class CollectedDetailOut(Camel):
+    label: str
+    value: str
+    personal: bool
+
+
+class CallNoteOut(Camel):
+    id: str
+    by: str
+    at: str
+    text: str
+
+
+class CallSummaryOut(Camel):
+    id: str
+    agent_id: str
+    agent_name: str
+    line: str
+    caller_phone: str
+    caller_name: str | None
+    started_at: str
+    duration_sec: int
+    language: str
+    intent: str
+    outcome: CallOutcome
+    handled_by: str | None
+
+
+class CallRecordOut(CallSummaryOut):
+    summary: str
+    path: list[str]
+    details: list[CollectedDetailOut]
+    # Passed through as the pipeline wrote them (TranscriptTurn, ToolCallRecord, …).
+    tool_calls: list[dict]
+    knowledge_used: list[str]
+    transcript: list[dict]
+    notes: list[CallNoteOut]
+    has_recording: bool
+    handled_by_id: str | None
+    analysis: dict
+    metrics: dict
+
+
+class CallLogPageOut(Camel):
+    calls: list[CallSummaryOut]
+    total: int
+
+
+class NoteIn(Camel):
+    text: str = Field(max_length=10000)
+
+
+class AssigneeOut(Camel):
+    id: str
+    name: str
+
+
+class CallbackOut(Camel):
+    id: str
+    caller_name: str | None
+    caller_phone: str
+    reason: str
+    requested_at: str
+    due_by: str
+    assigned_to: AssigneeOut | None
+    status: Literal["open", "done", "unreachable"]
+    attempts: int
+    notes: list[CallNoteOut]
+    call_id: str | None
+
+
+class CallbackPatchIn(Camel):
+    # Absent: unchanged. null: unassign.
+    assigned_to: str | None = Field(None, max_length=128)
+    attempt: Literal["reached", "no_answer"] | None = None
+    reopen: bool | None = None
+    note: str | None = Field(None, max_length=10000)
+
+
+class AppointmentOut(Camel):
+    id: str
+    patient_name: str
+    phone: str
+    department: str
+    doctor: str
+    date: str
+    time: str
+    status: AppointmentStatus
+    check_reason: str | None = None
+    booked_by: Literal["agent", "staff"]
+    agent_name: str | None
+    call_id: str | None
+    created_at: str
+    note: str | None = None
+
+
+class AppointmentPatchIn(Camel):
+    status: AppointmentStatus | None = None
+    date: str | None = Field(None, max_length=20)
+    time: str | None = Field(None, max_length=10)
+    department: str | None = Field(None, max_length=1000)
+    doctor: str | None = Field(None, max_length=1000)
+    note: str | None = Field(None, max_length=10000)
+
+
+class HandoffOut(Camel):
+    id: str
+    call_id: str
+    agent_name: str
+    line: str
+    caller_phone: str
+    reason: str
+    summary: str
+    details: list[CollectedDetailOut]
+    language: str
+    waiting_since: str
+    status: Literal["waiting", "taken", "missed"]
+    taken_by: str | None
+    taken_at: str | None
+    emergency: bool

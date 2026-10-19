@@ -173,3 +173,18 @@ def test_signup_writes_the_owner_member_record(env):
     uid = fb.by_email("owner@clinic.in").user.uid
     assert store.get_member("lakshmi-skin-clinic", uid).role == "owner"
     assert store.get_user(uid).memberships == [Membership("lakshmi-skin-clinic", "owner")]
+
+
+def test_seed_operations_writes_marked_records_only_when_asked():
+    from app.scripts.seed_operations import seed as seed_ops_script
+
+    from .orgkit import seed as seed_people
+
+    svc, fb, store, _ = make_services()
+    seed_people(fb, store)
+    dry = seed_ops_script(svc, SLUG, calls=40, write=False)
+    assert dry["calls"] == 40 and not store.all_records(SLUG, "call")
+    seed_ops_script(svc, SLUG, calls=40, write=True)
+    calls = store.all_records(SLUG, "call")
+    assert len(calls) == 40 and all(c.seeded for c in calls)
+    assert all(r.seeded for k in ("handoff", "callback", "appointment") for r in store.all_records(SLUG, k))

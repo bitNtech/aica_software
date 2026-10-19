@@ -45,6 +45,7 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `FIRESTORE_DATABASE` | `(default)`, the project's only Firestore database (asia-south1) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend. `onboarding@resend.dev` only delivers to the Resend account owner |
 | `DEMO_REQUEST_TO` | Who receives the landing page's "Book a demo" requests, comma-separated. Default `support@bitntech.in` |
+| `CHANGE_REQUESTS_TO` | Who at bitNtech is emailed about new requests and hospitals' replies, comma-separated. Default `support@bitntech.in` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The OAuth web client Firebase created for Google sign-in. Leave both empty to switch Google sign-in off: the button then returns to the login page with a "not set up yet" message |
 | `APP_URL` | The frontend's public URL, for email links and the redirect after Google. `http://localhost:5173` locally. **Required on Vercel** |
 | `API_URL` | This API's public URL when it has its own host, e.g. `https://api.aica.bitntech.in`; the Google redirect URI is built from it. Empty locally (same origin through the Vite proxy). On Vercel it defaults to the deployment's own URL |
@@ -79,6 +80,15 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | POST | `/api/orgs/{slug}/members/{id}/resend`, `/role` (`{"role"}`), `/permissions` (`{"permissions": [...] \| null}`), `/remove` | `team.manage`. See "Organisations" below |
 | GET/POST | `/api/orgs/{slug}/settings` | `settings.manage`. Name, city, languages, hours (7 days, Monday first), closed days |
 | GET | `/api/orgs/{slug}/activity?area=&actorId=&before=&limit=` | `activity.view`. Newest first, 25 a page; `before` is the previous page's `nextBefore`. Billing entries for owners only |
+| GET/POST | `/api/orgs/{slug}/requests` | read: `requests.create` or `agents.view` (and bitNtech); create: `requests.create`, members only |
+| POST | `/api/orgs/{slug}/requests/number` | `library.numbers` or `requests.create`. Asks bitNtech for another number |
+| POST | `/api/orgs/{slug}/requests/{id}/reply`, `/withdraw`, `/update` | reply: `requests.create` or the master admin; withdraw: who asked, or `team.manage`; update (status and reply): master admin only |
+| GET | `/api/ops/change-requests` | bitNtech. Every organisation's open requests and those updated in 90 days |
+| GET | `/api/orgs/{slug}/calls?days=&agentId=&outcome=&q=&limit=`, `/calls/{id}` | `calls.viewAll`, or `calls.take` for calls they handled. Numbers masked; names and personal details only with `calls.personal` |
+| POST | `/api/orgs/{slug}/calls/{id}/notes` | anyone who can see the call, except viewers and bitNtech staff |
+| GET/POST | `/api/orgs/{slug}/callbacks`, `/callbacks/{id}` | `calls.take` (own and unassigned) or `callbacks.assign` (all). Patch: `assignedTo`, `attempt`, `reopen`, `note` |
+| GET/POST | `/api/orgs/{slug}/appointments?from=&to=`, `/appointments/{id}` | read: `appointments.manage` or `calls.viewAll`; change: `appointments.manage` |
+| GET/POST | `/api/orgs/{slug}/handoffs`, `/handoffs/{id}/take`, `/to-callback` | `calls.take`. Taking one marks the call as handled by that person |
 | POST | `/api/leads/demo` | anyone, from an allowed origin. The landing page's demo form: validated, emailed to `DEMO_REQUEST_TO` through Resend, not stored. 204 when sent, 503 when Resend fails, 5 per minute per IP. A filled-in `website` honeypot gets 204 and is dropped |
 | GET | `/api/ops/orgs`, `/api/ops/signup-requests` | bitNtech staff and master admin |
 | POST | `/api/ops/signup-requests/{slug}/approve`, `/decline` | bitNtech staff and master admin |
@@ -129,9 +139,16 @@ A master admin can act as a client user to see exactly what they see. It's audit
 `firestore.indexes.json` lists every composite index the API's queries need. Create them **before** deploying code that uses them, either with `firebase deploy --only firestore:indexes` from `backend/` (needs a `firebase.json` pointing at the file), or by hand in Firebase console → Firestore Database → Indexes → Composite:
 
 - collection `audit`: `action` (or `actor`, or `target`) Ascending, then `at` Descending;
+- collection `calls`: `agentId`, `outcome`, `handledById` (any combination, Ascending), optionally `searchTokens` (Array contains), then `startedAt` Descending — 15 indexes;
+- collection `callbacks`: `status`, `assignedToId`;
+- field overrides with **collection-group** scope on `changeRequests`: `status` and `updatedAt` (for `/api/ops/change-requests`);
 - collection `activity` (scope: collection): each of `area`; `actorId`; `area`, `actorId`; `ownerOnly`; `ownerOnly`, `area`; `ownerOnly`, `actorId`; `ownerOnly`, `area`, `actorId` — all Ascending — then `at` Descending.
 
 Until they exist, the unfiltered audit log and an owner's unfiltered activity work, and other queries answer 503 with an explanation.
+
+### Sample operations data for staging
+
+Until the voice pipeline writes calls: `.venv/bin/python -m app.scripts.seed_operations --org <slug>` says what it would write, and `--yes` writes it. It refuses organisations whose name or slug doesn't contain "test" or "demo" (unless `--force`), and marks every record `seeded: true`.
 
 ### Firestore TTL for rate-limit counters
 

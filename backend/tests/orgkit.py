@@ -83,3 +83,38 @@ def token_of(url: str) -> str:
 def err(r) -> tuple[int, str, str]:
     e = r.json().get("error", {})
     return r.status_code, e.get("code", ""), e.get("message", "")
+
+
+def seed_ops(store, people, slug=SLUG):
+    """One of each Phase 2/3 record, with fixed ids. The call was handled by
+    front desk; the request was made by the owner."""
+    from datetime import timedelta
+
+    from app.redact import search_tokens
+    from app.store import AppointmentDoc, CallbackDoc, CallDoc, ChangeRequestDoc, HandoffDoc, now
+
+    t = now()
+    fd_uid = people["front_desk"][0]
+    store.save_record(slug, "request", ChangeRequestDoc(
+        id="cr_1", kind="other", title="Add Saturday hours", detail="Please add our Saturday OPD hours.", urgency="normal",
+        status="open", createdAt=t, createdBy="Owner", createdById=people["owner"][0], updatedAt=t,
+    ))
+    store.save_record(slug, "call", CallDoc(
+        id="call_1", agentId="ag_1", agentName="Main reception", line="+91 422 400 1000", callerPhone="9840243210",
+        startedAt=t - timedelta(minutes=30), durationSec=184, language="tamil", intent="Book OPD visit", outcome="handed_over",
+        callerName="Lakshmi K", handledBy="Front Desk", handledById=fd_uid,
+        summary="Lakshmi K wants an OPD visit on Friday.", details=[{"label": "Patient name", "value": "Lakshmi K", "personal": True}, {"label": "Department", "value": "OPD", "personal": False}],
+        transcript=[{"speaker": "caller", "at": 1, "text": "I am {{name:Lakshmi K}}, my number is {{phone:98402 43210}}"}],
+        analysis={"sentiment": "neutral", "success": True, "successReason": "Booked", "fields": [{"label": "Patient name", "value": "Lakshmi K"}]},
+        searchTokens=search_tokens("9840243210", "Book OPD visit", "Main reception", "Lakshmi K"),
+    ))
+    store.save_record(slug, "callback", CallbackDoc(id="cb_1", callerPhone="9840211111", reason="Wants test results", requestedAt=t, dueBy=t + timedelta(hours=2), callerName="Ravi"))
+    store.save_record(slug, "appointment", AppointmentDoc(
+        id="apt_1", patientName="Meena R", phone="9840222222", department="Cardiology", doctor="Dr. Arvind", date=t.date().isoformat(), time="10:30",
+        status="needs_check", bookedBy="agent", createdAt=t, agentName="Main reception", callId="call_1", checkReason="The caller wasn't sure of the date.",
+    ))
+    store.save_record(slug, "handoff", HandoffDoc(
+        id="ho_1", callId="call_1", agentName="Main reception", line="+91 422 400 1000", callerPhone="9840243210", reason="Asked for a person",
+        summary="Lakshmi K is asking about her scan report.", language="tamil", waitingSince=t - timedelta(minutes=2),
+        details=[{"label": "Patient name", "value": "Lakshmi K", "personal": True}],
+    ))
