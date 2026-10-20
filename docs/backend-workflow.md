@@ -1,6 +1,6 @@
 # Backend workflow: what to build, and how to connect it
 
-**Status:** written 2026-10-19 from a read-only audit of `backend/` and `frontend/`. **Updated 2026-10-19: Foundations (§3) and Phases 1–3 (§4) are built and tested; see [Decisions](#decisions-made-while-building-foundations-and-phase-1), [Phase 2 and 3 decisions](#decisions-made-while-building-phases-2-and-3) and the follow-ups.** Phases 4–8 are still plans.
+**Status:** written 2026-10-19 from a read-only audit of `backend/` and `frontend/`. **Updated 2026-10-20: Foundations (§3) and Phases 1–6 (§4) are built and tested; see the decisions and follow-ups sections near the end.** Phases 7–8 are still plans.
 **Scope:** everything the backend still needs **except** the AI, LLM, voice-pipeline and agent-runtime work. That work is listed under [Out of scope](#out-of-scope-ai-llm-and-agent-work) so it isn't forgotten, but it isn't planned here.
 
 Endpoint paths and collection names marked *proposed* don't exist yet. Agree on them before building.
@@ -21,12 +21,12 @@ Endpoint paths and collection names marked *proposed* don't exist yet. Agree on 
 | **Leads** | Live. `POST /api/leads/demo` emails the request and stores nothing. |
 | **Storage** | Firestore through `firebase-admin`, behind a `Store` Protocol (`app/store.py`). Collections: `users`, `orgs`, `invites`, `login_attempts`, `audit`, `impersonations`. |
 | **Security baseline** | A CSRF guard (same-origin check on writes), `no-store` and `nosniff` headers, CORS with exact origins, per-route rate limits shared across instances (Firestore), JSON request logs without personal data. |
-| **Tests** | 317 pytest tests (3 skipped by design) on in-memory fakes, so no credentials are needed; 314 frontend tests. (This audit first said 82; there were 90 before Phase 1.) |
+| **Tests** | 601 pytest tests (3 skipped by design) on in-memory fakes, so no credentials are needed; 328 frontend tests. (This audit first said 82; there were 90 before Phase 1.) |
 | **CI/CD** | GitHub Actions to Vercel. Pull requests run CI; `main` runs CI, deploys the backend, then the frontend, then a smoke test. |
 
 ### What doesn't exist
 
-- **Org endpoints beyond Phase 3.** Agents, the desk, live calls, reports, the library and billing still run on the in-browser demo client, `frontend/src/console/demoClient.ts`.
+- **Org endpoints beyond Phase 6.** The bot desk, live calls, billing and the AI features (§ Out of scope) still run on the in-browser demo client, `frontend/src/console/demoClient.ts`.
 - **No HTTP `OpsClient`.** `createDemoOpsClient()` still serves the Ops pages that have no API.
 - **No "My account" endpoints** (profile, devices, notification preferences). They are optional on `AuthClient`, and the UI shows them as unavailable.
 
@@ -190,9 +190,15 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 |---|---|
 | `getReport(query)` | `GET /reports?days&agent` (`reports.view`; export needs `reports.export`) |
 
-- [ ] Keep rollups: per-day and per-hour counters, updated when a call record is written, so a report doesn't scan every call.
-- [ ] Add an export as CSV, behind `reports.export`.
-- [ ] Leave out AI quality metrics until the pipeline sends them; return them as `null` and let the UI handle that.
+**Status: built** (`backend/app/reports.py`, `routes/org/reports.py`, `tests/test_org_reports.py`).
+
+- [x] Keep rollups: per-day and per-hour counters, updated when a call record is written, so a report doesn't scan every call. *`orgs/{slug}/rollups/{agentId}_{day}` (India time), with per-hour counts by outcome, durations, languages, intents, drop-off steps and quality inputs.*
+  - *`record_call` writes a call and its rollup in one transaction, and counts a retried delivery once. The seed script uses it, and pipeline ingestion will too.*
+  - *`app/scripts/rebuild_rollups.py` recounts them.*
+  - *Medians come from log-scale histograms, accurate to within about 13%. "The period before" is cut at the same hour, not the same minute.*
+- [x] Add an export as CSV, behind `reports.export`. *`GET /reports/calls.csv`: the call list, with the call log's own visibility rules (own calls without `calls.viewAll`). Numbers are masked, and names appear only with `calls.personal`. Cells are guarded against formula injection, and the file starts with a BOM so Excel reads Tamil names. Call history has a "Download call list" button. The report's own CSV is still built in the browser.*
+- [x] Leave out AI quality metrics until the pipeline sends them; return them as `null` and let the UI handle that. *`ReportQuality` fields and per-agent success and reply time are now nullable. Home shows "Not measured yet". The unused `ReportsPage.tsx` was removed.*
+- [x] `callsThisWeek` on the agents list comes from the rollups.
 
 ### Phase 5: Library (numbers, tools, credentials, knowledge metadata)
 
@@ -204,9 +210,29 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `listCredentials` / `setCredential` / `deleteCredential` | `GET /credentials`, `POST /credentials`, `POST /credentials/{name}/delete` | `library.secrets`; **values are write-only** |
 | `listKnowledge` / `updateKnowledge` / `deleteKnowledge` / `listPassages` | `GET` / `POST /knowledge…` | metadata and uploads only; indexing and search are AI work |
 
-- [ ] **Credentials:** encrypt them at rest with a KMS or Secret Manager key, or store them only in Secret Manager and keep a reference in Firestore. Never return the value, never log it, and record every set and delete in the activity log.
-- [ ] **Uploads:** use signed upload URLs to Cloud Storage, a size limit, a content-type allow-list and a virus scan if possible.
-- [ ] Refuse `deleteKnowledge` while an agent uses the source.
+**Status: built** (`routes/org/{numbers,tools,knowledge,uploads}.py`, `app/secrets.py`, `app/blobs.py`, `app/toolhttp.py`, `app/usage.py`, `tests/test_org_library.py`). Rules and messages follow the demo client.
+
+- [x] **Credentials:** encrypt them at rest with a KMS or Secret Manager key, or store them only in Secret Manager and keep a reference in Firestore. Never return the value, never log it, and record every set and delete in the activity log.
+  - *Decided: AES-256-GCM with `SECRETS_KEY`, a 32-byte key in the server's environment, using the `cryptography` package that was already installed. KMS was the alternative.*
+  - *Each ciphertext is bound to its organisation and name. A key id is stored with it, and `SECRETS_KEY_PREVIOUS` allows rotation.*
+  - *Values are never returned or logged. If a system echoes the secret back, the tool test's reply summary blanks it.*
+- [x] **Uploads:** use signed upload URLs to Cloud Storage, a size limit, a content-type allow-list and a virus scan if possible.
+  - *The browser PUTs straight to a private bucket (`STORAGE_BUCKET`), with a 15-minute v4 signed URL bound to the exact size and type. Object paths are built from ids, never from file names.*
+  - *Recordings are capped at 200 MB and documents at 50 MB, with an extension allow-list.*
+  - *The server checks that the object arrived with the right size. An upload never finished shows as failed after an hour.*
+  - ***No virus scan yet.***
+- [x] Refuse `deleteKnowledge` while an agent uses the source. *The check covers every agent's working setup, all of its versions, and drafts. The same applies to tools; secrets are checked against the tools that use them.*
+- [x] **Tool tests** (`app/toolhttp.py`):
+  - *HTTPS only, and redirects are never followed.*
+  - *Every address the host resolves to must be public. Private, loopback, link-local, carrier-grade NAT, multicast and reserved ranges are refused, which also blocks the cloud metadata service.*
+  - *The request goes to the checked address, with TLS SNI and the Host header set to the name, so a second DNS answer can't redirect it.*
+  - *The tool's own timeout applies, at most 64 KB of the reply is read, and there's a limit of 5 tests a minute.*
+  - *The secret goes in `Authorization: Bearer`, or in the tool's `credentialHeader` (a new optional field, which the form doesn't set yet).*
+  - *Only the master admin tests tools, as in the demo.*
+- [x] **Numbers:**
+  - *The master admin adds and removes lines (`POST /numbers`, `POST /numbers/{id}/delete`). Hospitals ask for one through a request.*
+  - *An agent answers one line. The agent that loses a line is paused.*
+- [x] **AI work is not faked:** new knowledge stays "being read" and uploads stay "queued"; passages and search return nothing; transcripts say they're still processing.
 
 ### Phase 6: Agents (the CRUD side only)
 
@@ -221,8 +247,20 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `listScenarios` / `saveScenario` / `deleteScenario` | `/agents/{id}/scenarios…` | storage only; *running* them is AI work |
 | `listAgentTypes` / `listVoices` | `GET /catalogue/agent-types`, `/voices` | static or seeded data |
 
-- [ ] **Store the spec as a versioned JSON document.** Validate it with Pydantic models that mirror `AgentSpec`, but treat the `pipeline`, `speech`, `guardrails` and `analysis` blocks as opaque until the pipeline contract is fixed.
-- [ ] **Optimistic concurrency:** use a `revision` field on drafts and agents. Return a conflict when it's stale, so autosave can't overwrite a newer save.
+**Status: built** (`routes/org/agents.py`, `app/agentspec.py`, `app/catalogue.py`, `tests/test_org_agents.py`).
+
+- [x] **Store the spec as a versioned JSON document.** Validate it with Pydantic models that mirror `AgentSpec`, but treat the `pipeline`, `speech`, `guardrails` and `analysis` blocks as opaque until the pipeline contract is fixed.
+  - *Agents live in `agents/{id}` (the working setup). Each published version is its own document, `agentVersions/{agentId}_{n}`, and is never changed.*
+  - *Every block is validated with generous limits, and the setup is capped at 256 KB. Unknown fields are kept. Only `pipeline` is stored as given, capped at 32 KB, because `speech`, `guardrails` and `analysis` are edited by hospitals.*
+  - *A test validates every setup the demo client produces.*
+  - *Locked fields use the demo client's exact list, which is wider than this doc said: type, sub-type, redaction, flow, details collected, global flows, pipeline, tools, confirm-before-acting and analysis fields.*
+- [x] **Optimistic concurrency:** use a `revision` field on drafts and agents. Return a conflict when it's stale, so autosave can't overwrite a newer save.
+  - *The server answers `409 conflict`. The HTTP client tracks revisions itself, so the pages are unchanged.*
+  - *Autosave stops on a conflict and offers "Reload" instead of retrying forever.*
+- [x] `publishDraft`'s idempotency key is the draft itself: once published it remembers its agent, and a retry returns that agent.
+- [x] Agent types, voices, built-in tools and the default setups are in `backend/app/catalogue.json`, generated from the frontend demo. `frontend/src/test/catalogue-parity.test.ts` fails if the two drift.
+- [x] Deleting an agent frees its numbers and removes its versions and scenarios.
+- [x] Reading a flow from calls (`extractFlow`) and running scenarios say "needs the AI pipeline" in live mode. The browser-only test chat still works.
 
 ### Phase 7: Bot desk (the data side)
 
@@ -300,8 +338,8 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 2. ~~Phase 1, Team and settings: the first real multi-user value.~~ **Done**, apart from the manual rollout steps in Follow-ups.
 3. ~~Phase 2, Requests to bitNtech: small, and it's already used by the detected-flow feature.~~ **Done.**
 4. ~~Phase 3, Operations data, seeded by a script, while the pipeline contracts (§5) are agreed in parallel.~~ **Done** for storage, reading and updating; pipeline ingestion waits on §5.
-5. Phase 4, Reports, on rollups.
-6. Phase 5, Library, then Phase 6, Agents CRUD, then Phase 7, Desk.
+5. ~~Phase 4, Reports, on rollups.~~ **Done.**
+6. ~~Phase 5, Library, then Phase 6, Agents CRUD~~ **Done**, then Phase 7, Desk.
 7. Phase 8, Billing, My account and Ops extras.
 8. Remove the demo fallback from production builds.
 
@@ -334,6 +372,55 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 | Operations data in production | `VITE_CONSOLE_LIVE` lists live sections; the default is Team, Settings, Activity and Requests, so the operations pages stay on sample data until an environment opts in (they'd be empty without the pipeline) |
 | Activity for operations changes | None, as in the demo |
 | Seed data | Only for orgs whose name or slug says test or demo (or `--force`), only with `--yes`, every record marked `seeded: true` |
+
+## Decisions made while building Phases 4–6
+
+| Question | Decision |
+|---|---|
+| Secrets at rest | AES-256-GCM, key in `SECRETS_KEY` (Vercel, Sensitive); not KMS |
+| How a tool sends its secret | `Authorization: Bearer <secret>`, or the tool's own header name |
+| Who tests tools | The master admin, as in the demo |
+| Files | Straight from the browser to a private bucket with signed URLs; no virus scan yet |
+| Report medians | Histograms (about 13% accurate) instead of storing every value |
+| Agents list | Visible to every member (other pages label and filter by agents); opening one needs `agents.view`, `agents.test` or `agents.configure` |
+| Live sections | `reports`, `numbers`, `tools`, `knowledge`, `uploads` and `agents` are switched on per environment through `VITE_CONSOLE_LIVE`; off by default |
+
+## Follow-ups from Phases 4–6
+
+**Manual steps:**
+1. Set `SECRETS_KEY` on the backend's Vercel project (Sensitive): `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Keep a copy somewhere safe. Losing it means re-entering every secret.
+2. Create the storage bucket (asia-south1, private, uniform access), add a CORS rule for `PUT` from `APP_URL`, and set `STORAGE_BUCKET`.
+3. Create the new composite index (`rollups`: `agentId`, `day`).
+4. On staging, add `reports,numbers,tools,knowledge,uploads,agents` to `VITE_CONSOLE_LIVE`. Before that, add numbers and agents there: no agents exist on the server until bitNtech builds them in the live builder.
+5. Write a retention policy for call recordings (DPDP) before uploading real ones.
+
+**Found by the independent review and fixed:**
+- A rename or pause could hide another tab's newer save from the conflict check.
+- Publish, discard and rollback now carry the revision too, so nobody publishes something they didn't see.
+- bitNtech staff could write test scenarios.
+- Tool tests:
+  - they now try IPv4 first and each checked address in turn;
+  - they read the reply uncompressed against an overall deadline, so a compressed or trickled reply can't run past the cap or the timeout;
+  - an invalid port or an unreadable secret is explained instead of failing.
+- Recording storage paths no longer take extensions from file names.
+- A failed knowledge upload is cleaned up.
+- Every agent version is read, not the first 500 or 1,000.
+- Success and sentiment rates use analysed calls as the denominator.
+- Unknown languages count as "mixed".
+- Rebuilding rollups removes stale ones.
+- Removing a recording no longer shows a false conflict in an open builder.
+- Changing the address of a tool that sends a secret is now spelled out in the activity log.
+
+**Accepted:**
+- The in-use checks for knowledge and tools run just before the delete's transaction, so a save in the same instant could leave an agent pointing at a deleted source. This is rare and harmless: the agent simply doesn't find it.
+- The master admin is trusted with tool addresses, and moves are logged.
+
+**Known limitations:**
+- AI work isn't connected: indexing, passages, search, transcripts, reading a flow from calls, running scenarios, and quality figures (until the pipeline sends them).
+- No virus scanning of uploads.
+- The tool form has no field for a custom secret header yet (the API takes `credentialHeader`).
+- The agent builder can't take a new agent past step 0 in live mode, because reading a flow from calls needs the pipeline. bitNtech can still build flows by hand in the later steps.
+- Templates (agent types, voices) are fixed until Phase 8's Ops templates.
 
 ## Follow-ups from Phases 2 and 3
 

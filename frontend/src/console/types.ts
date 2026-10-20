@@ -36,7 +36,7 @@ export interface AgentSummary {
 
 /** The parts of the console that move from demo data to the API one at a
  * time (docs/backend-workflow.md). */
-export type ConsoleSection = 'team' | 'settings' | 'activity' | 'requests' | 'calls' | 'callbacks' | 'appointments' | 'handoffs'
+export type ConsoleSection = 'team' | 'settings' | 'activity' | 'requests' | 'calls' | 'callbacks' | 'appointments' | 'handoffs' | 'reports' | 'numbers' | 'tools' | 'knowledge' | 'uploads' | 'agents'
 
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
  * written for the person using the console. Pages show it as-is, so a real
@@ -189,6 +189,9 @@ export interface ConsoleClient {
   getCallRecord(orgSlug: string, id: string): Promise<CallRecord>
   addCallNote(orgSlug: string, callId: string, text: string): Promise<CallNote>
   getReport(orgSlug: string, query: ReportQuery): Promise<Report>
+  /** The call list for a period as a CSV file (reports.export). Absent: the
+   * console can't make one (demo). */
+  exportCallLog?(orgSlug: string, query: ReportQuery): Promise<Blob>
   /** Looks at the agent's last `windowSize` calls for a step sequence
    * repeated outside its current design. */
   detectNewFlowPatterns(orgSlug: string, agentId: string, opts: { windowSize: number }): Promise<DetectedFlowPattern[]>
@@ -544,6 +547,8 @@ export interface AgentTool {
   /** The name of a secret held by AICA's servers; its value is never sent
    * to the browser. */
   credentialName?: string | null
+  /** The header the secret is sent in. Absent or null: "Authorization: Bearer <secret>". */
+  credentialHeader?: string | null
   timeoutMs?: number
   retries?: number
   params: ToolParam[]
@@ -972,21 +977,26 @@ export interface Report {
   dropOff: { step: string; calls: number }[]
   quality: ReportQuality
   /** One row per agent, busiest first. */
-  agents: { agentId: string; name: string; calls: number; byAgent: number; success: number; replyP50Ms: number }[]
+  agents: { agentId: string; name: string; calls: number; byAgent: number; success: number | null; replyP50Ms: number | null }[]
 }
 
+/** From each call's analysis and the voice servers' timings. Null until
+ * calls in the period carry them (the voice pipeline sends them). */
 export interface ReportQuality {
+  /** Calls that carried an analysis: success and sentiment are out of these.
+   * Absent (the demo): every call. */
+  analysed?: number
   /** Calls that met their agent's success criteria. */
-  success: number
-  sentiment: Record<Sentiment, number>
+  success: number | null
+  sentiment: Record<Sentiment, number> | null
   /** Medians across calls, ms. */
-  firstWordMs: number
-  replyP50Ms: number
-  replyP95Ms: number
-  speechMs: number
-  languageMs: number
-  voiceMs: number
-  interruptionsPerCall: number
+  firstWordMs: number | null
+  replyP50Ms: number | null
+  replyP95Ms: number | null
+  speechMs: number | null
+  languageMs: number | null
+  voiceMs: number | null
+  interruptionsPerCall: number | null
 }
 
 /* ---------------------------------------------------------------- manage

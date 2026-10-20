@@ -1,0 +1,4166 @@
+{
+ "specs": [
+  {
+   "typeId": "hospital",
+   "subTypeId": "enquiries",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy6_0",
+     "kind": "intent",
+     "label": "Visiting hours",
+     "confidence": 0.9,
+     "sourceCallIds": [
+      "call_001",
+      "call_002"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_1",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_2",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_3",
+     "kind": "intent",
+     "label": "Directions and parking",
+     "confidence": 0.81,
+     "sourceCallIds": [
+      "call_002",
+      "call_003"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_4",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_5",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_6",
+     "kind": "intent",
+     "label": "Departments",
+     "confidence": 0.72,
+     "sourceCallIds": [
+      "call_003",
+      "call_004"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_7",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_8",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_9",
+     "kind": "intent",
+     "label": "Consultation fees",
+     "confidence": 0.63,
+     "sourceCallIds": [
+      "call_004",
+      "call_005"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_a",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_b",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy6_e",
+     "label": "Caller name",
+     "type": "name",
+     "required": false,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I know your name?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_prices",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Front desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller got an answer from the knowledge, or was put through to the right desk.",
+    "fields": [
+     {
+      "id": "fld_topic",
+      "label": "Topic",
+      "type": "choice",
+      "description": "What the caller asked about.",
+      "options": [
+       "Timings",
+       "Doctors",
+       "Prices",
+       "Billing",
+       "Other"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "enquiries",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy6_0",
+     "kind": "intent",
+     "label": "Visiting hours",
+     "confidence": 0.9,
+     "sourceCallIds": [
+      "call_001",
+      "call_002"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_1",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_2",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_3",
+     "kind": "intent",
+     "label": "Directions and parking",
+     "confidence": 0.81,
+     "sourceCallIds": [
+      "call_002",
+      "call_003"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_4",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_5",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_6",
+     "kind": "intent",
+     "label": "Departments",
+     "confidence": 0.72,
+     "sourceCallIds": [
+      "call_003",
+      "call_004"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_7",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_8",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_9",
+     "kind": "intent",
+     "label": "Consultation fees",
+     "confidence": 0.63,
+     "sourceCallIds": [
+      "call_004",
+      "call_005"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_a",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_b",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy6_e",
+     "label": "Caller name",
+     "type": "name",
+     "required": false,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I know your name?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_prices",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Front desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller got an answer from the knowledge, or was put through to the right desk.",
+    "fields": [
+     {
+      "id": "fld_topic",
+      "label": "Topic",
+      "type": "choice",
+      "description": "What the caller asked about.",
+      "options": [
+       "Timings",
+       "Doctors",
+       "Prices",
+       "Billing",
+       "Other"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "enquiries",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy6_0",
+     "kind": "intent",
+     "label": "Visiting hours",
+     "confidence": 0.9,
+     "sourceCallIds": [
+      "call_001",
+      "call_002"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_1",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_2",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_3",
+     "kind": "intent",
+     "label": "Directions and parking",
+     "confidence": 0.81,
+     "sourceCallIds": [
+      "call_002",
+      "call_003"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_4",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_5",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_6",
+     "kind": "intent",
+     "label": "Departments",
+     "confidence": 0.72,
+     "sourceCallIds": [
+      "call_003",
+      "call_004"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_7",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_8",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_9",
+     "kind": "intent",
+     "label": "Consultation fees",
+     "confidence": 0.63,
+     "sourceCallIds": [
+      "call_004",
+      "call_005"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_a",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_b",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.66,
+       "sourceCallIds": [
+        "call_004",
+        "call_005"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy6_e",
+     "label": "Caller name",
+     "type": "name",
+     "required": false,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I know your name?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_prices",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Front desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller got an answer from the knowledge, or was put through to the right desk.",
+    "fields": [
+     {
+      "id": "fld_topic",
+      "label": "Topic",
+      "type": "choice",
+      "description": "What the caller asked about.",
+      "options": [
+       "Timings",
+       "Doctors",
+       "Prices",
+       "Billing",
+       "Other"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "enquiries",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy6_0",
+     "kind": "intent",
+     "label": "Visiting hours",
+     "confidence": 0.9,
+     "sourceCallIds": [
+      "call_001",
+      "call_002"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_1",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_2",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.93,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_3",
+     "kind": "intent",
+     "label": "Directions and parking",
+     "confidence": 0.81,
+     "sourceCallIds": [
+      "call_002",
+      "call_003"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_4",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_5",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.8400000000000001,
+       "sourceCallIds": [
+        "call_002",
+        "call_003"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy6_6",
+     "kind": "intent",
+     "label": "Departments",
+     "confidence": 0.72,
+     "sourceCallIds": [
+      "call_003",
+      "call_004"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy6_7",
+       "kind": "step",
+       "label": "Understand the question",
+       "say": "Sure, I can help with that. Could you tell me a little more?",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy6_8",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "Here’s what I found: {answer}",
+       "confidence": 0.75,
+       "sourceCallIds": [
+        "call_003",
+        "call_004"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy6_e",
+     "label": "Caller name",
+     "type": "name",
+     "required": false,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I know your name?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_prices",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Front desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller got an answer from the knowledge, or was put through to the right desk.",
+    "fields": [
+     {
+      "id": "fld_topic",
+      "label": "Topic",
+      "type": "choice",
+      "description": "What the caller asked about.",
+      "options": [
+       "Timings",
+       "Doctors",
+       "Prices",
+       "Billing",
+       "Other"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "appointments",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy7_f",
+     "kind": "intent",
+     "label": "Book an appointment",
+     "confidence": 0.94,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_g",
+       "kind": "step",
+       "label": "Ask for the doctor or department",
+       "say": "Which doctor or department would you like to see?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_h",
+       "kind": "step",
+       "label": "Ask if it’s a first visit or a review",
+       "say": "Is this your first visit, or a review visit?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_i",
+       "kind": "step",
+       "label": "Take the patient’s name and number",
+       "say": "May I have the patient’s name and the registered phone number?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_j",
+       "kind": "step",
+       "label": "Offer two slots",
+       "say": "Dr. {doctor} has {slot 1} or {slot 2}. Which suits you?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_k",
+       "kind": "branch",
+       "label": "No slot suits the caller",
+       "condition": "The caller can’t make either slot",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy7_l",
+         "kind": "step",
+         "label": "Offer the next available day",
+         "say": "The next free day is {date}. Shall I book that?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        },
+        {
+         "id": "node_mvg9uxy7_m",
+         "kind": "step",
+         "label": "Offer a callback",
+         "say": "I can ask the front desk to call you back with more options. Is this number fine?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy7_n",
+       "kind": "step",
+       "label": "Confirm the booking",
+       "say": "Booked: {date} at {time} with Dr. {doctor}. Please come 15 minutes early with your old reports.",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_o",
+     "kind": "intent",
+     "label": "Reschedule an appointment",
+     "confidence": 0.82,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_p",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Can you tell me the patient’s name and the current appointment date?",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_q",
+       "kind": "step",
+       "label": "Offer new slots",
+       "say": "I can move it to {slot 1} or {slot 2}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_r",
+       "kind": "step",
+       "label": "Confirm the change",
+       "say": "Done. Your appointment is now on {date} at {time}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_s",
+     "kind": "intent",
+     "label": "Cancel an appointment",
+     "confidence": 0.74,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_t",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Which appointment would you like to cancel?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_u",
+       "kind": "step",
+       "label": "Confirm the cancellation",
+       "say": "I’ve cancelled the appointment on {date}. Would you like to book another time?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_v",
+     "kind": "intent",
+     "label": "Ask about timings and directions",
+     "confidence": 0.58,
+     "sourceCallIds": [
+      "call_004",
+      "call_008"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_w",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "The OPD is open {hours}. Parking is {parking}.",
+       "confidence": 0.61,
+       "sourceCallIds": [
+        "call_004",
+        "call_008"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy7_x",
+     "label": "Patient name",
+     "type": "name",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "May I have the patient’s name?"
+    },
+    {
+     "id": "attr_mvg9uxy7_y",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "What’s the registered phone number?"
+    },
+    {
+     "id": "attr_mvg9uxy7_z",
+     "label": "Department",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which department would you like to see?",
+     "options": [
+      "Cardiology",
+      "Orthopaedics",
+      "General medicine",
+      "Paediatrics",
+      "ENT"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_10",
+     "label": "Visit type",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Is this a first visit or a review?",
+     "options": [
+      "First visit",
+      "Review"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_11",
+     "label": "Preferred date",
+     "type": "date",
+     "required": true,
+     "personal": false,
+     "confirm": true,
+     "ask": "Which day suits you?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_sms",
+     "tool_book",
+     "tool_slots"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "OPD desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+    "fields": [
+     {
+      "id": "fld_dept",
+      "label": "Department",
+      "type": "choice",
+      "description": "The department the caller wanted.",
+      "options": [
+       "Cardiology",
+       "General medicine",
+       "Orthopaedics",
+       "Paediatrics",
+       "ENT",
+       "Other"
+      ]
+     },
+     {
+      "id": "fld_first",
+      "label": "First visit",
+      "type": "yes_no",
+      "description": "Whether it was the patient’s first visit."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "appointments",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy7_f",
+     "kind": "intent",
+     "label": "Book an appointment",
+     "confidence": 0.94,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_g",
+       "kind": "step",
+       "label": "Ask for the doctor or department",
+       "say": "Which doctor or department would you like to see?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_h",
+       "kind": "step",
+       "label": "Ask if it’s a first visit or a review",
+       "say": "Is this your first visit, or a review visit?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_i",
+       "kind": "step",
+       "label": "Take the patient’s name and number",
+       "say": "May I have the patient’s name and the registered phone number?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_j",
+       "kind": "step",
+       "label": "Offer two slots",
+       "say": "Dr. {doctor} has {slot 1} or {slot 2}. Which suits you?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_k",
+       "kind": "branch",
+       "label": "No slot suits the caller",
+       "condition": "The caller can’t make either slot",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy7_l",
+         "kind": "step",
+         "label": "Offer the next available day",
+         "say": "The next free day is {date}. Shall I book that?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        },
+        {
+         "id": "node_mvg9uxy7_m",
+         "kind": "step",
+         "label": "Offer a callback",
+         "say": "I can ask the front desk to call you back with more options. Is this number fine?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy7_n",
+       "kind": "step",
+       "label": "Confirm the booking",
+       "say": "Booked: {date} at {time} with Dr. {doctor}. Please come 15 minutes early with your old reports.",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_o",
+     "kind": "intent",
+     "label": "Reschedule an appointment",
+     "confidence": 0.82,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_p",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Can you tell me the patient’s name and the current appointment date?",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_q",
+       "kind": "step",
+       "label": "Offer new slots",
+       "say": "I can move it to {slot 1} or {slot 2}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_r",
+       "kind": "step",
+       "label": "Confirm the change",
+       "say": "Done. Your appointment is now on {date} at {time}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_s",
+     "kind": "intent",
+     "label": "Cancel an appointment",
+     "confidence": 0.74,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_t",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Which appointment would you like to cancel?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_u",
+       "kind": "step",
+       "label": "Confirm the cancellation",
+       "say": "I’ve cancelled the appointment on {date}. Would you like to book another time?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_v",
+     "kind": "intent",
+     "label": "Ask about timings and directions",
+     "confidence": 0.58,
+     "sourceCallIds": [
+      "call_004",
+      "call_008"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_w",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "The OPD is open {hours}. Parking is {parking}.",
+       "confidence": 0.61,
+       "sourceCallIds": [
+        "call_004",
+        "call_008"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy7_x",
+     "label": "Patient name",
+     "type": "name",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "May I have the patient’s name?"
+    },
+    {
+     "id": "attr_mvg9uxy7_y",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "What’s the registered phone number?"
+    },
+    {
+     "id": "attr_mvg9uxy7_z",
+     "label": "Department",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which department would you like to see?",
+     "options": [
+      "Cardiology",
+      "Orthopaedics",
+      "General medicine",
+      "Paediatrics",
+      "ENT"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_10",
+     "label": "Visit type",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Is this a first visit or a review?",
+     "options": [
+      "First visit",
+      "Review"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_11",
+     "label": "Preferred date",
+     "type": "date",
+     "required": true,
+     "personal": false,
+     "confirm": true,
+     "ask": "Which day suits you?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_sms",
+     "tool_book",
+     "tool_slots"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "OPD desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+    "fields": [
+     {
+      "id": "fld_dept",
+      "label": "Department",
+      "type": "choice",
+      "description": "The department the caller wanted.",
+      "options": [
+       "Cardiology",
+       "General medicine",
+       "Orthopaedics",
+       "Paediatrics",
+       "ENT",
+       "Other"
+      ]
+     },
+     {
+      "id": "fld_first",
+      "label": "First visit",
+      "type": "yes_no",
+      "description": "Whether it was the patient’s first visit."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "appointments",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy7_f",
+     "kind": "intent",
+     "label": "Book an appointment",
+     "confidence": 0.94,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_g",
+       "kind": "step",
+       "label": "Ask for the doctor or department",
+       "say": "Which doctor or department would you like to see?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_h",
+       "kind": "step",
+       "label": "Ask if it’s a first visit or a review",
+       "say": "Is this your first visit, or a review visit?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_i",
+       "kind": "step",
+       "label": "Take the patient’s name and number",
+       "say": "May I have the patient’s name and the registered phone number?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_j",
+       "kind": "step",
+       "label": "Offer two slots",
+       "say": "Dr. {doctor} has {slot 1} or {slot 2}. Which suits you?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_k",
+       "kind": "branch",
+       "label": "No slot suits the caller",
+       "condition": "The caller can’t make either slot",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy7_l",
+         "kind": "step",
+         "label": "Offer the next available day",
+         "say": "The next free day is {date}. Shall I book that?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        },
+        {
+         "id": "node_mvg9uxy7_m",
+         "kind": "step",
+         "label": "Offer a callback",
+         "say": "I can ask the front desk to call you back with more options. Is this number fine?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy7_n",
+       "kind": "step",
+       "label": "Confirm the booking",
+       "say": "Booked: {date} at {time} with Dr. {doctor}. Please come 15 minutes early with your old reports.",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_o",
+     "kind": "intent",
+     "label": "Reschedule an appointment",
+     "confidence": 0.82,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_p",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Can you tell me the patient’s name and the current appointment date?",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_q",
+       "kind": "step",
+       "label": "Offer new slots",
+       "say": "I can move it to {slot 1} or {slot 2}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_r",
+       "kind": "step",
+       "label": "Confirm the change",
+       "say": "Done. Your appointment is now on {date} at {time}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_s",
+     "kind": "intent",
+     "label": "Cancel an appointment",
+     "confidence": 0.74,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_t",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Which appointment would you like to cancel?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_u",
+       "kind": "step",
+       "label": "Confirm the cancellation",
+       "say": "I’ve cancelled the appointment on {date}. Would you like to book another time?",
+       "confidence": 0.77,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_v",
+     "kind": "intent",
+     "label": "Ask about timings and directions",
+     "confidence": 0.58,
+     "sourceCallIds": [
+      "call_004",
+      "call_008"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_w",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "The OPD is open {hours}. Parking is {parking}.",
+       "confidence": 0.61,
+       "sourceCallIds": [
+        "call_004",
+        "call_008"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy7_x",
+     "label": "Patient name",
+     "type": "name",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I have the patient’s name?"
+    },
+    {
+     "id": "attr_mvg9uxy7_y",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "What’s the registered phone number?"
+    },
+    {
+     "id": "attr_mvg9uxy7_z",
+     "label": "Department",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which department would you like to see?",
+     "options": [
+      "Cardiology",
+      "Orthopaedics",
+      "General medicine",
+      "Paediatrics",
+      "ENT"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_10",
+     "label": "Visit type",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Is this a first visit or a review?",
+     "options": [
+      "First visit",
+      "Review"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_11",
+     "label": "Preferred date",
+     "type": "date",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which day suits you?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_sms",
+     "tool_book",
+     "tool_slots"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "OPD desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+    "fields": [
+     {
+      "id": "fld_dept",
+      "label": "Department",
+      "type": "choice",
+      "description": "The department the caller wanted.",
+      "options": [
+       "Cardiology",
+       "General medicine",
+       "Orthopaedics",
+       "Paediatrics",
+       "ENT",
+       "Other"
+      ]
+     },
+     {
+      "id": "fld_first",
+      "label": "First visit",
+      "type": "yes_no",
+      "description": "Whether it was the patient’s first visit."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "appointments",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy7_f",
+     "kind": "intent",
+     "label": "Book an appointment",
+     "confidence": 0.94,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_g",
+       "kind": "step",
+       "label": "Ask for the doctor or department",
+       "say": "Which doctor or department would you like to see?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_h",
+       "kind": "step",
+       "label": "Ask if it’s a first visit or a review",
+       "say": "Is this your first visit, or a review visit?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_i",
+       "kind": "step",
+       "label": "Take the patient’s name and number",
+       "say": "May I have the patient’s name and the registered phone number?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_j",
+       "kind": "step",
+       "label": "Offer two slots",
+       "say": "Dr. {doctor} has {slot 1} or {slot 2}. Which suits you?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_k",
+       "kind": "branch",
+       "label": "No slot suits the caller",
+       "condition": "The caller can’t make either slot",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy7_l",
+         "kind": "step",
+         "label": "Offer the next available day",
+         "say": "The next free day is {date}. Shall I book that?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        },
+        {
+         "id": "node_mvg9uxy7_m",
+         "kind": "step",
+         "label": "Offer a callback",
+         "say": "I can ask the front desk to call you back with more options. Is this number fine?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy7_n",
+       "kind": "step",
+       "label": "Confirm the booking",
+       "say": "Booked: {date} at {time} with Dr. {doctor}. Please come 15 minutes early with your old reports.",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_o",
+     "kind": "intent",
+     "label": "Reschedule an appointment",
+     "confidence": 0.82,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_p",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Can you tell me the patient’s name and the current appointment date?",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_q",
+       "kind": "step",
+       "label": "Offer new slots",
+       "say": "I can move it to {slot 1} or {slot 2}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_r",
+       "kind": "step",
+       "label": "Confirm the change",
+       "say": "Done. Your appointment is now on {date} at {time}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_v",
+     "kind": "intent",
+     "label": "Ask about timings and directions",
+     "confidence": 0.58,
+     "sourceCallIds": [
+      "call_004",
+      "call_008"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_w",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "The OPD is open {hours}. Parking is {parking}.",
+       "confidence": 0.61,
+       "sourceCallIds": [
+        "call_004",
+        "call_008"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy7_x",
+     "label": "Patient name",
+     "type": "name",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I have the patient’s name?"
+    },
+    {
+     "id": "attr_mvg9uxy7_y",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "What’s the registered phone number?"
+    },
+    {
+     "id": "attr_mvg9uxy7_z",
+     "label": "Department",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which department would you like to see?",
+     "options": [
+      "Cardiology",
+      "Orthopaedics",
+      "General medicine",
+      "Paediatrics",
+      "ENT"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_10",
+     "label": "Visit type",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Is this a first visit or a review?",
+     "options": [
+      "First visit",
+      "Review"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_11",
+     "label": "Preferred date",
+     "type": "date",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which day suits you?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_sms",
+     "tool_book",
+     "tool_slots"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "OPD desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+    "fields": [
+     {
+      "id": "fld_dept",
+      "label": "Department",
+      "type": "choice",
+      "description": "The department the caller wanted.",
+      "options": [
+       "Cardiology",
+       "General medicine",
+       "Orthopaedics",
+       "Paediatrics",
+       "ENT",
+       "Other"
+      ]
+     },
+     {
+      "id": "fld_first",
+      "label": "First visit",
+      "type": "yes_no",
+      "description": "Whether it was the patient’s first visit."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "appointments",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Hello, Arogya Demo Hospital. How may I help you?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy7_f",
+     "kind": "intent",
+     "label": "Book an appointment",
+     "confidence": 0.94,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_g",
+       "kind": "step",
+       "label": "Ask for the doctor or department",
+       "say": "Which doctor or department would you like to see?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_h",
+       "kind": "step",
+       "label": "Ask if it’s a first visit or a review",
+       "say": "Is this your first visit, or a review visit?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_i",
+       "kind": "step",
+       "label": "Take the patient’s name and number",
+       "say": "May I have the patient’s name and the registered phone number?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_j",
+       "kind": "step",
+       "label": "Offer two slots",
+       "say": "Dr. {doctor} has {slot 1} or {slot 2}. Which suits you?",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_k",
+       "kind": "branch",
+       "label": "No slot suits the caller",
+       "condition": "The caller can’t make either slot",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy7_l",
+         "kind": "step",
+         "label": "Offer the next available day",
+         "say": "The next free day is {date}. Shall I book that?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        },
+        {
+         "id": "node_mvg9uxy7_m",
+         "kind": "step",
+         "label": "Offer a callback",
+         "say": "I can ask the front desk to call you back with more options. Is this number fine?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_001",
+          "call_002"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy7_n",
+       "kind": "step",
+       "label": "Confirm the booking",
+       "say": "Booked: {date} at {time} with Dr. {doctor}. Please come 15 minutes early with your old reports.",
+       "confidence": 0.97,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_o",
+     "kind": "intent",
+     "label": "Reschedule an appointment",
+     "confidence": 0.82,
+     "sourceCallIds": [
+      "call_001",
+      "call_002",
+      "call_005",
+      "call_009",
+      "call_012"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_p",
+       "kind": "step",
+       "label": "Find the booking",
+       "say": "Can you tell me the patient’s name and the current appointment date?",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_q",
+       "kind": "step",
+       "label": "Offer new slots",
+       "say": "I can move it to {slot 1} or {slot 2}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy7_r",
+       "kind": "step",
+       "label": "Confirm the change",
+       "say": "Done. Your appointment is now on {date} at {time}.",
+       "confidence": 0.85,
+       "sourceCallIds": [
+        "call_001",
+        "call_002"
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy7_v",
+     "kind": "intent",
+     "label": "Ask about timings and directions",
+     "confidence": 0.58,
+     "sourceCallIds": [
+      "call_004",
+      "call_008"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy7_w",
+       "kind": "step",
+       "label": "Answer from the knowledge base",
+       "say": "The OPD is open {hours}. Parking is {parking}.",
+       "confidence": 0.61,
+       "sourceCallIds": [
+        "call_004",
+        "call_008"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy7_x",
+     "label": "Patient name",
+     "type": "name",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "May I have the patient’s name?"
+    },
+    {
+     "id": "attr_mvg9uxy7_y",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "What’s the registered phone number?"
+    },
+    {
+     "id": "attr_mvg9uxy7_z",
+     "label": "Department",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which department would you like to see?",
+     "options": [
+      "Cardiology",
+      "Orthopaedics",
+      "General medicine",
+      "Paediatrics",
+      "ENT"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_10",
+     "label": "Visit type",
+     "type": "choice",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Is this a first visit or a review?",
+     "options": [
+      "First visit",
+      "Review"
+     ]
+    },
+    {
+     "id": "attr_mvg9uxy7_11",
+     "label": "Preferred date",
+     "type": "date",
+     "required": true,
+     "personal": false,
+     "confirm": false,
+     "ask": "Which day suits you?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_doctors",
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_sms",
+     "tool_book",
+     "tool_slots"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "OPD desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+    "fields": [
+     {
+      "id": "fld_dept",
+      "label": "Department",
+      "type": "choice",
+      "description": "The department the caller wanted.",
+      "options": [
+       "Cardiology",
+       "General medicine",
+       "Orthopaedics",
+       "Paediatrics",
+       "ENT",
+       "Other"
+      ]
+     },
+     {
+      "id": "fld_first",
+      "label": "First visit",
+      "type": "yes_no",
+      "description": "Whether it was the patient’s first visit."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "reports",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy8_12",
+     "kind": "intent",
+     "label": "Check if a report is ready",
+     "confidence": 0.91,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_13",
+       "kind": "step",
+       "label": "Ask for the patient ID",
+       "say": "Can you tell me the patient ID printed on the bill?",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy8_14",
+       "kind": "branch",
+       "label": "Report is ready",
+       "condition": "All tests are reported",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_15",
+         "kind": "step",
+         "label": "Offer email or collection",
+         "say": "Your reports are ready. Shall I email them, or will you collect them?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy8_16",
+       "kind": "branch",
+       "label": "Report is pending",
+       "condition": "Some tests are still pending",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_17",
+         "kind": "step",
+         "label": "Give the expected time",
+         "say": "The {test} will be ready by {time}. We’ll send everything together.",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy8_18",
+     "kind": "intent",
+     "label": "Ask how to collect a report",
+     "confidence": 0.7,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_19",
+       "kind": "step",
+       "label": "Explain collection",
+       "say": "You can collect reports at the lab counter from 8 AM to 8 PM, or get them by email.",
+       "confidence": 0.73,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy8_1c",
+     "label": "Patient ID",
+     "type": "patient_id",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "Can you tell me the patient ID on the bill?"
+    },
+    {
+     "id": "attr_mvg9uxy8_1b",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "What’s the registered phone number?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_report"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Lab counter",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller found out whether the report was ready, and when to collect it.",
+    "fields": [
+     {
+      "id": "fld_ready",
+      "label": "Report ready",
+      "type": "yes_no",
+      "description": "Whether every test on the report was ready."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "reports",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy8_12",
+     "kind": "intent",
+     "label": "Check if a report is ready",
+     "confidence": 0.91,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_13",
+       "kind": "step",
+       "label": "Ask for the patient ID",
+       "say": "Can you tell me the patient ID printed on the bill?",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy8_14",
+       "kind": "branch",
+       "label": "Report is ready",
+       "condition": "All tests are reported",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_15",
+         "kind": "step",
+         "label": "Offer email or collection",
+         "say": "Your reports are ready. Shall I email them, or will you collect them?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy8_16",
+       "kind": "branch",
+       "label": "Report is pending",
+       "condition": "Some tests are still pending",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_17",
+         "kind": "step",
+         "label": "Give the expected time",
+         "say": "The {test} will be ready by {time}. We’ll send everything together.",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy8_18",
+     "kind": "intent",
+     "label": "Ask how to collect a report",
+     "confidence": 0.7,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_19",
+       "kind": "step",
+       "label": "Explain collection",
+       "say": "You can collect reports at the lab counter from 8 AM to 8 PM, or get them by email.",
+       "confidence": 0.73,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy8_1c",
+     "label": "Patient ID",
+     "type": "patient_id",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "Can you tell me the patient ID on the bill?"
+    },
+    {
+     "id": "attr_mvg9uxy8_1b",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": true,
+     "ask": "What’s the registered phone number?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_report"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Lab counter",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller found out whether the report was ready, and when to collect it.",
+    "fields": [
+     {
+      "id": "fld_ready",
+      "label": "Report ready",
+      "type": "yes_no",
+      "description": "Whether every test on the report was ready."
+     }
+    ]
+   }
+  },
+  {
+   "typeId": "hospital",
+   "subTypeId": "reports",
+   "redact": true,
+   "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+     "tamil",
+     "english"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+     "Never give medical advice, diagnoses or test interpretations.",
+     "Never share a patient’s details with anyone but the patient or the person they named.",
+     "Always repeat dates, times and phone numbers back to the caller."
+    ]
+   },
+   "speech": {
+    "pronunciations": [
+     {
+      "word": "Dr. Ramachandran",
+      "sayAs": "Doctor Raa-ma-chan-dran"
+     }
+    ],
+    "hints": [
+     "Ramachandran",
+     "Cardiology",
+     "Gandhipuram",
+     "OPD"
+    ],
+    "allowInterruptions": true,
+    "silenceSec": 8
+   },
+   "flow": [
+    {
+     "id": "node_mvg9uxy8_12",
+     "kind": "intent",
+     "label": "Check if a report is ready",
+     "confidence": 0.91,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_13",
+       "kind": "step",
+       "label": "Ask for the patient ID",
+       "say": "Can you tell me the patient ID printed on the bill?",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      },
+      {
+       "id": "node_mvg9uxy8_14",
+       "kind": "branch",
+       "label": "Report is ready",
+       "condition": "All tests are reported",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_15",
+         "kind": "step",
+         "label": "Offer email or collection",
+         "say": "Your reports are ready. Shall I email them, or will you collect them?",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      },
+      {
+       "id": "node_mvg9uxy8_16",
+       "kind": "branch",
+       "label": "Report is pending",
+       "condition": "Some tests are still pending",
+       "confidence": 0.9400000000000001,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": [
+        {
+         "id": "node_mvg9uxy8_17",
+         "kind": "step",
+         "label": "Give the expected time",
+         "say": "The {test} will be ready by {time}. We’ll send everything together.",
+         "confidence": 0.97,
+         "sourceCallIds": [
+          "call_003",
+          "call_007"
+         ],
+         "children": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "node_mvg9uxy8_18",
+     "kind": "intent",
+     "label": "Ask how to collect a report",
+     "confidence": 0.7,
+     "sourceCallIds": [
+      "call_003",
+      "call_007",
+      "call_011"
+     ],
+     "children": [
+      {
+       "id": "node_mvg9uxy8_19",
+       "kind": "step",
+       "label": "Explain collection",
+       "say": "You can collect reports at the lab counter from 8 AM to 8 PM, or get them by email.",
+       "confidence": 0.73,
+       "sourceCallIds": [
+        "call_003",
+        "call_007"
+       ],
+       "children": []
+      }
+     ]
+    }
+   ],
+   "attributes": [
+    {
+     "id": "attr_mvg9uxy8_1c",
+     "label": "Patient ID",
+     "type": "patient_id",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "Can you tell me the patient ID on the bill?"
+    },
+    {
+     "id": "attr_mvg9uxy8_1b",
+     "label": "Phone number",
+     "type": "phone",
+     "required": true,
+     "personal": true,
+     "confirm": false,
+     "ask": "What’s the registered phone number?"
+    }
+   ],
+   "globalFlows": [
+    {
+     "kind": "handoff",
+     "enabled": true,
+     "trigger": "The caller asks for a person, is upset, or the agent fails to help twice.",
+     "response": "Let me connect you to our front desk. Please stay on the line."
+    },
+    {
+     "kind": "emergency",
+     "enabled": true,
+     "trigger": "The caller describes chest pain, breathing trouble, heavy bleeding, an accident or any emergency.",
+     "response": "This sounds urgent. Please call 108 or come to our emergency department now. I’m connecting you to the emergency desk."
+    },
+    {
+     "kind": "repeat",
+     "enabled": true,
+     "trigger": "The caller asks the agent to repeat or slow down.",
+     "response": "Of course. {repeat the last answer, slower}"
+    },
+    {
+     "kind": "out_of_scope",
+     "enabled": true,
+     "trigger": "The question isn’t something this agent handles.",
+     "response": "I can’t help with that on this line, but I can connect you to someone who can."
+    },
+    {
+     "kind": "silence",
+     "enabled": true,
+     "trigger": "The caller says nothing for 8 seconds.",
+     "response": "Are you still there? Take your time."
+    },
+    {
+     "kind": "end_call",
+     "enabled": true,
+     "trigger": "The caller is done, or says goodbye.",
+     "response": "Thank you for calling. Take care!"
+    }
+   ],
+   "context": {
+    "knowledgeSourceIds": [
+     "kb_faq"
+    ],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [
+     "tool_transfer",
+     "tool_end",
+     "tool_report"
+    ],
+    "confirmBeforeActions": true
+   },
+   "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Lab counter",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+     "Diagnosis or medical advice",
+     "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+   },
+   "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+     "One moment, let me check.",
+     "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+   },
+   "analysis": {
+    "summary": true,
+    "sentiment": true,
+    "successCriteria": "The caller found out whether the report was ready, and when to collect it.",
+    "fields": [
+     {
+      "id": "fld_ready",
+      "label": "Report ready",
+      "type": "yes_no",
+      "description": "Whether every test on the report was ready."
+     }
+    ]
+   }
+  }
+ ],
+ "draft": {
+  "id": "draft_mvg9uxya0",
+  "reached": "calls",
+  "sourceCallIds": [],
+  "consent": false,
+  "redact": true,
+  "typeId": null,
+  "subTypeId": null,
+  "name": "",
+  "behaviour": {
+   "persona": "Kavya",
+   "tone": "warm",
+   "languages": [
+    "tamil",
+    "english",
+    "tanglish"
+   ],
+   "startLanguage": "tamil",
+   "followCaller": true,
+   "greeting": "Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?",
+   "closing": "Thank you for calling. Take care!",
+   "voiceId": "kavya",
+   "rate": "normal",
+   "rules": [
+    "Never give medical advice, diagnoses or test interpretations.",
+    "Never share a patient’s details with anyone but the patient or the person they named.",
+    "Always repeat dates, times and phone numbers back to the caller."
+   ]
+  },
+  "flow": [],
+  "attributes": [],
+  "globalFlows": [],
+  "context": {
+   "knowledgeSourceIds": [],
+   "answerOnlyFromKnowledge": true,
+   "topK": 4,
+   "minScore": 0.6,
+   "toolIds": [],
+   "confirmBeforeActions": true
+  },
+  "pipeline": {
+   "speechModel": "default",
+   "languageModel": "default",
+   "voiceModel": "default",
+   "turnDetection": "semantic",
+   "minEndpointMs": 500,
+   "maxEndpointMs": 3000,
+   "interruptMinWords": 2,
+   "interruptMinMs": 500,
+   "resumeAfterFalseInterruption": true,
+   "backchannel": false,
+   "fillerPhrases": [
+    "One moment, let me check.",
+    "Oru nimisham."
+   ],
+   "preemptiveReplies": true,
+   "noiseCancellation": "standard",
+   "ambience": "none",
+   "keypadInput": true,
+   "silenceReprompts": 2,
+   "temperature": 0.4
+  },
+  "updatedAt": "2026-10-20T05:58:01.570Z"
+ }
+}

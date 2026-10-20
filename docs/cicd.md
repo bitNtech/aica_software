@@ -54,7 +54,7 @@ Example hosts (use your own; they must **share a site**, i.e. sit under the same
 |---|---|
 | `VITE_API_URL` | `https://api.aica.bitntech.in` |
 | `VITE_CONSOLE_MODE` | `live` to serve organisation pages from the API where it exists; anything else keeps every page on sample data |
-| `VITE_CONSOLE_LIVE` | With `live`: the sections served by the API, comma-separated. Default `team,settings,activity,requests`. Add `calls,callbacks,appointments,handoffs` only where calls exist (staging with seeded data, or once the pipeline sends them) |
+| `VITE_CONSOLE_LIVE` | With `live`: the sections served by the API, comma-separated. Default `team,settings,activity,requests`. Add `calls,callbacks,appointments,handoffs,reports` only where calls exist (staging with seeded data, or once the pipeline sends them), and `numbers,tools,knowledge,uploads,agents` once agents are built on the server |
 
 **Backend project** (runtime; see `backend/README.md`):
 
@@ -72,6 +72,8 @@ Example hosts (use your own; they must **share a site**, i.e. sit under the same
 | `DEMO_REQUEST_TO` | Who receives the landing page's demo requests, comma-separated. Defaults to `support@bitntech.in` |
 | `CHANGE_REQUESTS_TO` | Who at bitNtech is emailed about requests from organisations, comma-separated. Defaults to `support@bitntech.in` |
 | `LOG_FORMAT` | Defaults to `json` on Vercel |
+| `SECRETS_KEY` | **Sensitive.** 32 random bytes, base64: encrypts organisations' system secrets. Keep a copy outside Vercel |
+| `STORAGE_BUCKET` | The private bucket for uploads (see `backend/README.md`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Leave both empty to switch Google sign-in off |
 | `ACT_AS_MINUTES` | Optional. How long a master admin's "act as" session lasts. Default 30 |
 

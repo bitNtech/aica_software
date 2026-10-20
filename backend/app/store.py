@@ -21,6 +21,7 @@ Collections
   orgs/{slug}/callbacks/{id}     people to call back, with notes[]
   orgs/{slug}/appointments/{id}  bookings made on calls or by staff
   orgs/{slug}/handoffs/{id}      callers the agent passed to a person
+  orgs/{slug}/rollups/{agentId}_{day}  report counters per agent per IST day (app/reports.py)
 """
 from __future__ import annotations
 
@@ -247,8 +248,168 @@ class HandoffDoc:
     seeded: bool = False
 
 
+# ---- Phase 5: the library
+
+
+@dataclass
+class NumberDoc:
+    id: str
+    number: str  # as shown, e.g. "+91 422 400 1000"
+    label: str
+    hours: str
+    afterHours: str = "agent"  # agent | voicemail | transfer
+    agentId: str | None = None
+    transferTo: str | None = None
+    createdAt: datetime = field(default_factory=now)
+
+
+@dataclass
+class ToolDoc:
+    id: str
+    name: str
+    kind: str  # builtin | http
+    description: str
+    acts: bool
+    enabled: bool
+    params: list[dict] = field(default_factory=list)  # {name, type, required, description}
+    builtin: str | None = None
+    method: str | None = None
+    url: str | None = None
+    credentialName: str | None = None
+    # How the secret is sent: None means "Authorization: Bearer <secret>";
+    # otherwise the header name, with the secret as its value.
+    credentialHeader: str | None = None
+    timeoutMs: int | None = None
+    retries: int | None = None
+    lastTestedAt: datetime | None = None
+    updatedAt: datetime = field(default_factory=now)
+
+
+@dataclass
+class CredentialDoc:
+    """A system secret. Only its ciphertext is stored (app/secrets.py)."""
+
+    id: str  # the name, e.g. HIS_API_KEY
+    ciphertext: str
+    keyId: str
+    setAt: datetime
+    setBy: str
+
+
+@dataclass
+class KnowledgeDoc:
+    id: str
+    name: str
+    kind: str  # document | web | faq | table
+    origin: str
+    description: str
+    status: str  # indexing | ready | failed
+    passages: int
+    refreshedAt: datetime
+    expiresAt: datetime | None = None
+    refreshEvery: str = "never"
+    faq: list[dict] | None = None
+    error: str | None = None
+    url: str | None = None
+    fileName: str | None = None
+    size: int | None = None
+    contentType: str | None = None
+    objectPath: str | None = None  # in the storage bucket
+    uploaded: bool = False  # the browser finished sending the file
+    createdAt: datetime = field(default_factory=now)
+
+
+@dataclass
+class UploadDoc:
+    """A recording of a past call, for building agents (frontend SourceCall)."""
+
+    id: str
+    name: str
+    size: int
+    contentType: str
+    objectPath: str
+    addedAt: datetime
+    status: str = "queued"  # queued | transcribing | extracting | ready | failed
+    durationSec: int = 0
+    language: str = "mixed"
+    error: str | None = None
+    topic: str | None = None
+    uploaded: bool = False
+
+
+# ---- Phase 6: agents
+
+
+@dataclass
+class AgentDoc:
+    id: str
+    name: str
+    useCase: str
+    status: str  # live | paused
+    working: dict  # the AgentSpec being edited: the live version plus saved edits
+    updatedAt: datetime
+    languages: list[str] = field(default_factory=list)
+    numberId: str | None = None
+    version: int | None = None
+    lastPublishedAt: datetime | None = None
+    builtBy: str | None = None
+    changed: bool = False  # saved edits not published yet
+    revision: int = 0  # bumped on every change to `working` (optimistic concurrency)
+    createdAt: datetime = field(default_factory=now)
+
+
+@dataclass
+class DraftDoc:
+    """An agent still being built (master admin only). `data` is the
+    frontend AgentDraft without id and updatedAt."""
+
+    id: str
+    data: dict
+    updatedAt: datetime
+    createdBy: str
+    revision: int = 0
+    # Set once published: publishing again returns this agent (safe retries).
+    publishedAgentId: str | None = None
+
+
+@dataclass
+class VersionDoc:
+    """A published version. Never changed once written."""
+
+    id: str  # "{agentId}_{version:06d}"
+    agentId: str
+    version: int
+    publishedAt: datetime
+    publishedBy: str
+    note: str
+    spec: dict
+
+
+@dataclass
+class ScenarioDoc:
+    id: str
+    agentId: str
+    name: str
+    callerSays: list[str]
+    expect: dict  # {intent, mustSay[], handover: bool | None}
+    lastRun: dict | None = None
+    createdAt: datetime = field(default_factory=now)
+
+
+from .reports import RollupDoc  # noqa: E402  (no store imports there)
+
 # Records kept per organisation: kind → (subcollection, type).
 RECORDS: dict[str, tuple[str, type]] = {
+    "rollup": ("rollups", RollupDoc),
+    "number": ("numbers", NumberDoc),
+    "tool": ("tools", ToolDoc),
+    "credential": ("credentials", CredentialDoc),
+    "knowledge": ("knowledge", KnowledgeDoc),
+    "upload": ("uploads", UploadDoc),
+    "agent": ("agents", AgentDoc),
+    "draft": ("drafts", DraftDoc),
+    "version": ("agentVersions", VersionDoc),
+    "scenario": ("scenarios", ScenarioDoc),
     "request": ("changeRequests", ChangeRequestDoc),
     "call": ("calls", CallDoc),
     "callback": ("callbacks", CallbackDoc),
@@ -332,6 +493,8 @@ class Tx(Protocol):
     def get_record(self, slug: str, kind: str, record_id: str): ...  # a RECORDS type, or None
     def save_record(self, slug: str, kind: str, rec) -> None: ...
     def open_callbacks_of(self, slug: str, member_id: str) -> list[CallbackDoc]: ...
+    def list_records(self, slug: str, kind: str, where: tuple = (), limit: int = 1000) -> list: ...  # where: ((field, op, value), …)
+    def delete_record(self, slug: str, kind: str, record_id: str) -> None: ...
 
 
 class Store(Protocol):
@@ -362,6 +525,11 @@ class Store(Protocol):
     def list_handoffs(self, slug: str, since: datetime) -> list[HandoffDoc]: ...  # waiting ones, and any since
     def list_calls(self, slug: str, f: CallFilter, limit: int) -> tuple[list[CallDoc], int]: ...  # newest first, and the total; raises IndexMissing
     def list_notes(self, slug: str, call_id: str) -> list[NoteDoc]: ...
+    def list_rollups(self, slug: str, day_from: str, day_to: str, agent_id: str | None = None) -> list[RollupDoc]: ...
+    # Generic, for the library and agents. Equality / "in" / range filters;
+    # callers sort in memory (the collections are small per organisation).
+    def list_records(self, slug: str, kind: str, where: tuple = (), limit: int = 1000) -> list: ...
+    def delete_record(self, slug: str, kind: str, record_id: str) -> None: ...
     def add_note(self, slug: str, call_id: str, note: NoteDoc) -> None: ...
     def get_attempts(self, key: str) -> tuple[int, datetime | None]: ...
     def set_attempts(self, key: str, count: int, until: datetime | None) -> None: ...
@@ -430,6 +598,14 @@ def _activity_data(entry: ActivityDoc) -> dict:
     return d
 
 
+def _filtered(q, where):
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
+    for f, op, v in where:
+        q = q.where(filter=FieldFilter(f, op, v))
+    return q
+
+
 class _FirestoreTx:
     def __init__(self, db, t):
         self.db, self.t = db, t
@@ -487,6 +663,12 @@ class _FirestoreTx:
 
     def save_record(self, slug, kind, rec):
         self.t.set(self._rec_ref(slug, kind, rec.id), record_data(rec))
+
+    def list_records(self, slug, kind, where=(), limit=1000):
+        return [record_from(kind, s.id, s.to_dict()) for s in _filtered(self._org_ref(slug).collection(RECORDS[kind][0]), where).limit(limit).stream(transaction=self.t)]
+
+    def delete_record(self, slug, kind, record_id):
+        self.t.delete(self._rec_ref(slug, kind, record_id))
 
     def open_callbacks_of(self, slug, member_id):
         from google.cloud.firestore_v1.base_query import FieldFilter
@@ -698,6 +880,20 @@ class FirestoreStore:
         except FailedPrecondition as e:
             raise IndexMissing() from e
         return [record_from("call", s.id, s.to_dict()) for s in snaps], total
+
+    def list_records(self, slug, kind, where=(), limit=1000):
+        return [record_from(kind, s.id, s.to_dict()) for s in _filtered(self._records(slug, kind), where).limit(limit).stream()]
+
+    def delete_record(self, slug, kind, record_id):
+        self._records(slug, kind).document(record_id).delete()
+
+    def list_rollups(self, slug, day_from, day_to, agent_id=None):
+        from google.cloud.firestore_v1.base_query import FieldFilter
+
+        q = self._records(slug, "rollup").where(filter=FieldFilter("day", ">=", day_from)).where(filter=FieldFilter("day", "<=", day_to))
+        if agent_id:
+            q = q.where(filter=FieldFilter("agentId", "==", agent_id))
+        return [record_from("rollup", s.id, s.to_dict()) for s in q.limit(20000).stream()]
 
     def _notes(self, slug, call_id):
         return self._records(slug, "call").document(call_id).collection("notes")

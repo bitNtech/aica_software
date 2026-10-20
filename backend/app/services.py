@@ -8,8 +8,10 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
+from .blobs import Blobs
 from .identity import FirebaseAdmin, GoogleOAuth, IdentityToolkit
 from .mailer import Mailer
+from .secrets import SecretBox, SecretsUnavailable
 from .settings import Settings
 from .store import FirestoreStore, Store
 
@@ -24,6 +26,13 @@ class Services:
     store: Store
     mailer: Mailer
     google: GoogleOAuth | None
+    # None when not configured: the routes that need them say so.
+    secrets: SecretBox | None = None
+    blobs: Blobs | None = None
+    # For tool tests: how a host name is looked up, and the HTTP transport.
+    # Tests replace both (app/toolhttp.py).
+    resolve: object = None
+    tool_transport: object = None
 
 
 def build_services(settings: Settings) -> Services:
@@ -46,6 +55,18 @@ def build_services(settings: Settings) -> Services:
         log.warning("Google sign-in disabled: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set")
     if not settings.resend_api_key:
         log.warning("RESEND_API_KEY not set: emails will not be sent")
+    try:
+        box = SecretBox(settings.secrets_key, settings.secrets_key_previous)
+    except SecretsUnavailable:
+        box = None
+        log.warning("SECRETS_KEY not set or not a 32-byte base64 key: system secrets can't be set")
+    blobs = None
+    if settings.storage_bucket:
+        from firebase_admin import storage
+
+        blobs = Blobs(storage.bucket(settings.storage_bucket, app=app))
+    else:
+        log.warning("STORAGE_BUCKET not set: recordings and knowledge files can't be uploaded")
     return Services(
         settings=settings,
         admin=FirebaseAdmin(app),
@@ -53,6 +74,8 @@ def build_services(settings: Settings) -> Services:
         store=FirestoreStore(db),
         mailer=Mailer(settings.resend_api_key, settings.email_from),
         google=google,
+        secrets=box,
+        blobs=blobs,
     )
 
 

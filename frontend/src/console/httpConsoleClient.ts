@@ -1,9 +1,24 @@
 import { request } from '../auth/httpClient'
-import { apiBase } from '../lib/api'
+import { AuthError, type AuthErrorCode } from '../auth/types'
+import { apiBase, apiCredentials, apiUrl } from '../lib/api'
 import { createDemoConsoleClient } from './demoClient'
 import type {
   ActivityPage,
   ActivityQuery,
+  AgentDetail,
+  AgentDraft,
+  AgentSummary,
+  AgentTool,
+  AgentType,
+  Credential,
+  KnowledgeSource,
+  Passage,
+  PhoneNumber,
+  Scenario,
+  SourceCall,
+  ToolTestResult,
+  Transcript,
+  Voice,
   Appointment,
   Callback,
   CallLogPage,
@@ -18,10 +33,11 @@ import type {
   NewInvite,
   OrgSettings,
   OrgSettingsInput,
+  Report,
 } from './types'
 
 /** Every section the API serves (docs/backend-workflow.md, Phases 1–3). */
-export const ALL_LIVE_SECTIONS: readonly ConsoleSection[] = ['team', 'settings', 'activity', 'requests', 'calls', 'callbacks', 'appointments', 'handoffs']
+export const ALL_LIVE_SECTIONS: readonly ConsoleSection[] = ['team', 'settings', 'activity', 'requests', 'calls', 'callbacks', 'appointments', 'handoffs', 'reports', 'numbers', 'tools', 'knowledge', 'uploads', 'agents']
 
 /** What's live unless an environment says otherwise. The operations
  * sections (calls, callbacks, appointments, handoffs) only fill up once the
@@ -56,6 +72,43 @@ export function createHttpConsoleClient(
   const org = (slug: string, path = '') => `/orgs/${enc(slug)}${path}`
   const member = (slug: string, id: string, action: string) => org(slug, `/members/${enc(id)}/${action}`)
   const live = new Set<ConsoleSection>(sections)
+  /** A file from the API, e.g. a CSV. Errors arrive as JSON like any other call's. */
+  const file = async (path: string): Promise<Blob> => {
+    let res: Response
+    try {
+      res = await fetch(apiUrl(`/api${path}`, base), { credentials: apiCredentials(base) })
+    } catch {
+      throw new AuthError('network', "We couldn't reach AICA. Check your connection and try again.")
+    }
+    if (res.ok) return res.blob()
+    const err = ((await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null)?.error
+    throw new AuthError((err?.code as AuthErrorCode) ?? 'unknown', err?.message ?? 'Something went wrong on our side. Try again in a moment.')
+  }
+  /** Where and how the browser sends a file straight to storage (backend/app/blobs.py). */
+  type Upload = { url: string; method: 'PUT'; headers: Record<string, string> }
+  const put = async (upload: Upload, body: Blob, name: string) => {
+    let res: Response
+    try {
+      // To the storage bucket, not the API: no cookies.
+      res = await fetch(upload.url, { method: upload.method, headers: upload.headers, body })
+    } catch {
+      throw new AuthError('network', `We couldn't upload ${name}. Check your connection and add it again.`)
+    }
+    if (!res.ok) throw new AuthError('unknown', `We couldn't upload ${name}. Add it again.`)
+  }
+  /** Saves carry the revision they were made from, so one tab can't
+   * overwrite another's newer save (the server answers "conflict"). */
+  const agentRev = new Map<string, number>()
+  const draftRev = new Map<string, number>()
+  const seen = (d: AgentDetail & { revision?: number }) => {
+    if (typeof d.revision === 'number') agentRev.set(d.agent.id, d.revision)
+    return d
+  }
+  const seenDraft = (d: AgentDraft & { revision?: number }) => {
+    if (typeof d.revision === 'number') draftRev.set(d.id, d.revision)
+    return d
+  }
+  const NEEDS_PIPELINE = (what: string) => Promise.reject(new AuthError('unknown', `${what} needs the AI pipeline, which isn’t connected yet.`))
   const qs = (params: Record<string, string | number | undefined>) => {
     const p = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') p.set(k, String(v))
@@ -105,6 +158,93 @@ export function createHttpConsoleClient(
     appointments: {
       listAppointments: (o, from, to) => get<Appointment[]>(org(o, `/appointments${qs({ from, to })}`)),
       updateAppointment: (o, id, patch) => post<Appointment>(org(o, `/appointments/${enc(id)}`), patch),
+    },
+    reports: {
+      getReport: (o, q) => get<Report>(org(o, `/reports${qs({ days: q.days, agentId: q.agentId })}`)),
+      exportCallLog: (o, q) => file(org(o, `/reports/calls.csv${qs({ days: q.days, agentId: q.agentId })}`)),
+    },
+    numbers: {
+      listNumbers: (o) => get<PhoneNumber[]>(org(o, '/numbers')),
+      updateNumber: (o, id, patch) => post<PhoneNumber>(org(o, `/numbers/${enc(id)}`), patch),
+    },
+    tools: {
+      listTools: (o) => get<AgentTool[]>(org(o, '/tools')),
+      saveTool: (o, tool) => post<AgentTool>(org(o, '/tools'), tool),
+      deleteTool: (o, id) => post<void>(org(o, `/tools/${enc(id)}/delete`)),
+      testTool: (o, id, inputs) => post<ToolTestResult>(org(o, `/tools/${enc(id)}/test`), { inputs }),
+      listCredentials: (o) => get<Credential[]>(org(o, '/credentials')),
+      setCredential: (o, name, value) => post<Credential>(org(o, '/credentials'), { name, value }),
+      deleteCredential: (o, name) => post<void>(org(o, `/credentials/${enc(name)}/delete`)),
+    },
+    knowledge: {
+      listKnowledge: (o) => get<KnowledgeSource[]>(org(o, '/knowledge')),
+      addKnowledge: async (o, src) => {
+        const { file, ...meta } = src as typeof src & { file?: Blob }
+        const r = await post<{ source: KnowledgeSource; upload: Upload | null }>(org(o, '/knowledge'), meta)
+        if (!r.upload || !file) return r.source
+        try {
+          await put(r.upload, file, src.name)
+          return await post<KnowledgeSource>(org(o, `/knowledge/${enc(r.source.id)}/uploaded`))
+        } catch (err) {
+          // Don't leave a source that never got its file (and blocks its own name).
+          await post(org(o, `/knowledge/${enc(r.source.id)}/delete`)).catch(() => undefined)
+          throw err
+        }
+      },
+      updateKnowledge: (o, id, patch) => post<KnowledgeSource>(org(o, `/knowledge/${enc(id)}`), patch),
+      refreshKnowledge: (o, id) => post<KnowledgeSource>(org(o, `/knowledge/${enc(id)}/refresh`)),
+      deleteKnowledge: (o, id) => post<void>(org(o, `/knowledge/${enc(id)}/delete`)),
+      listPassages: (o, id) => get<Passage[]>(org(o, `/knowledge/${enc(id)}/passages`)),
+      searchKnowledge: (o, sourceIds, question) => post<Passage[]>(org(o, '/knowledge/search'), { sourceIds, question }),
+    },
+    uploads: {
+      listCalls: (o) => get<SourceCall[]>(org(o, '/uploads')),
+      addRecordings: async (o, files) => {
+        const r = await post<{ calls: SourceCall[]; uploads: (Upload & { id: string })[] }>(org(o, '/uploads'), { files: files.map(({ name, size, type }) => ({ name, size, type })) })
+        const failed: string[] = []
+        for (const [i, call] of r.calls.entries()) {
+          const upload = r.uploads.find((u) => u.id === call.id)
+          const file = files[i]?.file
+          if (!upload || !file) continue
+          try {
+            await put(upload, file, call.name)
+            await post(org(o, `/uploads/${enc(call.id)}/uploaded`))
+          } catch {
+            failed.push(call.name)
+            await post(org(o, `/uploads/${enc(call.id)}/delete`)).catch(() => undefined)
+          }
+        }
+        if (failed.length) throw new AuthError('unknown', `We couldn't upload ${failed.join(', ')}. Add ${failed.length === 1 ? 'it' : 'them'} again.`)
+        return get<SourceCall[]>(org(o, '/uploads')).then((all) => all.filter((c) => r.calls.some((x) => x.id === c.id)))
+      },
+      deleteCall: (o, id) => post<void>(org(o, `/uploads/${enc(id)}/delete`)),
+      getTranscript: (o, id) => get<Transcript>(org(o, `/uploads/${enc(id)}/transcript`)),
+    },
+    agents: {
+      listAgents: (o) => get<AgentSummary[]>(org(o, '/agents')),
+      getAgent: (o, id) => get<AgentDetail>(org(o, `/agents/${enc(id)}`)).then(seen),
+      saveAgent: (o, id, working) => post<AgentDetail>(org(o, `/agents/${enc(id)}`), { working, revision: agentRev.get(id) }).then(seen),
+      // These act on what this page last saw: someone else's newer save is refused, not published.
+      publishAgent: (o, id, note) => post<AgentDetail>(org(o, `/agents/${enc(id)}/publish`), { note, revision: agentRev.get(id) }).then(seen),
+      discardAgentChanges: (o, id) => post<AgentDetail>(org(o, `/agents/${enc(id)}/discard`), { revision: agentRev.get(id) }).then(seen),
+      rollbackAgent: (o, id, version) => post<AgentDetail>(org(o, `/agents/${enc(id)}/rollback`), { version, revision: agentRev.get(id) }).then(seen),
+      // Not seen(): the page keeps its own setup after a rename or pause, so
+      // taking this reply's revision would hide another tab's newer save.
+      updateAgent: (o, id, patch) => post<AgentDetail>(org(o, `/agents/${enc(id)}/settings`), patch),
+      deleteAgent: (o, id) => post<void>(org(o, `/agents/${enc(id)}/delete`)),
+      createDraft: (o, orgName) => post<AgentDraft>(org(o, '/drafts'), { orgName }).then(seenDraft),
+      getDraft: (o, id) => get<AgentDraft>(org(o, `/drafts/${enc(id)}`)).then(seenDraft),
+      saveDraft: (o, draft) => post<AgentDraft>(org(o, `/drafts/${enc(draft.id)}`), { draft, revision: draftRev.get(draft.id) }).then(seenDraft),
+      discardDraft: (o, id) => post<void>(org(o, `/drafts/${enc(id)}/discard`)),
+      publishDraft: (o, id, numberId) => post<AgentSummary>(org(o, `/drafts/${enc(id)}/publish`), { numberId }),
+      listScenarios: (o, id) => get<Scenario[]>(org(o, `/agents/${enc(id)}/scenarios`)),
+      saveScenario: (o, id, scenario) => post<Scenario>(org(o, `/agents/${enc(id)}/scenarios`), scenario),
+      deleteScenario: (o, id, sid) => post<void>(org(o, `/agents/${enc(id)}/scenarios/${enc(sid)}/delete`)),
+      listAgentTypes: () => get<AgentType[]>('/catalogue/agent-types'),
+      listVoices: () => get<Voice[]>('/catalogue/voices'),
+      // AI work (docs/backend-workflow.md, out of scope): say so instead of pretending.
+      runScenarios: () => NEEDS_PIPELINE('Running test scenarios'),
+      extractFlow: () => NEEDS_PIPELINE('Reading a flow from calls'),
     },
     handoffs: {
       listHandoffs: (o) => get<Handoff[]>(org(o, '/handoffs')),

@@ -77,7 +77,7 @@ function BuilderPage() {
 
   if (loadError) {
     return (
-      <ConsolePage kicker="New agent" title="New agent" docTitle="New agent">
+      <ConsolePage section="agents" kicker="New agent" title="New agent" docTitle="New agent">
         <Alert tone="error" title="Couldn't open this draft">
           <p>{asAuthError(loadError).message}</p>
           <p className="builder__alert-actions">
@@ -95,7 +95,7 @@ function BuilderPage() {
 
   if (!draft) {
     return (
-      <ConsolePage kicker="New agent" title="New agent" docTitle="New agent">
+      <ConsolePage section="agents" kicker="New agent" title="New agent" docTitle="New agent">
         <div className="loading-row" role="status">
           <Spinner />
           <span>Opening the draft…</span>
@@ -168,7 +168,7 @@ function BuilderPage() {
   const props: StepProps = { draft, org, base: orgBase, update, showErrors: tries > 0, attempt: tries, validator, save: () => autosave.flush(), done: autosave.cancel }
 
   return (
-    <ConsolePage
+    <ConsolePage section="agents"
       key={step}
       kicker={
         <>

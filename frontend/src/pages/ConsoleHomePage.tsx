@@ -26,7 +26,9 @@ const PERIOD: Record<Days, string> = { 1: 'yesterday by this time', 7: 'the 7 da
 const shortDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 const longDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 const hourLabel = (h: number) => (h === 0 ? '12 am' : h < 12 ? `${h} am` : h === 12 ? '12 pm' : `${h - 12} pm`)
-const pct = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}%` : '-')
+const pct = (n: number | null, of: number) => (n !== null && of ? `${Math.round((n / of) * 100)}%` : '-')
+/** A timing, or a dash until the voice servers send timings. */
+const secs = (ms: number | null) => (ms === null ? '-' : seconds(ms))
 
 interface Today {
   live: LiveCall[] | null
@@ -252,25 +254,29 @@ export default function ConsoleHomePage() {
 
               <section className="op-section" aria-labelledby={`${id}-q`}>
                 <h3 id={`${id}-q`} className="op-section__subtitle">Quality</h3>
-                <p className="op-section__sub">From each call's analysis and the voice servers' timings. Success is measured against each agent's own criteria.</p>
+                <p className="op-section__sub">From each call's analysis and the voice servers' timings. Success is measured against each agent's own criteria.{r.quality.success === null && r.quality.replyP50Ms === null && r.totals.calls > 0 ? ' These show once the voice servers send each call’s analysis and timings.' : ''}</p>
                 <dl className="stats">
-                  <StatTile label="Successful calls" value={pct(r.quality.success, r.totals.calls)} sub={`${r.quality.success.toLocaleString('en-IN')} met their agent's criteria`} />
-                  <StatTile label="Callers pleased" value={pct(r.quality.sentiment.positive, r.totals.calls)} sub={`${pct(r.quality.sentiment.negative, r.totals.calls)} sounded unhappy`} />
-                  <StatTile label="Typical reply" value={seconds(r.quality.replyP50Ms)} sub={`Slowest 1 in 20: ${seconds(r.quality.replyP95Ms)}`} />
-                  <StatTile label="First words" value={seconds(r.quality.firstWordMs)} sub="From answering to the greeting" />
-                  <StatTile label="Caller cut in" value={String(r.quality.interruptionsPerCall)} sub="Times per call, on average" />
+                  <StatTile label="Successful calls" value={pct(r.quality.success, r.quality.analysed ?? r.totals.calls)} sub={r.quality.success === null ? 'Not measured yet' : `${r.quality.success.toLocaleString('en-IN')} met their agent's criteria`} />
+                  <StatTile label="Callers pleased" value={pct(r.quality.sentiment?.positive ?? null, r.quality.analysed ?? r.totals.calls)} sub={r.quality.sentiment ? `${pct(r.quality.sentiment.negative, r.quality.analysed ?? r.totals.calls)} sounded unhappy` : 'Not measured yet'} />
+                  <StatTile label="Typical reply" value={secs(r.quality.replyP50Ms)} sub={`Slowest 1 in 20: ${secs(r.quality.replyP95Ms)}`} />
+                  <StatTile label="First words" value={secs(r.quality.firstWordMs)} sub="From answering to the greeting" />
+                  <StatTile label="Caller cut in" value={r.quality.interruptionsPerCall === null ? '-' : String(r.quality.interruptionsPerCall)} sub="Times per call, on average" />
                 </dl>
                 <div className="op-split">
                   <div>
                     <h4 className="op-section__subtitle">Where a reply's wait goes</h4>
-                    <BarList
-                      label="Typical time for each part of a reply, in milliseconds"
-                      items={[
-                        { label: 'Hearing the caller (speech recognition)', value: r.quality.speechMs },
-                        { label: 'Working out the reply (language model)', value: r.quality.languageMs },
-                        { label: 'Starting to speak (voice)', value: r.quality.voiceMs },
-                      ]}
-                    />
+                    {r.quality.speechMs === null || r.quality.languageMs === null || r.quality.voiceMs === null ? (
+                      <p className="op-section__sub">Not measured yet.</p>
+                    ) : (
+                      <BarList
+                        label="Typical time for each part of a reply, in milliseconds"
+                        items={[
+                          { label: 'Hearing the caller (speech recognition)', value: r.quality.speechMs },
+                          { label: 'Working out the reply (language model)', value: r.quality.languageMs },
+                          { label: 'Starting to speak (voice)', value: r.quality.voiceMs },
+                        ]}
+                      />
+                    )}
                   </div>
                   {!agentId && r.agents.length > 0 && (
                     <div>
@@ -284,7 +290,7 @@ export default function ConsoleHomePage() {
                               <th scope="row">{a.name}</th>
                               <td>{a.calls.toLocaleString('en-IN')}</td>
                               <td>{pct(a.success, a.calls)}</td>
-                              <td>{seconds(a.replyP50Ms)}</td>
+                              <td>{secs(a.replyP50Ms)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -446,12 +452,13 @@ function upperFirst(s: string): string {
 }
 
 function downloadCsv(r: Report, days: Days, agentName?: string) {
-  const esc = (v: string | number) => {
+  const esc = (v: string | number | null) => {
+    if (v === null) return ''
     let t = String(v)
     if (typeof v === 'string' && /^[=+\-@]/.test(t)) t = `'${t}`
     return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
   }
-  const rows: (string | number)[][] = [
+  const rows: (string | number | null)[][] = [
     ['AICA report', DAYS_LABEL[days], agentName ?? 'All agents'],
     [],
     ['Day', 'Answered by the agents', 'Handed to your team', 'Caller hung up'],
@@ -465,9 +472,9 @@ function downloadCsv(r: Report, days: Days, agentName?: string) {
     [],
     ['Quality', 'Value'],
     ['Successful calls', r.quality.success],
-    ['Callers pleased', r.quality.sentiment.positive],
-    ['Callers neutral', r.quality.sentiment.neutral],
-    ['Callers unhappy', r.quality.sentiment.negative],
+    ['Callers pleased', r.quality.sentiment?.positive ?? null],
+    ['Callers neutral', r.quality.sentiment?.neutral ?? null],
+    ['Callers unhappy', r.quality.sentiment?.negative ?? null],
     ['Typical reply (ms)', r.quality.replyP50Ms],
     ['Slowest 1 in 20 replies (ms)', r.quality.replyP95Ms],
     ['First words (ms)', r.quality.firstWordMs],

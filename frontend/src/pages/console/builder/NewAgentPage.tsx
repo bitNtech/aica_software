@@ -45,7 +45,7 @@ export default function NewAgentPage() {
   }, [start])
 
   return (
-    <ConsolePage kicker="New agent" title="New agent" docTitle="New agent">
+    <ConsolePage section="agents" kicker="New agent" title="New agent" docTitle="New agent">
       {error ? (
         <Alert tone="error" title="Couldn't start a new agent">
           <p>{asAuthError(error).message}</p>

@@ -40,7 +40,7 @@ export default function NumbersPage() {
   const agentOf = (n: PhoneNumber) => (lib.state === 'ready' ? lib.data.agents.find((a) => a.id === n.agentId) : undefined)
 
   return (
-    <ConsolePage
+    <ConsolePage section="numbers"
       kicker="Agents"
       title="Phone numbers"
       docTitle="Phone numbers"

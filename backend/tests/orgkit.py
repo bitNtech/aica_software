@@ -118,3 +118,53 @@ def seed_ops(store, people, slug=SLUG):
         summary="Lakshmi K is asking about her scan report.", language="tamil", waitingSince=t - timedelta(minutes=2),
         details=[{"label": "Patient name", "value": "Lakshmi K", "personal": True}],
     ))
+
+
+def sample_spec(**over) -> dict:
+    """A valid AgentSpec from the catalogue's defaults."""
+    from app import catalogue as c
+
+    spec = {
+        "typeId": "hospital", "subTypeId": "appointments", "redact": True, "behaviour": c.default_behaviour("Arogya"), "speech": c.default_speech(),
+        "flow": [{"id": "n1", "kind": "intent", "label": "Book a visit", "sourceCallIds": ["up_1"], "children": [{"id": "n2", "kind": "step", "label": "Ask the date", "say": "Which day?", "sourceCallIds": [], "children": []}]}],
+        "attributes": [{"id": "a1", "label": "Patient name", "type": "name", "required": True, "personal": True, "confirm": True, "ask": "May I have the patient's name?"}],
+        "globalFlows": [{"kind": "handoff", "enabled": True, "trigger": "Caller asks for a person", "response": "Let me put you through."}],
+        "context": {**c.default_context(), "knowledgeSourceIds": ["kn_1"], "toolIds": ["tool_1"]},
+        "guardrails": c.default_guardrails(), "pipeline": c.default_pipeline(), "analysis": c.default_analysis("appointments"),
+    }
+    spec.update(over)
+    return spec
+
+
+def seed_library(svc, store, slug=SLUG):
+    """One of each Phase 5/6 record, with fixed ids: agent agt_1 (version 1)
+    answers num_1; num_2 is free; tool_1 sends secret HIS_KEY; OTHER_KEY is
+    unused; kn_1 (ready FAQ) is used by agt_1, kn_2 (web) isn't, kn_3 is a
+    document waiting for its upload; up_1 is uploaded, up_2 waiting;
+    draft_1 is being built; scn_1 tests agt_1."""
+    from app.store import (AgentDoc, CredentialDoc, DraftDoc, KnowledgeDoc, NumberDoc, ScenarioDoc, ToolDoc, UploadDoc, VersionDoc, now)
+    from app import catalogue as c
+
+    t = now()
+    spec = sample_spec()
+    store.save_record(slug, "agent", AgentDoc(id="agt_1", name="Main reception", useCase="Appointments", status="live", working=spec, updatedAt=t, languages=["tamil", "english", "tanglish"], numberId="num_1", version=1, lastPublishedAt=t))
+    store.save_record(slug, "version", VersionDoc(id="agt_1_000001", agentId="agt_1", version=1, publishedAt=t, publishedBy="Support (bitNtech)", note="First version.", spec=spec))
+    store.save_record(slug, "number", NumberDoc(id="num_1", number="+91 422 400 1000", label="Main reception", hours="8 AM to 8 PM", agentId="agt_1"))
+    store.save_record(slug, "number", NumberDoc(id="num_2", number="+91 422 400 2000", label="Lab", hours="8 AM to 8 PM"))
+    for name in ("HIS_KEY", "OTHER_KEY"):
+        ct, kid = svc.secrets.seal(slug, name, f"value-of-{name}")
+        store.save_record(slug, "credential", CredentialDoc(id=name, ciphertext=ct, keyId=kid, setAt=t, setBy="Owner"))
+    store.save_record(slug, "tool", ToolDoc(id="tool_1", name="Book an appointment", kind="http", description="Books a slot in the hospital system.", acts=True, enabled=True,
+                                            params=[{"name": "patient_id", "type": "string", "required": True, "description": "The patient's ID."}], method="POST",
+                                            url="https://his.example.in/api/book", credentialName="HIS_KEY", timeoutMs=5000, retries=0))
+    store.save_record(slug, "knowledge", KnowledgeDoc(id="kn_1", name="OPD timings", kind="faq", origin="1 questions", description="When the OPD is open.", status="ready", passages=1, refreshedAt=t, faq=[{"q": "When is OPD open?", "a": "8 AM to 8 PM."}]))
+    store.save_record(slug, "knowledge", KnowledgeDoc(id="kn_2", name="Price list", kind="web", origin="https://arogya.example.in/prices", description="Prices.", status="indexing", passages=0, refreshedAt=t, url="https://arogya.example.in/prices"))
+    store.save_record(slug, "knowledge", KnowledgeDoc(id="kn_3", name="Doctor list", kind="document", origin="doctors.pdf", description="", status="indexing", passages=0, refreshedAt=t, fileName="doctors.pdf", size=1000, contentType="application/pdf", objectPath=f"orgs/{slug}/knowledge/kn_3.pdf"))
+    svc.blobs.put(f"orgs/{slug}/knowledge/kn_3.pdf", 1000)
+    store.save_record(slug, "upload", UploadDoc(id="up_1", name="call-1.mp3", size=2000, contentType="audio/mpeg", objectPath=f"orgs/{slug}/uploads/up_1.mp3", addedAt=t, uploaded=True))
+    store.save_record(slug, "upload", UploadDoc(id="up_2", name="call-2.mp3", size=3000, contentType="audio/mpeg", objectPath=f"orgs/{slug}/uploads/up_2.mp3", addedAt=t))
+    svc.blobs.put(f"orgs/{slug}/uploads/up_2.mp3", 3000)
+    draft = {"reached": "type", "sourceCallIds": ["up_1"], "consent": True, "redact": True, "typeId": None, "subTypeId": None, "name": "Lab reports",
+             "behaviour": c.default_behaviour("Arogya"), "flow": [], "attributes": [], "globalFlows": [], "context": c.default_context(), "pipeline": c.default_pipeline()}
+    store.save_record(slug, "draft", DraftDoc(id="draft_1", data=draft, updatedAt=t, createdBy="Support (bitNtech)"))
+    store.save_record(slug, "scenario", ScenarioDoc(id="scn_1", agentId="agt_1", name="Books a first visit", callerSays=["I want to see a doctor"], expect={"intent": "", "mustSay": [], "handover": None}))

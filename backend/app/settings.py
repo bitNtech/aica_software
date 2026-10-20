@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     invite_days: int = 7
     # How long a master admin's "act as" session lasts.
     act_as_minutes: int = Field(30, ge=5, le=120)
+    # System secrets' encryption key: 32 random bytes, base64 (app/secrets.py).
+    # Empty: secrets can't be set. SECRETS_KEY_PREVIOUS only while rotating.
+    secrets_key: str = ""
+    secrets_key_previous: str = ""
+    # The private bucket for uploaded recordings and knowledge files.
+    # Empty: uploads are refused with an explanation.
+    storage_bucket: str = ""
     # "text" for a terminal, "json" for log search (the default on Vercel).
     log_format: Literal["text", "json"] = "text"
 

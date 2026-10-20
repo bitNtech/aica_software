@@ -105,7 +105,7 @@ export default function UploadsPage() {
   }
 
   return (
-    <ConsolePage
+    <ConsolePage section="uploads"
       kicker="Agents"
       title="Call uploads"
       docTitle="Call uploads"
@@ -127,7 +127,7 @@ export default function UploadsPage() {
             multiple
             disabled={uploading}
             hint={
-              client.isDemo
+              (client.isDemo && !client.isLive?.('uploads'))
                 ? 'MP3, WAV, M4A, OGG or FLAC, up to 200 MB each. Only calls whose callers agreed to recording. In this demo nothing is uploaded: added files become sample calls.'
                 : 'MP3, WAV, M4A, OGG or FLAC, up to 200 MB each. Only calls whose callers agreed to recording.'
             }

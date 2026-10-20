@@ -92,8 +92,8 @@ describe('createHttpConsoleClient', () => {
     const c = client()
     expect(c.isDemo).toBe(true)
     expect(ALL_LIVE_SECTIONS.every((s) => c.isLive?.(s))).toBe(true)
-    // Agents aren't built yet: no request, sample data.
-    expect((await c.listAgents('arogya')).length).toBeGreaterThan(0)
+    // The model catalogue is the pipeline's: no request, sample data.
+    expect(await c.listModels()).toBeTruthy()
     expect(f).not.toHaveBeenCalled()
   })
 

@@ -21,6 +21,7 @@ from datetime import timedelta
 
 from ..access import member_access
 from ..redact import search_tokens
+from ..reports import record_call
 from ..services import Services, build_services
 from ..settings import get_settings
 from ..store import AppointmentDoc, CallbackDoc, CallDoc, HandoffDoc, new_id, now
@@ -42,7 +43,10 @@ def seed(svc: Services, slug: str, calls: int = 120, write: bool = False) -> dic
     def put(kind, rec, key):
         counts[key] += 1
         if write:
-            svc.store.save_record(slug, kind, rec)
+            if kind == "call":
+                record_call(svc, slug, rec)  # the call and its report rollup together
+            else:
+                svc.store.save_record(slug, kind, rec)
 
     for i in range(calls):
         intent, outcome = rng.choice(INTENTS)
@@ -58,7 +62,9 @@ def seed(svc: Services, slug: str, calls: int = 120, write: bool = False) -> dic
             summary=f"{name or 'The caller'} asked: {intent.lower()}.",
             details=[{"label": "Patient name", "value": name, "personal": True}] if name else [],
             transcript=[{"speaker": "agent", "at": 0, "text": "Vanakkam, this is the hospital's assistant."}, {"speaker": "caller", "at": 3, "text": f"I'm {{{{name:{name}}}}}. {intent}." if name else f"{intent}."}],
-            analysis={"sentiment": "neutral", "success": outcome in ("resolved", "booked"), "successReason": "Sample data", "fields": []},
+            analysis={"sentiment": rng.choice(["positive", "neutral", "neutral", "negative"]), "success": outcome in ("resolved", "booked", "emergency"), "successReason": "Sample data", "fields": []},
+            metrics={"firstWordMs": rng.randint(600, 1400), "replyP50Ms": rng.randint(700, 1300), "replyP95Ms": rng.randint(1500, 3200), "speechMs": rng.randint(150, 400), "languageMs": rng.randint(300, 700), "voiceMs": rng.randint(150, 350), "interruptions": rng.randint(0, 3)},
+            path=[intent, "Confirm details"] if outcome in ("dropped", "handed_over") else [],
             searchTokens=search_tokens(phone, intent, "Main reception (sample)", name), seeded=True,
         ), "calls")
         if outcome == "booked":

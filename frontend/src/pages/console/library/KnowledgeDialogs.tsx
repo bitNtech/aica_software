@@ -124,7 +124,7 @@ export function AddKnowledgeDialog({ orgSlug, open, onClose, onAdded }: { orgSlu
               invalid={!!errors.file}
               errorId={`${formId}-file`}
               accept={FILE_ACCEPT[kind]}
-              hint={`${kind === 'table' ? 'Excel or CSV' : 'PDF, Word, text or Markdown'}, up to 50 MB.${client.isDemo ? ' In this demo the file isn’t uploaded or read.' : ''}`}
+              hint={`${kind === 'table' ? 'Excel or CSV' : 'PDF, Word, text or Markdown'}, up to 50 MB.${client.isDemo && !client.isLive?.('knowledge') ? ' In this demo the file isn’t uploaded or read.' : ''}`}
               onFiles={([f]) => {
                 setFile(f ?? null)
                 setErrors((x) => ({ ...x, file: '' }))
