@@ -19,8 +19,15 @@ export function SaveStatus({ state, onRetry }: { state: SaveState; onRetry(): vo
 
   return (
     <div className="save-status-wrap">
-      <p className={`save-status${state === 'error' ? ' save-status--error' : ''}`}>
-        {state === 'error' ? (
+      <p className={`save-status${state === 'error' || state === 'conflict' ? ' save-status--error' : ''}`}>
+        {state === 'conflict' ? (
+          <>
+            Someone else saved changes, so yours weren’t saved.{' '}
+            <button type="button" className="btn-text" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </>
+        ) : state === 'error' ? (
           <>
             Couldn’t save.{' '}
             <button type="button" className="btn-text" onClick={onRetry}>
@@ -37,7 +44,7 @@ export function SaveStatus({ state, onRetry }: { state: SaveState; onRetry(): vo
         )}
       </p>
       <p className="sr-only" role="status">
-        {state === 'error' ? 'Couldn’t save your changes.' : recovered && state === 'saved' ? 'Your changes are saved now.' : ''}
+        {state === 'conflict' ? 'Someone else saved changes. Reload to see them.' : state === 'error' ? 'Couldn’t save your changes.' : recovered && state === 'saved' ? 'Your changes are saved now.' : ''}
       </p>
     </div>
   )

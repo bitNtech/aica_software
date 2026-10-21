@@ -68,7 +68,7 @@ export default function ToolsPage() {
   const systems = tools.filter((t) => t.kind === 'http')
 
   return (
-    <ConsolePage
+    <ConsolePage section="tools"
       kicker="Agents"
       title="Tools and integrations"
       docTitle="Tools and integrations"

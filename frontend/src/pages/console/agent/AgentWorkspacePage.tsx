@@ -115,7 +115,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
 
   if (loadError) {
     return (
-      <ConsolePage kicker="Agent" title="Agent" docTitle="Agent">
+      <ConsolePage section="agents" kicker="Agent" title="Agent" docTitle="Agent">
         <Alert tone="error" title="Couldn't open this agent">
           <p>{asAuthError(loadError).message}</p>
           <p className="builder__alert-actions">
@@ -132,7 +132,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
   }
   if (!detail || !spec || !live || lib.state !== 'ready') {
     return (
-      <ConsolePage kicker="Agent" title={detail?.agent.name ?? 'Agent'} docTitle={detail?.agent.name ?? 'Agent'}>
+      <ConsolePage section="agents" kicker="Agent" title={detail?.agent.name ?? 'Agent'} docTitle={detail?.agent.name ?? 'Agent'}>
         {lib.state === 'error' ? (
           <Alert tone="error" title="Couldn't load your voices, knowledge and tools">
             <p>{asAuthError(lib.error).message}</p>
@@ -277,7 +277,7 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
   const changes = publish !== 'closed' ? diffSpecs(live.spec, spec, names) : []
 
   return (
-    <ConsolePage
+    <ConsolePage section="agents"
       kicker={
         <>
           <Link className="ws__crumb" to={`${orgBase}/agents`}>

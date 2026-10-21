@@ -61,7 +61,7 @@ export function TranscriptDialog({ orgSlug, call, redact, onClose }: { orgSlug: 
   }, [client, orgSlug, call, tick])
   const load = useCallback(() => setTick((n) => n + 1), [])
   // Uploaded in demo mode: nothing was transcribed, so it's a stand-in.
-  const sample = client.isDemo && call?.size !== undefined
+  const sample = client.isDemo && !client.isLive?.('uploads') && call?.size !== undefined
 
   return (
     <Modal open={!!call} title={call ? `Transcript: ${call.name}` : 'Transcript'} onClose={onClose} wide>

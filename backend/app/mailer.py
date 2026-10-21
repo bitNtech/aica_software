@@ -141,6 +141,17 @@ class Mailer:
             "master-admin-alert",
         )
 
+    def change_request(self, to: str | list[str], org_name: str, title: str, event: str, by: str, url: str) -> bool:
+        """A request to bitNtech was made, replied to or moved on. Only its
+        title and a link: the request itself stays in AICA."""
+        title = _one_line(title)[:120]
+        heading, intro = {
+            "created": (f"New request from {org_name}.", f"{by} asked bitNtech: “{title}”."),
+            "replied": (f"A reply on “{title}”.", f"{by} replied on {org_name}'s request."),
+            "updated": (f"Your request was updated.", f"{by} updated {org_name}'s request “{title}”."),
+        }[event]
+        return self.send(to, _one_line(f"{org_name}: {title}")[:150], _page(heading, intro, "Open the request", url, "You get this because of your role in AICA."), f"request-{event}")
+
     def demo_request(self, to: list[str], lead: dict[str, str]) -> bool:
         """The landing page's "Book a demo" form, to the team. Unlike the
         emails above, this one is the whole point of the request: the caller

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AuthError } from '../../../auth/types'
 
-export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error'
+/** conflict: someone else saved since this page loaded; saving stops until a reload. */
+export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error' | 'conflict'
 
 /**
  * Saves `value` shortly after it stops changing, one save at a time, and
@@ -14,6 +16,8 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
   /** The last save failed (not just "changed since"). */
   const failed = useRef(false)
   const cancelled = useRef(false)
+  /** Saving again would overwrite someone else's work. */
+  const conflicted = useRef(false)
   /** The page has gone: late changes (say, a slow reply) aren't saved. */
   const gone = useRef(false)
   const running = useRef<Promise<void>>(Promise.resolve())
@@ -23,16 +27,22 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
   const run = useCallback(() => {
     window.clearTimeout(timer.current)
     running.current = running.current.then(async () => {
-      if (cancelled.current || !dirty.current || latest.current === null) return
+      if (cancelled.current || conflicted.current || !dirty.current || latest.current === null) return
       dirty.current = false
       setState('saving')
       try {
         await save(latest.current)
         failed.current = false
         setState(dirty.current ? 'unsaved' : 'saved')
-      } catch {
-        dirty.current = true
+      } catch (err) {
         failed.current = true
+        if (err instanceof AuthError && err.code === 'conflict') {
+          conflicted.current = true
+          dirty.current = false
+          setState('conflict')
+          return
+        }
+        dirty.current = true
         setState('error')
       }
     })
@@ -87,6 +97,7 @@ export function useAutosave<T>(value: T | null, save: (v: T) => Promise<unknown>
     window.clearTimeout(timer.current)
     dirty.current = false
     failed.current = false
+    conflicted.current = false
     setState('saved')
   }, [])
 

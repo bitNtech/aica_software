@@ -189,8 +189,9 @@ describe('call quality', () => {
 
     const r = report(ctx, 7)
     const q = r.quality
-    expect(q.sentiment.positive + q.sentiment.neutral + q.sentiment.negative).toBe(r.totals.calls)
-    expect(q.success).toBeLessThanOrEqual(r.totals.calls)
+    const s = q.sentiment! // the demo always has analysis
+    expect(s.positive + s.neutral + s.negative).toBe(r.totals.calls)
+    expect(q.success!).toBeLessThanOrEqual(r.totals.calls)
     expect(r.agents.reduce((s, a) => s + a.calls, 0)).toBe(r.totals.calls)
   })
 })

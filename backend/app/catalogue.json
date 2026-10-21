@@ -1,0 +1,369 @@
+{
+  "$comment": "Agent types, voices and the defaults a new agent starts from. Generated from frontend/src/console/demo (templates.ts, agentConfig.ts, specs.ts, library.ts); frontend/src/test/catalogue-parity.test.ts fails if they drift.",
+  "agentTypes": [
+    {
+      "id": "hospital",
+      "label": "Hospital",
+      "subTypes": [
+        {
+          "id": "appointments",
+          "label": "Appointments",
+          "description": "Books, moves and cancels OPD appointments.",
+          "covers": [
+            "Book an appointment",
+            "Reschedule",
+            "Cancel",
+            "Doctor availability"
+          ]
+        },
+        {
+          "id": "reports",
+          "label": "Report status",
+          "description": "Tells patients whether lab and scan reports are ready.",
+          "covers": [
+            "Is my report ready?",
+            "How to collect it",
+            "Report delays"
+          ]
+        },
+        {
+          "id": "enquiries",
+          "label": "General enquiries",
+          "description": "Answers the questions every reception hears: timings, directions, prices.",
+          "covers": [
+            "Visiting hours",
+            "Directions and parking",
+            "Departments",
+            "Consultation fees"
+          ]
+        },
+        {
+          "id": "billing",
+          "label": "Billing and insurance",
+          "description": "Explains bills, payment options and insurance claims.",
+          "covers": [
+            "Bill amount",
+            "Payment options",
+            "Insurance claim status",
+            "Cashless approval"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clinic",
+      "label": "Clinic",
+      "subTypes": [
+        {
+          "id": "appointments",
+          "label": "Appointments",
+          "description": "Books and moves appointments with the clinic’s doctors.",
+          "covers": [
+            "Book an appointment",
+            "Reschedule",
+            "Cancel",
+            "Clinic timings"
+          ]
+        },
+        {
+          "id": "enquiries",
+          "label": "General enquiries",
+          "description": "Timings, fees, directions and what to bring.",
+          "covers": [
+            "Timings",
+            "Fees",
+            "Directions",
+            "What to bring"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "diagnostics",
+      "label": "Diagnostic centre",
+      "subTypes": [
+        {
+          "id": "reports",
+          "label": "Report status",
+          "description": "Tells patients whether their reports are ready and how to get them.",
+          "covers": [
+            "Is my report ready?",
+            "Email or collect",
+            "Report delays"
+          ]
+        },
+        {
+          "id": "home_collection",
+          "label": "Home sample collection",
+          "description": "Books home visits to collect samples.",
+          "covers": [
+            "Book a home visit",
+            "Area served",
+            "Fasting and preparation",
+            "Charges"
+          ]
+        },
+        {
+          "id": "prices",
+          "label": "Tests and prices",
+          "description": "Answers what a test costs and how to prepare.",
+          "covers": [
+            "Test prices",
+            "Preparation",
+            "Packages",
+            "Timings"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "label": "Other",
+      "subTypes": [
+        {
+          "id": "enquiries",
+          "label": "General enquiries",
+          "description": "Answers common questions about your business.",
+          "covers": [
+            "Timings",
+            "Location",
+            "Prices",
+            "Talk to a person"
+          ]
+        }
+      ]
+    }
+  ],
+  "voices": [
+    {
+      "id": "kavya",
+      "name": "Kavya",
+      "description": "Warm, mid-pitched. Clear in Tamil and English.",
+      "languages": [
+        "tamil",
+        "english",
+        "tanglish"
+      ]
+    },
+    {
+      "id": "arun",
+      "name": "Arun",
+      "description": "Calm, lower-pitched. Steady pace.",
+      "languages": [
+        "tamil",
+        "english",
+        "tanglish"
+      ]
+    },
+    {
+      "id": "meera",
+      "name": "Meera",
+      "description": "Bright and quick. Suits short enquiries.",
+      "languages": [
+        "english",
+        "tanglish"
+      ]
+    },
+    {
+      "id": "selvi",
+      "name": "Selvi",
+      "description": "Gentle, slower. Suits older callers.",
+      "languages": [
+        "tamil",
+        "tanglish"
+      ]
+    }
+  ],
+  "behaviour": {
+    "persona": "Kavya",
+    "tone": "warm",
+    "languages": [
+      "tamil",
+      "english",
+      "tanglish"
+    ],
+    "startLanguage": "tamil",
+    "followCaller": true,
+    "greeting": "Vanakkam! This is Kavya from {orgName}. How can I help you today?",
+    "closing": "Thank you for calling. Take care!",
+    "voiceId": "kavya",
+    "rate": "normal",
+    "rules": [
+      "Never give medical advice, diagnoses or test interpretations.",
+      "Never share a patient’s details with anyone but the patient or the person they named.",
+      "Always repeat dates, times and phone numbers back to the caller."
+    ]
+  },
+  "pipeline": {
+    "speechModel": "default",
+    "languageModel": "default",
+    "voiceModel": "default",
+    "turnDetection": "semantic",
+    "minEndpointMs": 500,
+    "maxEndpointMs": 3000,
+    "interruptMinWords": 2,
+    "interruptMinMs": 500,
+    "resumeAfterFalseInterruption": true,
+    "backchannel": false,
+    "fillerPhrases": [
+      "One moment, let me check.",
+      "Oru nimisham."
+    ],
+    "preemptiveReplies": true,
+    "noiseCancellation": "standard",
+    "ambience": "none",
+    "keypadInput": true,
+    "silenceReprompts": 2,
+    "temperature": 0.4
+  },
+  "speech": {
+    "pronunciations": [],
+    "hints": [],
+    "allowInterruptions": true,
+    "silenceSec": 8
+  },
+  "guardrails": {
+    "handoffAfterFailures": 2,
+    "transferTo": "Front desk",
+    "emergencyTo": "Emergency desk, extension 108",
+    "refuseTopics": [
+      "Diagnosis or medical advice",
+      "Medicine doses"
+    ],
+    "recordingNotice": true,
+    "recordingNoticeText": "This call may be recorded to improve our service.",
+    "maxCallMinutes": 10
+  },
+  "analysis": {
+    "default": {
+      "summary": true,
+      "sentiment": true,
+      "successCriteria": "The caller got what they called for without needing a person.",
+      "fields": []
+    },
+    "appointments": {
+      "summary": true,
+      "sentiment": true,
+      "successCriteria": "The caller booked, changed or cancelled an appointment without needing a person.",
+      "fields": [
+        {
+          "id": "fld_dept",
+          "label": "Department",
+          "type": "choice",
+          "description": "The department the caller wanted.",
+          "options": [
+            "Cardiology",
+            "General medicine",
+            "Orthopaedics",
+            "Paediatrics",
+            "ENT",
+            "Other"
+          ]
+        },
+        {
+          "id": "fld_first",
+          "label": "First visit",
+          "type": "yes_no",
+          "description": "Whether it was the patient’s first visit."
+        }
+      ]
+    },
+    "reports": {
+      "summary": true,
+      "sentiment": true,
+      "successCriteria": "The caller found out whether the report was ready, and when to collect it.",
+      "fields": [
+        {
+          "id": "fld_ready",
+          "label": "Report ready",
+          "type": "yes_no",
+          "description": "Whether every test on the report was ready."
+        }
+      ]
+    },
+    "enquiries": {
+      "summary": true,
+      "sentiment": true,
+      "successCriteria": "The caller got an answer from the knowledge, or was put through to the right desk.",
+      "fields": [
+        {
+          "id": "fld_topic",
+          "label": "Topic",
+          "type": "choice",
+          "description": "What the caller asked about.",
+          "options": [
+            "Timings",
+            "Doctors",
+            "Prices",
+            "Billing",
+            "Other"
+          ]
+        }
+      ]
+    }
+  },
+  "context": {
+    "knowledgeSourceIds": [],
+    "answerOnlyFromKnowledge": true,
+    "topK": 4,
+    "minScore": 0.6,
+    "toolIds": [],
+    "confirmBeforeActions": true
+  },
+  "builtinTools": [
+    {
+      "id": "tool_transfer",
+      "name": "Transfer to a person",
+      "kind": "builtin",
+      "builtin": "transfer",
+      "description": "Puts the caller through to the front desk, with a summary of the call so far.",
+      "acts": false,
+      "params": [],
+      "enabled": true
+    },
+    {
+      "id": "tool_end",
+      "name": "End the call",
+      "kind": "builtin",
+      "builtin": "end_call",
+      "description": "Says the closing line and hangs up.",
+      "acts": false,
+      "params": [],
+      "enabled": true
+    },
+    {
+      "id": "tool_sms",
+      "name": "Send an SMS",
+      "kind": "builtin",
+      "builtin": "sms",
+      "description": "Texts the caller a confirmation, directions or a link.",
+      "acts": true,
+      "params": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "The text to send."
+        }
+      ],
+      "enabled": true
+    },
+    {
+      "id": "tool_whatsapp",
+      "name": "Send a WhatsApp message",
+      "kind": "builtin",
+      "builtin": "whatsapp",
+      "description": "Sends the caller a WhatsApp message from the hospital’s business number.",
+      "acts": true,
+      "params": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "The message to send."
+        }
+      ],
+      "enabled": false
+    }
+  ]
+}

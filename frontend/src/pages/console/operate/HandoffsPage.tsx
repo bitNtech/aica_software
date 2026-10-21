@@ -67,7 +67,7 @@ export default function HandoffsPage() {
   }
 
   return (
-    <ConsolePage kicker="Operate" title="Handoff queue" docTitle="Handoff queue" lede={<p>Callers an agent passed to a person, with what the agent learned. Emergencies come first, then whoever has waited longest.</p>}>
+    <ConsolePage section="handoffs" kicker="Operate" title="Handoff queue" docTitle="Handoff queue" lede={<p>Callers an agent passed to a person, with what the agent learned. Emergencies come first, then whoever has waited longest.</p>}>
       <p className="sr-only" role="status">
         {note}
       </p>

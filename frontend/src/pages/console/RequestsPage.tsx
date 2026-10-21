@@ -78,6 +78,7 @@ export default function RequestsPage() {
 
   return (
     <ConsolePage
+      section="requests"
       kicker="Agents"
       docTitle="Requests"
       title={platform ? `Requests from ${org.orgName}` : 'Requests to bitNtech'}

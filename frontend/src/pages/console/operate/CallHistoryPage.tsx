@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { asAuthError } from '../../../auth/types'
 import { useConsole } from '../../../console/ConsoleProvider'
+import { flowRequestDetail } from '../../../console/flowRequest'
 import type { AgentSummary, CallLogPage, CallOutcome, CallQuery, DetectedFlowPattern } from '../../../console/types'
 import { can, pageAccess } from '../../../console/access'
 import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../../console/flowPatternConfig'
@@ -11,6 +12,7 @@ import { SegFilter, useSettled } from '../../../components/console/ListTools'
 import { DetectedFlowBanner } from '../../../components/console/DetectedFlowBanner'
 import { DetectedFlowChart } from '../../../components/console/DetectedFlowChart'
 import { Alert } from '../../../components/ui/Alert'
+import { Button } from '../../../components/ui/Button'
 import { SelectField, TextField } from '../../../components/ui/Field'
 import { Spinner } from '../../../components/ui/Spinner'
 import { Modal } from '../../../components/ui/Dialog'
@@ -57,6 +59,8 @@ export default function CallHistoryPage() {
   const search = useRef<HTMLInputElement>(null)
   const canSeePatterns = canSeeFlowPatterns(access)
   const [pattern, setPattern] = useState<DetectedFlowPattern | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [showFlow, setShowFlow] = useState(false)
   const [requesting, setRequesting] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
@@ -121,6 +125,28 @@ export default function CallHistoryPage() {
   const said = useSettled(page ? `${page.total.toLocaleString('en-IN')} ${page.total === 1 ? 'call' : 'calls'} found.` : '', !loading && !!page, 400)
   const filtered = !!(agentId || outcome || q)
 
+  async function exportCsv() {
+    if (!client.exportCallLog) return
+    setExporting(true)
+    setExportError(null)
+    try {
+      const blob = await client.exportCallLog(org.orgSlug, { days, agentId: agentId || undefined })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `aica-calls-${days}d.csv`
+      document.body.append(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+      say('Call list downloaded.')
+    } catch (err) {
+      setExportError(asAuthError(err).message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function requestFlow() {
     if (!pattern) return
     setRequesting(true)
@@ -130,7 +156,7 @@ export default function CallHistoryPage() {
         kind: 'flow_change',
         agentId: pattern.agentId,
         title: 'New call flow pattern detected',
-        detail: `${pattern.occurrences} of the last ${pattern.windowSize} calls to ${pattern.agentName} followed this step sequence, which isn't part of its current flow:\n${pattern.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\nCalls: ${pattern.callIds.join(', ')}`,
+        detail: flowRequestDetail(pattern),
         urgency: 'normal',
       })
       setShowFlow(false)
@@ -144,11 +170,24 @@ export default function CallHistoryPage() {
 
   return (
     <ConsolePage
+      section="calls"
       kicker="Operate"
       title={own ? 'Calls you handled' : 'Call history'}
       docTitle="Call history"
+      actions={
+        client.exportCallLog && can(access, 'export') ? (
+          <Button variant="line" busy={exporting} busyLabel="Preparing…" onClick={() => void exportCsv()}>
+            Download call list
+          </Button>
+        ) : undefined
+      }
       lede={<p>{own ? 'Calls the agents handed to you. Open one for its transcript, what was collected and its notes.' : 'Every call the agents took. Open one to see the conversation, what was collected, and what happened.'}</p>}
     >
+      {exportError && (
+        <Alert tone="error" title="We couldn't make the call list">
+          <p>{exportError}</p>
+        </Alert>
+      )}
       <div className="list-tools op-filters">
         <SegFilter<`${Days}`> legend="When" value={`${days}`} onChange={(v) => setDays(Number(v) as Days)} options={([1, 7, 30, 90] as Days[]).map((d) => ({ value: `${d}`, label: DAYS_LABEL[d] }))} />
         <TextField

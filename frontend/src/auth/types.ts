@@ -198,6 +198,8 @@ export type AuthErrorCode =
   | 'email_unverified'
   | 'forbidden'
   | 'invalid_input'
+  /** Saved from an older copy: someone else saved since (agents, drafts). */
+  | 'conflict'
   | 'unknown'
 
 export class AuthError extends Error {

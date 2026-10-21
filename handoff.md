@@ -1,6 +1,10 @@
 # Project Handoff
 
 ## Status
+- Latest (2026-10-20, `feat/detected-flow-patterns`): Phases 4 (reports), 5 (library: numbers, tools, secrets, knowledge and upload metadata) and 6 (agents, versions, drafts, scenarios) are built on top of Phases 1–3 (`b34db71`). **Not run against real Firebase, storage or the network yet.**
+- Next recommended action: set `SECRETS_KEY` and `STORAGE_BUCKET`, create the indexes, try Phases 1–6 on staging, then agree the pipeline contracts (§5) before Phase 7 (bot desk).
+- Latest (2026-10-19, `feat/detected-flow-patterns`, **uncommitted**): Phases 2 (requests to bitNtech) and 3 (calls, notes, callbacks, appointments, handoffs: storage, reading and updating) are built on top of the pushed Phase 1 commit `f9cc1fd`. The stray `not staged for commit:` file (a saved `less` help screen) is removed. **Not run against real Firebase yet.**
+- Next recommended action: create the new indexes in `backend/firestore.indexes.json`, try Phases 1–3 on staging (seed with `app.scripts.seed_operations`), then agree the pipeline contracts in `docs/backend-workflow.md` §5 before Phase 4 (reports).
 - Latest (2026-10-19, on branch `feat/detected-flow-patterns`, **uncommitted**): backend Foundations and Phase 1 from `docs/backend-workflow.md` are built: org access guard, shared permission table, transactional store layer, shared rate limiter, JSON logs, and the Team / Settings / Activity endpoints with revocable invites and a signed-in join path. The frontend has `httpConsoleClient` (`VITE_CONSOLE_MODE=live`), a per-section "Demo data" label and the invite page's existing-account path. **Not yet run against the real Firebase project.**
 - Next recommended action: do the manual rollout steps in `docs/backend-workflow.md` → "Follow-ups from Foundations and Phase 1" (indexes, TTL policy, `.env.example` line), try it on staging, then plan Phase 2 (Requests to bitNtech).
 - Latest: `main` was restored to exactly this commit's state (PR #25, `2101d6c`) on 2026-10-18, discarding PR #26 and PR #27 ("premium redesign" — warm charcoal/champagne palette, homepage rebuild, mobile pass) by explicit request, via a new commit whose tree matches `2101d6c` byte for byte (`git checkout 2101d6c -- .` + removing two files PR #27 added), not a reset or force-push. Those commits stay in `main`'s history; this just moves the tip's content back to what PR #25 shipped. If the premium redesign is wanted again, it needs to be re-applied — it isn't recoverable by simply moving the branch pointer forward again, since this restore is itself a new commit on top of it.
@@ -21,6 +25,45 @@
   - Frontend: `npm test` 48/48, `tsc` clean, `npm run build` passes.
   - Screenshots: API-mode login with the Google button, the Google-cancelled message, and the backend-down state.
 
+
+
+
+## Backend Phases 4–6 (2026-10-20, approved "proceed, do everything you can")
+
+- **Built:** see `docs/backend-workflow.md`: the Phase 4–6 status notes, "Decisions made while building Phases 4–6" and "Follow-ups from Phases 4–6".
+  - Choices: secrets are AES-GCM with `SECRETS_KEY`, and tools send their secret as `Authorization: Bearer` or in a header of their own.
+- **Verified (against fakes and a mocked network only):**
+  - backend pytest: 601 passed, 3 skipped;
+  - frontend: `tsc -b` clean, vitest 328 passed, `npm run build` ok;
+  - a uvicorn smoke run over HTTP: report, CSV, secret, a private-address tool test refused, a save conflict, publishing a draft;
+  - server logs held no secret values, emails or names;
+  - an independent review, whose findings are fixed with tests.
+- **Not verified:** real Firestore (transactions, the new index, count queries), signed GCS uploads and their CORS, a real outbound tool call, a browser.
+- **Manual steps:**
+  1. set `SECRETS_KEY` (Sensitive; keep a copy);
+  2. create the bucket with its CORS rule and set `STORAGE_BUCKET`;
+  3. create the `rollups` index;
+  4. add sections to `VITE_CONSOLE_LIVE` per environment;
+  5. write a recording retention policy.
+
+## Backend Phases 2 and 3 (2026-10-19, approved "proceed")
+
+- **Built:** see `docs/backend-workflow.md`: the Phase 2 and 3 status notes, "Decisions made while building Phases 2 and 3" and "Follow-ups from Phases 2 and 3".
+  - New backend: `app/routes/org/{requests,calls,callbacks,appointments,handoffs}.py`, `app/redact.py`, `app/scripts/seed_operations.py`, and `GET /api/ops/change-requests`.
+  - New frontend: `VITE_CONSOLE_LIVE` sections, the Phase 2/3 HTTP methods, `console/flowRequest.ts`, and the Ops Changes page in one call.
+- **Verified (against fakes only):**
+  - backend pytest: 317 passed, 3 skipped;
+  - frontend: `tsc -b` clean, vitest 314 passed, `npm run build` ok;
+  - a uvicorn smoke run on fakes over HTTP;
+  - an independent review, whose 6 findings are fixed and covered by tests.
+- **Not verified:**
+  - real Firestore: composite indexes, the collection-group query, `count()`, `array_contains_any`;
+  - Resend;
+  - a browser.
+- **Manual steps:**
+  1. create the indexes and field overrides;
+  2. set `CHANGE_REQUESTS_TO` (optional);
+  3. on staging, run `seed_operations --org <test-org> --yes` and set `VITE_CONSOLE_LIVE` to include the operations sections.
 
 ## Backend Foundations and Phase 1 (2026-10-19, approved "proceed", all defaults chosen by the user's delegation)
 

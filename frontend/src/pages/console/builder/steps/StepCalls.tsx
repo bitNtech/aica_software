@@ -145,7 +145,7 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
           multiple
           disabled={uploading}
           hint={
-            client.isDemo
+            (client.isDemo && !client.isLive?.('uploads'))
               ? 'MP3, WAV, M4A, OGG or FLAC, up to 200 MB each. In this demo nothing is uploaded: added files become sample calls with sample transcripts.'
               : 'MP3, WAV, M4A, OGG or FLAC, up to 200 MB each.'
           }
@@ -232,7 +232,7 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
                     label={<span className="call-pick__name">{c.name}</span>}
                     hint={
                       <>
-                        {c.topic ? (client.isDemo && c.size !== undefined ? `Sample topic: ${c.topic}` : c.topic) : 'Not processed yet'}{' '}
+                        {c.topic ? ((client.isDemo && !client.isLive?.('uploads')) && c.size !== undefined ? `Sample topic: ${c.topic}` : c.topic) : 'Not processed yet'}{' '}
                         <i aria-hidden="true">·</i> {callLanguage(c)} <i aria-hidden="true">·</i> {duration(c.durationSec)}
                       </>
                     }

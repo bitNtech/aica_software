@@ -27,6 +27,8 @@ export default function OpsChangesPage() {
   const id = useId()
   const [filter, setFilter] = useState<Filter>('open')
   const load = useCallback(async (): Promise<Row[]> => {
+    // One call when the API serves requests; otherwise each organisation in turn.
+    if (consoleClient.listAllChangeRequests) return consoleClient.listAllChangeRequests()
     const orgs = (await client.listOrgs()).filter((o) => o.status === 'active')
     const lists = await Promise.all(orgs.map(async (o) => (await consoleClient.listChangeRequests(o.slug)).map((r) => ({ ...r, orgName: o.name }))))
     return lists.flat()

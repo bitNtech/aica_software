@@ -16,6 +16,7 @@ from ..identity import AuthUser
 from ..models import (
     AuditEntryOut,
     AuditPageOut,
+    OpsChangeRequestOut,
     OrgSummaryOut,
     OwnerOut,
     PersonMembershipOut,
@@ -339,3 +340,21 @@ def audit_log(
         ],
         next_before=iso(entries[-1].at) if more and entries else None,
     )
+
+
+# ---------------------------------------------------------------- change requests
+
+
+@router.get("/change-requests", response_model=list[OpsChangeRequestOut], response_model_by_alias=True)
+def change_requests(_: Caller = Depends(staff_caller), svc: Services = Depends(get_services)):
+    """Every organisation's open requests, and any updated in the last 90
+    days, for /ops/changes. One query across organisations, not one per org."""
+    from .org.requests import request_out
+
+    names = {o.slug: o.name for o in svc.store.list_orgs() if o.status == "active"}
+    try:
+        rows = svc.store.list_requests_everywhere(now() - timedelta(days=90))
+    except IndexMissing:
+        raise ApiError(503, "unknown", "This list needs Firestore indexes that haven't been created yet. See backend/README.md.")
+    out = [OpsChangeRequestOut(**request_out(slug, r).model_dump(), org_name=names.get(slug, slug)) for slug, r in rows if slug in names]
+    return sorted(out, key=lambda r: r.created_at, reverse=True)

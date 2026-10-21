@@ -91,7 +91,7 @@ export default function AgentsPage() {
   }, [summary, agents.state])
 
   return (
-    <ConsolePage
+    <ConsolePage section="agents"
       kicker="Agents"
       docTitle="Agents"
       title="Agents"

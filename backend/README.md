@@ -45,6 +45,9 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `FIRESTORE_DATABASE` | `(default)`, the project's only Firestore database (asia-south1) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend. `onboarding@resend.dev` only delivers to the Resend account owner |
 | `DEMO_REQUEST_TO` | Who receives the landing page's "Book a demo" requests, comma-separated. Default `support@bitntech.in` |
+| `SECRETS_KEY` | 32 random bytes, base64, encrypting system secrets (`app/secrets.py`). Make one with `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Without it, secrets can't be set. Keep a copy: losing it means re-entering every secret. `SECRETS_KEY_PREVIOUS` only while rotating |
+| `STORAGE_BUCKET` | The private Cloud Storage bucket for recordings and knowledge files. Without it, uploads are refused with an explanation |
+| `CHANGE_REQUESTS_TO` | Who at bitNtech is emailed about new requests and hospitals' replies, comma-separated. Default `support@bitntech.in` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The OAuth web client Firebase created for Google sign-in. Leave both empty to switch Google sign-in off: the button then returns to the login page with a "not set up yet" message |
 | `APP_URL` | The frontend's public URL, for email links and the redirect after Google. `http://localhost:5173` locally. **Required on Vercel** |
 | `API_URL` | This API's public URL when it has its own host, e.g. `https://api.aica.bitntech.in`; the Google redirect URI is built from it. Empty locally (same origin through the Vite proxy). On Vercel it defaults to the deployment's own URL |
@@ -79,6 +82,25 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | POST | `/api/orgs/{slug}/members/{id}/resend`, `/role` (`{"role"}`), `/permissions` (`{"permissions": [...] \| null}`), `/remove` | `team.manage`. See "Organisations" below |
 | GET/POST | `/api/orgs/{slug}/settings` | `settings.manage`. Name, city, languages, hours (7 days, Monday first), closed days |
 | GET | `/api/orgs/{slug}/activity?area=&actorId=&before=&limit=` | `activity.view`. Newest first, 25 a page; `before` is the previous page's `nextBefore`. Billing entries for owners only |
+| GET/POST | `/api/orgs/{slug}/requests` | read: `requests.create` or `agents.view` (and bitNtech); create: `requests.create`, members only |
+| POST | `/api/orgs/{slug}/requests/number` | `library.numbers` or `requests.create`. Asks bitNtech for another number |
+| POST | `/api/orgs/{slug}/requests/{id}/reply`, `/withdraw`, `/update` | reply: `requests.create` or the master admin; withdraw: who asked, or `team.manage`; update (status and reply): master admin only |
+| GET | `/api/ops/change-requests` | bitNtech. Every organisation's open requests and those updated in 90 days |
+| GET | `/api/orgs/{slug}/calls?days=&agentId=&outcome=&q=&limit=`, `/calls/{id}` | `calls.viewAll`, or `calls.take` for calls they handled. Numbers masked; names and personal details only with `calls.personal` |
+| POST | `/api/orgs/{slug}/calls/{id}/notes` | anyone who can see the call, except viewers and bitNtech staff |
+| GET/POST | `/api/orgs/{slug}/callbacks`, `/callbacks/{id}` | `calls.take` (own and unassigned) or `callbacks.assign` (all). Patch: `assignedTo`, `attempt`, `reopen`, `note` |
+| GET/POST | `/api/orgs/{slug}/appointments?from=&to=`, `/appointments/{id}` | read: `appointments.manage` or `calls.viewAll`; change: `appointments.manage` |
+| GET/POST | `/api/orgs/{slug}/handoffs`, `/handoffs/{id}/take`, `/to-callback` | `calls.take`. Taking one marks the call as handled by that person |
+| GET | `/api/orgs/{slug}/reports?days=&agentId=` | `reports.view`. From the rollups (`app/reports.py`) |
+| GET | `/api/orgs/{slug}/reports/calls.csv?days=&agentId=` | `reports.export`, with the call log's visibility rules |
+| GET/POST | `/api/orgs/{slug}/numbers`, `/numbers/{id}`, `/numbers/{id}/delete` | read: `library.numbers` or non-viewers who see agents; change: `library.numbers`; add and remove: master admin |
+| GET/POST | `/api/orgs/{slug}/tools`, `/tools/{id}/delete`, `/tools/{id}/test` | read as numbers; set up, delete, test: master admin. Tests are SSRF-guarded (`app/toolhttp.py`), 5 a minute |
+| GET/POST | `/api/orgs/{slug}/credentials`, `/credentials/{name}/delete` | read names: as tools; set and delete: `library.secrets`. Values are encrypted and never returned |
+| GET/POST | `/api/orgs/{slug}/knowledge`, `/{id}`, `/{id}/uploaded`, `/{id}/refresh`, `/{id}/delete`, `/{id}/passages`, `/search` | read: `library.knowledge` or `agents.view`; change: `library.knowledge` |
+| GET/POST | `/api/orgs/{slug}/uploads`, `/{id}/uploaded`, `/{id}/delete`, `/{id}/transcript` | read: `library.uploads`, or `agents.view` with `calls.personal`; change: `library.uploads` |
+| GET/POST | `/api/orgs/{slug}/agents`, `/agents/{id}`, `/publish`, `/discard`, `/rollback`, `/settings`, `/delete`, `/scenarios…` | see `routes/org/agents.py`: list for members; open with `agents.view`/`test`/`configure`; edit `agents.configure` (structure: master admin); publish `agents.publish`; delete master admin |
+| GET/POST | `/api/orgs/{slug}/drafts`, `/drafts/{id}`, `/discard`, `/publish` | master admin only. Publishing is safe to retry |
+| GET | `/api/catalogue/agent-types`, `/api/catalogue/voices` | anyone signed in |
 | POST | `/api/leads/demo` | anyone, from an allowed origin. The landing page's demo form: validated, emailed to `DEMO_REQUEST_TO` through Resend, not stored. 204 when sent, 503 when Resend fails, 5 per minute per IP. A filled-in `website` honeypot gets 204 and is dropped |
 | GET | `/api/ops/orgs`, `/api/ops/signup-requests` | bitNtech staff and master admin |
 | POST | `/api/ops/signup-requests/{slug}/approve`, `/decline` | bitNtech staff and master admin |
@@ -129,9 +151,31 @@ A master admin can act as a client user to see exactly what they see. It's audit
 `firestore.indexes.json` lists every composite index the API's queries need. Create them **before** deploying code that uses them, either with `firebase deploy --only firestore:indexes` from `backend/` (needs a `firebase.json` pointing at the file), or by hand in Firebase console → Firestore Database → Indexes → Composite:
 
 - collection `audit`: `action` (or `actor`, or `target`) Ascending, then `at` Descending;
+- collection `calls`: `agentId`, `outcome`, `handledById` (any combination, Ascending), optionally `searchTokens` (Array contains), then `startedAt` Descending — 15 indexes;
+- collection `callbacks`: `status`, `assignedToId`;
+- collection `rollups`: `agentId` Ascending, `day` Ascending;
+- field overrides with **collection-group** scope on `changeRequests`: `status` and `updatedAt` (for `/api/ops/change-requests`);
 - collection `activity` (scope: collection): each of `area`; `actorId`; `area`, `actorId`; `ownerOnly`; `ownerOnly`, `area`; `ownerOnly`, `actorId`; `ownerOnly`, `area`, `actorId` — all Ascending — then `at` Descending.
 
 Until they exist, the unfiltered audit log and an owner's unfiltered activity work, and other queries answer 503 with an explanation.
+
+### Sample operations data for staging
+
+Until the voice pipeline writes calls: `.venv/bin/python -m app.scripts.seed_operations --org <slug>` says what it would write, and `--yes` writes it. It refuses organisations whose name or slug doesn't contain "test" or "demo" (unless `--force`), and marks every record `seeded: true`.
+
+### Storage bucket for uploads
+
+Create a bucket in asia-south1 (or use the Firebase project's default one): private, uniform bucket-level access, no public access. The browser uploads to it directly, so it needs a CORS rule:
+
+```json
+[{"origin": ["https://aica.bitntech.in"], "method": ["PUT"], "responseHeader": ["Content-Type", "x-goog-content-length-range"], "maxAgeSeconds": 3600}]
+```
+
+(`gcloud storage buckets update gs://<bucket> --cors-file=cors.json`, with each `APP_URL` origin listed.) The service account the API runs as signs the URLs and reads object sizes; it needs `roles/storage.objectAdmin` on the bucket.
+
+### Report rollups
+
+Reports read `rollups`, which `app.reports.record_call` keeps up to date as calls are written. To recount an organisation: `.venv/bin/python -m app.scripts.rebuild_rollups --org <slug>`.
 
 ### Firestore TTL for rate-limit counters
 

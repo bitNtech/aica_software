@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     email_from: str = "AICA <onboarding@resend.dev>"
     # Who gets the landing page's demo requests. Comma-separated.
     demo_request_to: str = "support@bitntech.in"
+    # Who at bitNtech hears about new requests and hospitals' replies. Comma-separated.
+    change_requests_to: str = "support@bitntech.in"
 
     google_client_id: str = ""
     google_client_secret: str = ""
@@ -53,6 +55,13 @@ class Settings(BaseSettings):
     invite_days: int = 7
     # How long a master admin's "act as" session lasts.
     act_as_minutes: int = Field(30, ge=5, le=120)
+    # System secrets' encryption key: 32 random bytes, base64 (app/secrets.py).
+    # Empty: secrets can't be set. SECRETS_KEY_PREVIOUS only while rotating.
+    secrets_key: str = ""
+    secrets_key_previous: str = ""
+    # The private bucket for uploaded recordings and knowledge files.
+    # Empty: uploads are refused with an explanation.
+    storage_bucket: str = ""
     # "text" for a terminal, "json" for log search (the default on Vercel).
     log_format: Literal["text", "json"] = "text"
 
@@ -92,6 +101,10 @@ class Settings(BaseSettings):
     @property
     def demo_recipients(self) -> list[str]:
         return [a.strip() for a in self.demo_request_to.split(",") if a.strip()]
+
+    @property
+    def change_request_recipients(self) -> list[str]:
+        return [a.strip() for a in self.change_requests_to.split(",") if a.strip()]
 
     @property
     def firestore_database_id(self) -> str | None:

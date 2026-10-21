@@ -60,7 +60,7 @@ export default function KnowledgePage() {
   const opened = all.find((k) => k.id === openId) ?? null
 
   return (
-    <ConsolePage
+    <ConsolePage section="knowledge"
       kicker="Agents"
       title="Knowledge"
       docTitle="Knowledge"

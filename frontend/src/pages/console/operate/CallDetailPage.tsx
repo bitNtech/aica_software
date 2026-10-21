@@ -32,7 +32,7 @@ export default function CallDetailPage() {
 
   if (call.state !== 'ready') {
     return (
-      <ConsolePage kicker={back} title="Call" docTitle="Call">
+      <ConsolePage section="calls" kicker={back} title="Call" docTitle="Call">
         {call.state === 'loading' ? (
           <div className="loading-row" role="status">
             <Spinner />
@@ -62,6 +62,7 @@ export default function CallDetailPage() {
 
   return (
     <ConsolePage
+      section="calls"
       kicker={back}
       title={redact ? 'A caller' : (c.callerName ?? c.callerPhone)}
       docTitle={`Call at ${timeOfDay(c.startedAt)}`}
@@ -219,9 +220,9 @@ function Recording({ call }: { call: CallRecord }) {
     <Section title="Recording">
       {!allowed ? (
         <p className="row__meta">You can play recordings of the calls you handled. Ask an owner or admin for more.</p>
-      ) : client.isDemo || !call.hasRecording ? (
+      ) : (client.isDemo && !client.isLive?.('calls')) || !call.hasRecording ? (
         <div className="op-unavailable">
-          <p>{client.isDemo ? 'The demo has no recordings: real calls play here.' : 'There’s no recording of this call.'}</p>
+          <p>{client.isDemo && !client.isLive?.('calls') ? 'The demo has no recordings: real calls play here.' : call.hasRecording ? 'Playing recordings isn’t available yet.' : 'There’s no recording of this call.'}</p>
         </div>
       ) : null}
     </Section>
