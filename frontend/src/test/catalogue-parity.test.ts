@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+// @ts-ignore -- Vercel builds frontend/ on its own, without backend/, and the
+// build typechecks tests too. Tests run (CI, locally) with the whole repo.
 import shared from '../../../backend/app/catalogue.json'
 import { defaultAnalysis, defaultPipeline } from '../console/demo/agentConfig'
 import { seedTools } from '../console/demo/library'
