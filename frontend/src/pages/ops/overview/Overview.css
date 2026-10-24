@@ -1,0 +1,123 @@
+/* The Ops overview: groups of titled panels in a responsive grid. */
+
+.ov { display: grid; gap: 1.75rem; }
+.ov.is-loading .ov-grid { opacity: 0.6; transition: opacity 0.2s var(--ease); }
+.ov-alert { margin-bottom: 1rem; }
+
+.ov-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 1.5rem; margin-bottom: 0.75rem; }
+.ov-toolbar__status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem; font-size: var(--fs-sm); color: var(--muted); }
+.ov-toolbar__status .btn-text { margin-left: 0.5rem; }
+
+/* On this page: a row of links that scrolls sideways on a phone. */
+.ov-jump { margin-bottom: 1.25rem; overflow-x: auto; }
+.ov-jump ul { display: flex; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.ov-jump a { display: inline-block; padding: 0.3rem 0.7rem; border: 1px solid var(--line); border-radius: var(--r-pill); font-size: var(--fs-sm); color: var(--text); white-space: nowrap; text-decoration: none; }
+.ov-jump a:hover { border-color: var(--line-strong); color: var(--ink); }
+.ov-jump a:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; }
+
+.ov-group { scroll-margin-top: 1rem; }
+.ov-group:focus { outline: none; }
+.ov-group > .ops-section__head { margin-bottom: 0.75rem; }
+.ov-group > * + * { margin-top: 1rem; }
+
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+.ov .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 1000px) {
+  .ov .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ov-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-grid--health { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+@media (min-width: 1280px) {
+  .ov-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.ov-panel { display: grid; align-content: start; gap: 0.75rem; min-width: 0; padding: 0.9rem 1rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.ov-panel--wide { grid-column: 1 / -1; }
+.ov-panel--flush { padding: 0.9rem 0 0; overflow: hidden; }
+.ov-panel--flush > .ov-panel__head { padding: 0 1rem; }
+.ov-panel--flush .rows { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.ov-panel--flush > .ops-section__notice { margin: 0 1rem; }
+.ov-panel__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; }
+.ov-panel__title { font: 600 var(--fs-md)/1.35 var(--sans); color: var(--ink); }
+.ov-panel__note { font-size: var(--fs-sm); color: var(--muted); }
+.ov-panel__action { margin-left: auto; font-size: var(--fs-sm); }
+.ov-panel__action a { color: var(--orange-text); font-weight: 500; text-underline-offset: 3px; }
+
+.ov-empty { padding: 0.75rem 0; color: var(--muted); font-size: var(--fs-md); }
+.ov-error { font-size: var(--fs-md); color: var(--danger-ink); }
+.ov-foot { font-size: var(--fs-sm); color: var(--muted); }
+.ov-muted { color: var(--muted); font-weight: 400; }
+.ov-more { justify-self: start; }
+
+/* Lists of things to look at: a line of what, a quieter line of detail. */
+.ov-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.ov-item { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.ov-item:first-child { border-top: 0; padding-top: 0.15rem; }
+.ov-item--critical, .ov-item--warning { padding-left: 0.6rem; box-shadow: inset 2px 0 0 var(--danger); }
+.ov-item--warning { box-shadow: inset 2px 0 0 var(--warn); }
+.ov-item__main { display: grid; gap: 0.15rem; min-width: 0; }
+.ov-item__title { font-size: var(--fs-md); font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.ov-item__title .pill { vertical-align: 1px; }
+.ov-item__meta { font-size: var(--fs-sm); color: var(--muted); overflow-wrap: anywhere; }
+.ov-item__body { font-size: var(--fs-sm); color: var(--text); }
+.ov-item > .btn, .ov-item > .pill, .ov-item > .status-chip, .ov-item > .wait { flex-shrink: 0; }
+
+/* A headline figure inside a panel. */
+.ov-figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; font-size: var(--fs-md); color: var(--text); }
+.ov-figure__num { font: 600 var(--fs-xl)/1.15 var(--sans); color: var(--ink); }
+.ov-delta { font-size: var(--fs-sm); font-weight: 500; }
+.ov-delta--good { color: var(--ok-ink); }
+.ov-delta--bad { color: var(--danger-ink); }
+.ov-delta--flat { color: var(--muted); }
+
+.ov-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.6rem 1rem; margin: 0; }
+.ov-facts--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ov-facts--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.4rem 0.75rem; }
+.ov-facts dt { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-sm); color: var(--muted); }
+.ov-facts dd { margin: 0; font-size: var(--fs-md); font-weight: 500; color: var(--ink); }
+
+/* Succeeded / hung up / failed, as one bar; the list under it says the same. */
+.ov-split { display: flex; gap: 2px; height: 12px; border-radius: var(--r-pill); overflow: hidden; }
+.ov-split > span { min-width: 3px; }
+.ov-split__ok, .ov-key--ok { background: var(--series-1, #2a78d6); }
+.ov-split__dropped, .ov-key--dropped { background: var(--warn); }
+.ov-split__failed, .ov-key--failed { background: var(--series-2, #eb6834); }
+.ov-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+
+/* Tables: right-aligned figures, a quiet bar under the busiest. */
+.ov-table th, .ov-table td { vertical-align: top; }
+.ov-num { text-align: right !important; white-space: nowrap; }
+.ov-cell-name { display: block; font-weight: 500; color: var(--ink); }
+.ov-cell-sub { display: block; font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
+.ov-bar { display: block; height: 4px; margin-top: 0.35rem; border-radius: var(--r-pill); background: var(--bg-2); }
+.ov-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--series-1, #2a78d6); }
+
+/* Agents by status. */
+.ov-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
+.ov-counts__item { display: grid; gap: 0.1rem; align-content: start; }
+.ov-counts__item dt { font-size: var(--fs-sm); color: var(--muted); }
+.ov-counts__item dd { margin: 0; }
+.ov-counts__item dd.num { font: 600 var(--fs-xl)/1.15 var(--sans); color: var(--ink); }
+.ov-counts__item dd.ov-muted { font-size: var(--fs-sm); }
+
+/* Services. */
+.ov-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; margin: 0; padding: 0; list-style: none; }
+.ov-service { display: grid; align-content: start; gap: 0.45rem; padding: 0.7rem 0.8rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-1); }
+.ov-service--flag { box-shadow: inset 2px 0 0 var(--warn); }
+.ov-service__head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.ov-service .spark, .ov-service svg[role='img'] { max-width: 100%; }
+
+@media (max-width: 700px) {
+  .ov-toolbar { align-items: stretch; flex-direction: column; }
+  .ov-counts { grid-template-columns: 1fr; }
+  .ov-item { flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ov.is-loading .ov-grid { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .ov-item--critical, .ov-item--warning, .ov-service--flag { border-left: 3px solid CanvasText; }
+  .ov-split > span, .ov-key, .ov-bar > span { background: CanvasText; }
+}

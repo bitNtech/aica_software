@@ -141,7 +141,8 @@ export interface ConsoleClient {
   removeDoctorChange(orgSlug: string, id: string): Promise<Desk>
   /** Reports an answer the agent got wrong, for whoever looks after it. */
   flagAnswer(orgSlug: string, input: NewAnswerFlag): Promise<AnswerFlag>
-  resolveFlag(orgSlug: string, id: string, resolution: { status: 'fixed' | 'dismissed'; note: string }): Promise<Desk>
+  /** `open` puts a fixed or dismissed answer back (an undo, or it came back). */
+  resolveFlag(orgSlug: string, id: string, resolution: { status: 'fixed' | 'dismissed' | 'open'; note: string }): Promise<Desk>
 
   // ---- agent workspace (a published agent)
   getAgent(orgSlug: string, agentId: string): Promise<AgentDetail>

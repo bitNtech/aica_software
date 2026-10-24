@@ -1,4 +1,5 @@
-/* bitNtech's console — sidebar + full-width content. */
+/* bitNtech's console — the same quiet sidebar as the organisation console,
+   marked by the orange hairline. */
 
 /* ── Shell ──────────────────────────────────────────────────── */
 
@@ -14,11 +15,11 @@
   position: sticky;
   top: 0;
   height: 100dvh;
-  width: 240px;
+  width: 220px;
   flex: none;
   display: flex;
   flex-direction: column;
-  background: var(--night);
+  background: var(--card);
   border-right: 1px solid var(--line);
   overflow-y: auto;
   overflow-x: hidden;
@@ -27,7 +28,7 @@
 
 /* Orange accent: you are looking at every client's data. */
 .ops__hairline {
-  height: 3px;
+  height: 2px;
   flex: none;
   background: var(--orange);
 }
@@ -36,20 +37,18 @@
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.85rem 1rem 0.75rem;
+  padding: 0.75rem 1rem 0.6rem;
   text-decoration: none;
   border-radius: 0;
 }
 .ops__brand:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
 
 .ops__tag {
-  padding: 0.25rem 0.45rem;
-  border: 1px solid var(--orange);
-  border-radius: 5px;
-  color: var(--orange);
-  font: 500 0.6rem/1 var(--mono);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--orange-text);
+  border-radius: var(--r-xs);
+  color: var(--orange-text);
+  font: 500 var(--fs-xs)/1 var(--sans);
 }
 
 /* ── Sidebar nav ────────────────────────────────────────────── */
@@ -57,8 +56,8 @@
 .ops__nav {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.25rem 0.6rem;
+  gap: 1px;
+  padding: 0.25rem 0.5rem;
   flex: 1;
 }
 
@@ -67,18 +66,18 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 34px;
-  padding: 0 0.75rem;
-  border-radius: 7px;
-  color: var(--muted);
+  min-height: 32px;
+  padding: 0 0.6rem;
+  border-radius: var(--r-sm);
+  color: var(--text);
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: var(--fs-md);
   text-decoration: none;
   white-space: nowrap;
   transition: color 0.15s var(--ease), background-color 0.15s var(--ease);
 }
-.ops__link:hover { color: var(--ink); background: rgba(247, 243, 237, 0.06); }
-.ops__link.active { color: var(--ink); font-weight: 600; background: rgba(247, 243, 237, 0.1); }
+.ops__link:hover { color: var(--ink); background: var(--bg-2); }
+.ops__link.active { color: var(--ink); background: var(--bg-2); }
 .ops__link:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
 
 .ops__count {
@@ -90,7 +89,7 @@
   border-radius: var(--r-pill);
   background: var(--orange);
   color: var(--orange-ink);
-  font: 700 0.68rem/1 var(--sans);
+  font: 500 var(--fs-xs)/1 var(--sans);
   margin-left: auto;
 }
 
@@ -106,38 +105,37 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 1rem;
   border-top: 1px solid var(--line);
 }
 
 .ops__name {
   color: var(--ink);
-  font-weight: 600;
-  font-size: 0.875rem;
+  font-weight: 500;
+  font-size: var(--fs-md);
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
 }
 .ops__name:hover { text-decoration: underline; }
 .ops__name:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
 
 .ops__role {
-  font: 500 0.6rem var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font: 500 var(--fs-xs) var(--sans);
   color: var(--muted);
 }
-.ops__role--master_admin { color: var(--orange); }
+.ops__role--master_admin { color: var(--orange-text); }
 
 .ops__out {
   margin-top: 0.4rem;
-  padding: 0.45rem 0.75rem;
+  min-height: 28px;
+  padding: 0 0.6rem;
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--ink);
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-align: left;
+  font-weight: 500;
+  font-size: var(--fs-sm);
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.15s var(--ease);
 }
@@ -149,14 +147,15 @@
 .ops__main {
   flex: 1;
   min-width: 0;
-  padding: 1.5rem 2.5rem 3rem;
+  padding: 1.25rem 1.75rem 2.5rem;
 }
 .ops__main:focus { outline: none; }
 
-.ops__head { display: grid; gap: 0.25rem; margin-bottom: 1rem; }
-.ops__title { font-size: clamp(1.4rem, 1rem + 1.2vw, 1.9rem); }
-.ops__lede { max-width: 52rem; color: var(--text); font-size: 0.875rem; }
-.ops__demo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; font-size: 0.82rem; color: var(--muted); margin-top: 0.15rem; }
+.ops__head { display: grid; gap: 0.25rem; margin-bottom: 1.25rem; }
+.ops__head > .label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ops__title { font-size: var(--fs-2xl); }
+.ops__lede { max-width: 52rem; color: var(--muted); font-size: var(--fs-md); }
+.ops__demo { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; font-size: var(--fs-sm); color: var(--muted); margin-top: 0.15rem; }
 
 /* ── Org sub-nav (drill-down shell) ─────────────────────────── */
 
@@ -168,16 +167,16 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.75rem;
-  padding: 0.4rem 2rem;
+  padding: 0.4rem 1.75rem;
 }
-.ops-org__name { margin-right: auto; font: 700 0.95rem/1.3 var(--display); color: var(--ink); text-decoration: none; border-radius: 4px; }
+.ops-org__name { margin-right: auto; font: 600 var(--fs-md)/1.3 var(--display); color: var(--ink); text-decoration: none; border-radius: var(--r-xs); }
 .ops-org__name:hover { text-decoration: underline; }
-.ops-org__link { padding: 0.35rem 0.55rem; border-radius: 7px; font-size: 0.875rem; color: var(--text); text-decoration: none; }
+.ops-org__link { padding: 0.35rem 0.55rem; border-radius: var(--r-sm); font-size: var(--fs-md); color: var(--text); text-decoration: none; }
 .ops-org__link:hover { color: var(--ink); background: var(--bg); }
-.ops-org__link[aria-current='page'] { color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--orange); border-radius: 7px 7px 0 0; }
+.ops-org__link[aria-current='page'] { color: var(--ink); box-shadow: inset 0 -2px 0 var(--orange); border-radius: var(--r-sm) var(--r-sm) 0 0; }
 .ops-org__name:focus-visible,
 .ops-org__link:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; }
-.ops-org__main { flex: 1; margin-inline: auto; padding: 1.5rem 2.5rem 3rem; }
+.ops-org__main { flex: 1; width: 100%; min-width: 0; padding: clamp(1rem, 0.5rem + 1.2vw, 1.75rem) clamp(1.25rem, 0.5rem + 1.6vw, 2.5rem) 2.5rem; }
 
 /* ── Mobile: sidebar collapses to top nav ───────────────────── */
 
@@ -198,7 +197,7 @@
     border-bottom: 1px solid var(--line);
   }
 
-  .ops__hairline { width: 100%; height: 3px; }
+  .ops__hairline { width: 100%; height: 2px; }
 
   .ops__brand { padding: 0.6rem 1rem; }
 

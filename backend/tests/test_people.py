@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.store import Membership, UserDoc
+from app.data.store import Membership, UserDoc
 
 from .test_api import PW, env, login, post, seed_master, seed_org  # noqa: F401 — env is a fixture
 

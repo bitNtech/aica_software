@@ -470,17 +470,17 @@ const LIVE_SCRIPTS: { agent: string; intent: string; flagged: boolean; language:
   },
   {
     agent: 'agt_reception',
-    intent: 'Bill and insurance',
+    intent: 'Billing question',
     flagged: true,
     language: 'english',
     turns: [
       { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
-      { speaker: 'caller', at: 4, text: 'I have called three times about my father’s insurance claim. Nobody tells me anything.' },
-      { speaker: 'agent', at: 13, text: 'I’m sorry about that. May I have the patient’s name and the policy number?' },
-      { speaker: 'caller', at: 22, text: '{{name:Ramasamy K}}, policy {{policy:SH-88213-02}}. Please just put me to someone.' },
-      { speaker: 'agent', at: 34, text: 'Of course. Let me connect you to our billing desk. Please stay on the line.' },
+      { speaker: 'caller', at: 4, text: 'My MRI was charged twice on the same bill. I told your billing desk last week and nothing happened.' },
+      { speaker: 'agent', at: 13, text: 'I’m sorry about that. May I have the patient’s name and the invoice number?' },
+      { speaker: 'caller', at: 22, text: '{{name:Farook M}}, invoice {{invoice:20418}}. This is the second time I am asking.' },
+      { speaker: 'agent', at: 34, text: 'I understand. Let me note this down and check what I can do for you.' },
     ],
-    steps: [[0, 'Greeting'], [13, 'Understand the question'], [34, 'Hand over to billing']],
+    steps: [[0, 'Greeting'], [13, 'Understand the billing question'], [34, 'Note the double charge']],
   },
   {
     agent: 'agt_reception',
@@ -543,6 +543,79 @@ export function liveCalls(orgSlug: string, taken: Record<string, string>, paused
   })
 }
 
+/**
+ * The calls behind the sample handovers: each waiting caller has a call that
+ * is still on the line (so it carries a transcript), joined to its handover
+ * by id. They stay on the list while the caller waits, and after someone
+ * takes the call; a caller who hung up (a "missed" handover) is gone.
+ */
+const HANDOFF_SCRIPTS: Record<string, { intent: string; step: string; flagged: boolean; secondsBefore: number; turns: TranscriptTurn[] }> = {
+  live_handoff_1: {
+    intent: 'Insurance claim',
+    step: 'Passed to a person',
+    flagged: true,
+    secondsBefore: 95,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
+      { speaker: 'caller', at: 6, text: 'I have called three times about my father’s insurance claim. Nobody tells me anything.' },
+      { speaker: 'agent', at: 15, text: 'I’m sorry about that. May I have the patient’s name and the policy number?' },
+      { speaker: 'caller', at: 24, text: '{{name:Ramasamy K}}, policy {{policy:SH-88213-02}}. Please just put me to someone.' },
+      { speaker: 'agent', at: 36, text: 'Of course. Let me connect you to a person at the front desk. Please stay on the line.' },
+    ],
+  },
+  live_handoff_2: {
+    intent: 'Reschedule a cardiology review',
+    step: 'Passed to a person',
+    flagged: false,
+    secondsBefore: 110,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
+      { speaker: 'caller', at: 5, text: 'Cardiology review venum, this week. Dr. Ramachandran.' },
+      { speaker: 'agent', at: 13, text: 'I can offer Wednesday 10:00 or Friday 4:30. Which suits you?' },
+      { speaker: 'caller', at: 24, text: 'Both are my dialysis days. Saturday possible-aa?' },
+      { speaker: 'agent', at: 33, text: 'I can’t book a Saturday for Dr. Ramachandran myself. Let me pass you to the front desk.' },
+    ],
+  },
+  live_handoff_3: {
+    intent: 'Chest pain',
+    step: 'Passed to a person: emergency',
+    flagged: false,
+    secondsBefore: 40,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! Arogya Demo Hospital, Kavya pesuren. How can I help?' },
+      { speaker: 'caller', at: 4, text: 'My father has chest pain since twenty minutes, he is sweating a lot. Please help.' },
+      { speaker: 'agent', at: 11, text: 'I’m passing you to our emergency desk now. Please stay on the line, and keep him seated.' },
+    ],
+  },
+}
+
+/** The live calls that belong to `handoffs`, in progress as long as their caller waits (or has been taken). */
+export function handoffCalls(handoffs: Handoff[], taken: Record<string, string>, paused: Set<string>, extras: LiveExtras = { whispers: {}, transfers: {} }): LiveCall[] {
+  return handoffs.flatMap((h) => {
+    const s = HANDOFF_SCRIPTS[h.callId]
+    const agent = AGENTS.find((a) => a.name === h.agentName)
+    if (!s || !agent || h.status === 'missed' || paused.has(agent.id)) return []
+    return [
+      {
+        id: h.callId,
+        agentId: agent.id,
+        agentName: agent.name,
+        line: agent.line,
+        callerPhone: h.callerPhone,
+        startedAt: new Date(Date.parse(h.waitingSince) - s.secondsBefore * 1000).toISOString(),
+        language: h.language,
+        intent: s.intent,
+        step: s.step,
+        turns: s.turns,
+        flagged: s.flagged,
+        takenBy: h.takenBy ?? taken[h.callId] ?? null,
+        whispers: extras.whispers[h.callId] ?? [],
+        transferredTo: extras.transfers[h.callId] ?? null,
+      },
+    ]
+  })
+}
+
 // ---------------------------------------------------------------- handoffs, callbacks, appointments
 
 export function seedHandoffs(orgSlug: string): Handoff[] {
@@ -594,15 +667,18 @@ export function seedHandoffs(orgSlug: string): Handoff[] {
       agentName: 'Main reception',
       line: '+91 00000 01200',
       callerPhone: '+91 ••••• 77310',
-      reason: 'The agent couldn’t answer twice.',
-      summary: 'Asking whether the hospital does home sample collection in Saibaba Colony. Not in the knowledge base.',
-      details: [],
+      reason: 'The caller described chest pain: a possible emergency.',
+      summary: 'Says his father has had chest pain for twenty minutes and is sweating a lot. The agent asked him to keep his father seated and passed the call at once.',
+      details: [
+        { label: 'Caller’s relation to the patient', value: 'Son', personal: false },
+        { label: 'Patient name', value: 'Venkatesan R', personal: true },
+      ],
       language: 'tanglish',
-      waitingSince: min(0.7),
+      waitingSince: min(1.4),
       status: 'waiting',
       takenBy: null,
       takenAt: null,
-      emergency: false,
+      emergency: true,
     },
     {
       id: 'ho_4',

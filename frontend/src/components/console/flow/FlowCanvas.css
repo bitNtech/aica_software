@@ -1,0 +1,221 @@
+/* FlowCanvas: the conversation-flow diagram. Colours are tokens (they flip
+   in dark mode). Kinds differ by shape, caption and weight, never colour
+   alone; the path a call took is heavier, numbered and arrowed as well as
+   tinted. Nothing animates, so reduced motion needs no special case. */
+
+.flowc { display: grid; gap: 0.6rem; min-width: 0; }
+
+/* ---- controls ---- */
+
+.flowc__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; }
+.flowc__find { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.flowc__input {
+  width: 11rem;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-field);
+  background: var(--field);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+.flowc__found { min-width: 7ch; font-size: var(--fs-xs); color: var(--muted); }
+.flowc__group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.flowc__zoom { min-width: 3.4ch; text-align: center; font: 500 var(--fs-xs) var(--mono); color: var(--muted); }
+
+.flowc__btn {
+  min-height: 28px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink);
+  font: 500 var(--fs-sm)/1 var(--sans);
+  white-space: nowrap;
+}
+.flowc__btn:hover:not(:disabled) { border-color: var(--ink); }
+.flowc__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.flowc__btn[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.flowc__btn--icon { min-width: 28px; padding: 0; }
+.flowc__btn--danger { color: var(--danger-ink); }
+.flowc__btn--add { border-style: dashed; }
+@media (pointer: coarse) {
+  .flowc__btn, .flowc__input { min-height: 44px; }
+  .flowc__btn--icon { min-width: 44px; }
+}
+
+/* ---- the view ---- */
+
+.flowc__stage { position: relative; min-width: 0; }
+.flowc__scroll {
+  height: var(--flowc-h, clamp(20rem, 62vh, 38rem));
+  overflow: auto;
+  /* Panning and scrolling are the browser's; pinch is ours (see FlowCanvas.tsx). */
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.flowc__scroll.is-dragging { cursor: grabbing; user-select: none; }
+.flowc__content { position: relative; margin-inline: auto; }
+/* base.css caps every svg at its parent's width; zoomed in, this one is wider. */
+.flowc__svg { display: block; max-width: none; overflow: visible; }
+.flowc__empty { margin: 0; padding: 2rem 1rem; color: var(--muted); text-align: center; }
+
+/* Full screen: the real thing, or a fixed overlay where it isn't allowed. */
+.flowc.is-full { background: var(--bg); padding: 0.9rem; grid-template-rows: auto auto minmax(0, 1fr) auto auto; height: 100%; }
+.flowc.is-full .flowc__stage { min-height: 0; }
+.flowc.is-full .flowc__scroll { height: 100%; }
+.flowc.is-overlay { position: fixed; inset: 0; z-index: 400; height: auto; overflow: auto; }
+
+/* ---- nodes ---- */
+
+.flowc__node { outline: none; cursor: pointer; }
+.flowc__body { stroke-width: 1.5; }
+.flowc__node--intent .flowc__body { fill: var(--ink); stroke: var(--ink); }
+.flowc__node--step .flowc__body { fill: var(--card); stroke: var(--line-strong); }
+.flowc__node--branch .flowc__body { fill: var(--info-bg); stroke: var(--info-ink); }
+.flowc__node:hover .flowc__body { stroke: var(--orange-text, var(--orange)); }
+
+.flowc__caption { font: 600 10px/1 var(--sans); letter-spacing: 0.08em; fill: var(--muted); }
+.flowc__text { font: 600 13px/1 var(--sans); fill: var(--ink); }
+.flowc__detail { font: 400 12px/1 var(--sans); fill: var(--text); }
+.flowc__node--intent .flowc__caption { fill: var(--bg); opacity: 0.75; }
+.flowc__node--intent .flowc__text { fill: var(--bg); }
+.flowc__node--branch .flowc__caption { fill: var(--info-ink); }
+
+.flowc__focus { fill: none; stroke: var(--orange-text, var(--orange)); stroke-width: 3; opacity: 0; pointer-events: none; }
+.flowc__node:focus-visible .flowc__focus { opacity: 1; }
+.flowc__ring { fill: none; pointer-events: none; }
+.flowc__ring--selected { stroke: var(--ink); stroke-width: 2; }
+.flowc__ring--match { stroke: var(--orange-text, var(--orange)); stroke-width: 2; stroke-dasharray: 4 3; }
+.flowc__node.is-current .flowc__ring--match { stroke-dasharray: none; stroke-width: 3; }
+
+/* A call's path: heavier line, numbered, and the rest recedes. */
+.flowc__node.is-on-path .flowc__body { stroke: var(--orange-text, var(--orange)); stroke-width: 3.5; }
+.flowc__node.is-dim, .flowc__edge.is-dim { opacity: 0.38; }
+.flowc__node.is-exit .flowc__body { stroke: var(--danger-ink); stroke-width: 3.5; }
+.flowc__barrier { stroke: var(--danger-ink); stroke-width: 5; stroke-linecap: round; }
+
+.flowc__mark text { font: 600 11px/1 var(--sans); }
+.flowc__mark--info { fill: var(--info-ink); color: var(--info-ink); }
+.flowc__mark--warn { fill: var(--warn-ink); color: var(--warn-ink); }
+.flowc__mark--danger { fill: var(--danger-ink); color: var(--danger-ink); }
+.flowc__mark-icon { fill: currentColor; }
+.flowc__node--intent .flowc__mark--warn,
+.flowc__node--intent .flowc__mark--danger,
+.flowc__node--intent .flowc__mark--info { fill: var(--bg); color: var(--bg); }
+
+.flowc__count rect { fill: var(--ink); }
+.flowc__count text { font: 600 11px/1 var(--sans); fill: var(--bg); }
+.flowc__ordinal circle { fill: var(--bg); stroke: var(--ink); stroke-width: 2; }
+.flowc__ordinal text { font: 700 11px/1 var(--sans); fill: var(--ink); }
+
+.flowc__toggle { cursor: pointer; }
+.flowc__toggle circle { fill: var(--card); stroke: var(--ink); stroke-width: 1.5; }
+.flowc__toggle path { stroke: var(--ink); stroke-width: 2; fill: none; stroke-linecap: round; }
+.flowc__toggle rect { fill: var(--ink); }
+.flowc__toggle text { font: 600 11px/1 var(--sans); fill: var(--bg); }
+.flowc__toggle:hover circle { stroke: var(--orange-text, var(--orange)); }
+
+/* ---- arrows ---- */
+
+.flowc__edge path { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.flowc__edge--branch path, .flowc__edge--child path { stroke-dasharray: 6 4; }
+.flowc__edge.is-on-path path { stroke: var(--orange-text, var(--orange)); stroke-width: 3.5; stroke-dasharray: none; }
+.flowc__arrow path { fill: var(--muted); }
+.flowc__arrow--path path { fill: var(--orange-text, var(--orange)); }
+.flowc__label rect { fill: var(--bg); stroke: var(--line-strong); stroke-width: 1; }
+.flowc__label text { font: 500 11px/1 var(--sans); fill: var(--text); }
+
+/* ---- overview ---- */
+
+.flowc__mini {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  box-shadow: var(--elev);
+  /* Over the scrollbar's corner, not under it. */
+  margin: 0 12px 12px 0;
+}
+.flowc__mini svg { display: block; max-width: none; cursor: crosshair; touch-action: none; }
+.flowc__mini-node { fill: var(--line-strong); }
+.flowc__mini-node--intent { fill: var(--ink); }
+.flowc__mini-node--branch { fill: var(--info-ink); }
+.flowc__mini-view { fill: none; stroke: var(--orange-text, var(--orange)); stroke-width: 2; }
+@media (max-width: 640px) {
+  .flowc__mini, .flowc__btn--overview { display: none; }
+}
+
+/* ---- editing ---- */
+
+.flowc__edit {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  box-shadow: var(--elev);
+  white-space: nowrap;
+}
+
+/* ---- keys ---- */
+
+.flowc__keys { font-size: var(--fs-sm); color: var(--text); }
+.flowc__keys > summary { cursor: pointer; width: fit-content; color: var(--muted); }
+.flowc__keys > summary:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 3px; border-radius: var(--r-xs); }
+.flowc__keys dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.25rem 1rem; margin: 0.5rem 0 0; }
+.flowc__keys dt { font-weight: 500; color: var(--ink); }
+.flowc__keys dd { margin: 0; }
+@media (max-width: 560px) {
+  .flowc__keys dl { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- forced colours: fills and tints vanish, so shape and weight carry it ---- */
+
+@media (forced-colors: active) {
+  .flowc__body { fill: Canvas; stroke: CanvasText; stroke-width: 1.5; }
+  .flowc__node--intent .flowc__body { stroke-width: 3; }
+  .flowc__text, .flowc__detail, .flowc__caption,
+  .flowc__node--intent .flowc__text, .flowc__node--intent .flowc__caption, .flowc__node--branch .flowc__caption { fill: CanvasText; opacity: 1; }
+  .flowc__node.is-on-path .flowc__body { stroke: Highlight; stroke-width: 4; }
+  .flowc__node.is-exit .flowc__body { stroke: Mark; stroke-width: 4; }
+  .flowc__barrier { stroke: Mark; }
+  .flowc__ring--selected, .flowc__ring--match, .flowc__focus { stroke: Highlight; }
+  .flowc__focus { stroke-width: 4; }
+  .flowc__edge path { stroke: CanvasText; }
+  .flowc__edge.is-on-path path { stroke: Highlight; }
+  .flowc__arrow path { fill: CanvasText; }
+  .flowc__arrow--path path { fill: Highlight; }
+  .flowc__label rect { fill: Canvas; stroke: CanvasText; }
+  .flowc__label text { fill: CanvasText; }
+  .flowc__mark, .flowc__mark--info, .flowc__mark--warn, .flowc__mark--danger,
+  .flowc__node--intent .flowc__mark--warn, .flowc__node--intent .flowc__mark--danger, .flowc__node--intent .flowc__mark--info { fill: CanvasText; color: CanvasText; }
+  .flowc__count rect, .flowc__toggle rect { fill: CanvasText; }
+  .flowc__count text, .flowc__toggle text { fill: Canvas; }
+  .flowc__ordinal circle, .flowc__toggle circle { fill: Canvas; stroke: CanvasText; }
+  .flowc__ordinal text { fill: CanvasText; }
+  .flowc__toggle path { stroke: CanvasText; }
+  .flowc__mini-node, .flowc__mini-node--intent, .flowc__mini-node--branch { fill: CanvasText; }
+  .flowc__mini-view { stroke: Highlight; }
+  .flowc__node.is-dim, .flowc__edge.is-dim { opacity: 0.55; }
+  .flowc__btn[aria-pressed='true'] { forced-color-adjust: none; background: Highlight; border-color: Highlight; color: HighlightText; }
+}
+
+/* ---- the list under a detected pattern's diagram ---- */
+
+.detected-flow__list { font-size: var(--fs-sm); color: var(--text); }
+.detected-flow__list > summary { cursor: pointer; width: fit-content; color: var(--muted); }
+.detected-flow__list > summary:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: 3px; border-radius: var(--r-xs); }
+.detected-flow__list ol { margin: 0.4rem 0 0; padding-left: 1.4rem; list-style: decimal; display: grid; gap: 0.2rem; }

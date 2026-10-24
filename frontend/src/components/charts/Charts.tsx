@@ -280,7 +280,18 @@ function TableToggle({ open, onToggle, id, children }: { open: boolean; onToggle
  * Horizontal bars, one series, each labelled with its value: a ranked list
  * you can read without the bars. The bars only show the proportions.
  */
-export function BarList({ items, label, valueText }: { items: { label: string; value: number }[]; label: string; valueText?(v: number): string }) {
+export function BarList({
+  items,
+  label,
+  valueText,
+  showShare,
+}: {
+  items: { label: string; value: number }[]
+  label: string
+  valueText?(v: number): string
+  /** Write each row's share of the total beside its value, not only on hover. */
+  showShare?: boolean
+}) {
   const [active, setActive] = useState<number | null>(null)
   const max = Math.max(...items.map((i) => i.value), 1)
   const total = items.reduce((s, i) => s + i.value, 0)
@@ -300,7 +311,7 @@ export function BarList({ items, label, valueText }: { items: { label: string; v
           ' '
         )}
       </p>
-      <ul className="barlist" aria-label={label}>
+      <ul className={`barlist${showShare ? ' barlist--share' : ''}`} aria-label={label}>
         {items.map((i, k) => (
           <li
             key={i.label}
@@ -315,9 +326,17 @@ export function BarList({ items, label, valueText }: { items: { label: string; v
             <span className="barlist__track" aria-hidden="true">
               <span className="barlist__bar" style={{ width: `${(i.value / max) * 100}%` }} />
             </span>
-            <span className="barlist__value">{valueText ? valueText(i.value) : num(i.value)}</span>
+            <span className="barlist__value">
+              {valueText ? valueText(i.value) : num(i.value)}
+              {showShare && total > 0 && (
+                <span className="barlist__share">
+                  {' '}
+                  {share(i.value)}%<span className="sr-only">{` of ${num(total)}`}</span>
+                </span>
+              )}
+            </span>
             {/* The share is read out always; the readout line above only repeats it for the eye. */}
-            {total > 0 && <span className="sr-only">{`, ${share(i.value)} percent of ${num(total)}`}</span>}
+            {total > 0 && !showShare && <span className="sr-only">{`, ${share(i.value)} percent of ${num(total)}`}</span>}
           </li>
         ))}
       </ul>

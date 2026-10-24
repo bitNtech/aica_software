@@ -19,12 +19,12 @@ import random
 import sys
 from datetime import timedelta
 
-from ..access import member_access
-from ..redact import search_tokens
-from ..reports import record_call
-from ..services import Services, build_services
-from ..settings import get_settings
-from ..store import AppointmentDoc, CallbackDoc, CallDoc, HandoffDoc, new_id, now
+from ..access.permissions import member_access
+from ..core.config import get_settings
+from ..core.services import Services, build_services
+from ..data.store import AppointmentDoc, CallbackDoc, CallDoc, HandoffDoc, new_id, now
+from ..domain.redact import search_tokens
+from ..domain.rollups import record_call
 
 NAMES = ["Lakshmi K", "Ravi S", "Meena R", "Arun P", "Priya N", "Karthik V", "Divya M", "Suresh T"]
 INTENTS = [("Book OPD visit", "booked"), ("Ask OPD timings", "resolved"), ("Lab report status", "resolved"), ("Talk to a nurse", "handed_over"), ("Cancel appointment", "resolved"), ("Call back about bill", "callback"), ("Chest pain", "emergency"), ("Hung up", "dropped")]

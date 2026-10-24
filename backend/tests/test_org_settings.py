@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.store import ActivityDoc, now
+from app.data.store import ActivityDoc, now
 
 from .orgkit import SLUG, api, env, err, login, post, seed  # noqa: F401
 

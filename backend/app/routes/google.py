@@ -17,11 +17,11 @@ import secrets
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
-from ..accounts import ensure_profile, link, mark_active
-from ..errors import ApiError
-from ..identity import pkce_pair
-from ..services import Services, get_services
-from ..sessions import start_session
+from ..auth.accounts import ensure_profile, link, mark_active
+from ..auth.identity import pkce_pair
+from ..auth.sessions import start_session
+from ..core.errors import ApiError
+from ..core.services import Services, get_services
 
 log = logging.getLogger("aica.google")
 router = APIRouter(prefix="/api/auth/google", tags=["google"])

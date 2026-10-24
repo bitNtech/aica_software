@@ -7,11 +7,11 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from app.errors import ApiError
-from app.identity import AuthUser, EmailExists, InvalidSession
-from app.services import Services
-from app.settings import Settings
-from app.store import RECORDS, ActivityDoc, AuditEntry, InviteDoc, MemberDoc, OrgDoc, SlugTaken, UserDoc, new_id, now, window_of
+from app.core.errors import ApiError
+from app.auth.identity import AuthUser, EmailExists, InvalidSession
+from app.core.services import Services
+from app.core.config import Settings
+from app.data.store import RECORDS, ActivityDoc, AuditEntry, InviteDoc, MemberDoc, OrgDoc, SlugTaken, UserDoc, new_id, now, window_of
 
 
 @dataclass
@@ -514,7 +514,7 @@ TEST_SECRETS_KEY = "a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s="
 
 
 def make_services(**overrides) -> tuple[Services, FakeFirebase, MemoryStore, FakeMailer]:
-    from app.secrets import SecretBox
+    from app.data.vault import SecretBox
 
     fb, store, mailer = FakeFirebase(), MemoryStore(), FakeMailer()
     settings = Settings(_env_file=None, app_url="http://localhost:5173", allowed_origins="http://localhost:5173", firebase_web_api_key="x", **overrides)

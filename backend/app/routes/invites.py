@@ -18,16 +18,16 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Response
 
-from ..access import ROLE_LABEL
-from ..accounts import ensure_profile, iso, link, mark_active, session_out
-from ..errors import ApiError, forbidden
-from ..identity import EmailExists
+from ..access.permissions import ROLE_LABEL
+from ..auth.accounts import ensure_profile, iso, link, mark_active, session_out
+from ..auth.identity import EmailExists
+from ..auth.passwords import password_problem
+from ..auth.sessions import PLATFORM_CLAIM, PLATFORM_ROLES, Caller, not_acting, start_session
+from ..core.errors import ApiError, forbidden
+from ..core.ratelimit import limit, limit_caller
+from ..core.services import Services, get_services
+from ..data.store import ActivityDoc, InviteDoc, MemberDoc, Membership, OrgDoc, Tx, UserDoc, hash_key, now
 from ..models import AcceptInviteIn, InviteOut, SessionOut
-from ..passwords import password_problem
-from ..ratelimit import limit, limit_caller
-from ..services import Services, get_services
-from ..sessions import PLATFORM_CLAIM, PLATFORM_ROLES, Caller, not_acting, start_session
-from ..store import ActivityDoc, InviteDoc, MemberDoc, Membership, OrgDoc, Tx, UserDoc, hash_key, now
 
 log = logging.getLogger("aica.invites")
 router = APIRouter(prefix="/api/invites", tags=["invites"])

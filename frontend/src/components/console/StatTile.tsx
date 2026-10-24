@@ -1,3 +1,5 @@
+import { computeDelta, type Change } from './statDelta'
+
 /**
  * One headline number: its label, the value, and how it moved against a
  * named earlier period. The change is said in words and marked with an
@@ -14,21 +16,9 @@ export function StatTile({
   /** A quieter line under the value, e.g. "of 214 calls". */
   sub?: string
   /** `words` for the direction, e.g. ["longer", "shorter"]; "more"/"fewer" by default. */
-  change?: { now: number; before: number; period: string; upIsGood: boolean; format?(n: number): string; words?: [string, string] }
+  change?: Change
 }) {
-  let delta: { arrow: string; text: string; tone: 'good' | 'bad' | 'flat' } | null = null
-  if (change) {
-    const diff = change.now - change.before
-    const fmt = change.format ?? ((n: number) => n.toLocaleString('en-IN'))
-    const [up, down] = change.words ?? ['more', 'fewer']
-    if (diff === 0 || !Number.isFinite(diff)) delta = { arrow: '', text: `Same as ${change.period}`, tone: 'flat' }
-    else
-      delta = {
-        arrow: diff > 0 ? '▲' : '▼',
-        text: `${fmt(Math.abs(diff))} ${diff > 0 ? up : down} than ${change.period}`,
-        tone: diff > 0 === change.upIsGood ? 'good' : 'bad',
-      }
-  }
+  const delta = change ? computeDelta(change) : null
   return (
     <div className="stat">
       <dt className="stat__label">{label}</dt>

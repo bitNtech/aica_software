@@ -1,5 +1,8 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
 import type { FlowNode, FlowNodeKind } from '../../../console/types'
+import { FlowCanvas, type FlowCanvasHandle, type FlowMark } from '../../../components/console/flow/FlowCanvas'
+import { ancestorIds, flatten } from '../../../components/console/flow/layout'
+import { SegFilter } from '../../../components/console/ListTools'
 import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/Dialog'
 import { SelectField, TextAreaField, TextField } from '../../../components/ui/Field'
@@ -15,11 +18,28 @@ import {
   lowConfidence,
   mergeIntents,
   moveNode,
+  NEEDS_REVIEW,
   neighbour,
   position,
   removeNode,
   updateNode,
 } from './flowTree'
+import './FlowViews.css'
+
+/** How the flow is shown: the outline (a list, and the accessible default),
+ * the diagram, or both side by side. */
+export type FlowView = 'outline' | 'diagram' | 'both'
+const VIEW_KEY = 'aica.flow.view'
+const VIEWS: FlowView[] = ['outline', 'diagram', 'both']
+
+function readView(): FlowView {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    return VIEWS.includes(v as FlowView) ? (v as FlowView) : 'outline'
+  } catch {
+    return 'outline'
+  }
+}
 
 interface Props {
   flow: FlowNode[]
@@ -31,14 +51,23 @@ interface Props {
   onShowCalls?(node: FlowNode): void
   /** Id for the summary line, so the page can move focus to it. */
   summaryId?: string
+  /** Start in this view instead of the remembered one. The choice then
+   * isn't remembered either (used where the flow is a one-off copy). */
+  initialView?: FlowView
 }
 
 /**
  * The conversation flow as an editable outline: intents at the top, their
  * steps and branches nested under them. Each row can be expanded, edited,
  * moved, or given new steps; editing opens a small form under the row.
+ *
+ * The same flow can also be shown as a diagram (FlowCanvas), alone or beside
+ * the outline. Both are views of one state: folding, selection, editing,
+ * undo and the "needs a look" filter are shared, and the diagram's edit
+ * buttons call the very same handlers as the outline's. The choice of view
+ * is remembered.
  */
-export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls, summaryId }: Props) {
+export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls, summaryId, initialView }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [editing, setEditing] = useState<string | null>(null)
   /** A node just added: removed again if its form is cancelled while empty. */
@@ -51,18 +80,42 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
   /** The flow before the last delete, so it can be undone. */
   const [undo, setUndo] = useState<{ id: string; label: string; flow: FlowNode[] } | null>(null)
   const addIntent = useRef<HTMLButtonElement>(null)
+  const [view, setViewState] = useState<FlowView>(() => initialView ?? readView())
+  const showOutline = view !== 'diagram'
+  const showDiagram = view !== 'outline'
+  /** The node picked in either view; the other follows it. */
+  const [selected, setSelected] = useState<string | null>(null)
+  /** A delete asked for in the diagram on a node that has steps inside. */
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const canvas = useRef<FlowCanvasHandle>(null)
+  const treeRef = useRef<HTMLUListElement>(null)
+  /** The last change was made in the diagram, so focus goes back there. */
+  const fromCanvas = useRef(false)
+
+  const setView = (v: FlowView) => {
+    setViewState(v)
+    if (initialView) return
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* not remembered */
+    }
+  }
 
   // After a move or delete, put focus back on a sensible row.
   useEffect(() => {
     if (!focusId) return
     if (focusId === 'add') addIntent.current?.focus()
-    else {
+    else if (showDiagram && (fromCanvas.current || !showOutline)) {
+      canvas.current?.focusNode(focusId.startsWith('move:') ? focusId.split(':')[1] : focusId)
+    } else {
       // A move keeps focus on its button, unless the row can't move further.
       const el = document.querySelector<HTMLButtonElement>(`[data-node-focus="${focusId}"]`)
       const row = focusId.startsWith('move:') ? focusId.split(':')[1] : null
       if (el && !el.disabled) el.focus()
       else if (row) document.querySelector<HTMLElement>(`[data-node-focus="${row}"]`)?.focus()
     }
+    fromCanvas.current = false
     setFocusId(null)
   }, [focusId, flow])
 
@@ -134,9 +187,13 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
     const err = errors[node.id]
     const listId = `kids-${node.id}`
     const Title = node.kind === 'intent' ? 'h3' : 'p'
+    const picked = showDiagram && selected === node.id
     return (
       <li key={node.id} className={`flow__item flow__item--${node.kind}`}>
-        <div className={['flow__row', err && 'flow__row--error', editing === node.id && 'is-editing'].filter(Boolean).join(' ')}>
+        <div
+          className={['flow__row', err && 'flow__row--error', editing === node.id && 'is-editing', picked && 'is-selected'].filter(Boolean).join(' ')}
+          onClick={showDiagram ? () => setSelected(node.id) : undefined}
+        >
           {hasKids ? (
             <button
               type="button"
@@ -157,7 +214,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
             {/* Intents are headings, so screen-reader users can jump between them. */}
             <Title className="flow__title">
               <span className={`flow__kind flow__kind--${node.kind}`}>{KIND_LABEL[node.kind]}</span>
-              <span className="flow__label" id={`node-${node.id}`} tabIndex={-1} data-node-focus={node.id}>
+              <span className="flow__label" id={`node-${node.id}`} tabIndex={-1} data-node-focus={node.id} aria-current={picked ? 'true' : undefined}>
                 {node.label || <em className="flow__unnamed">Unnamed</em>}
               </span>
             </Title>
@@ -244,6 +301,127 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
 
   const shown = flow.filter(visible)
 
+  /** A line of status on each node of the diagram: icon and words. */
+  const marks = useMemo(() => {
+    const out: Record<string, FlowMark> = {}
+    for (const n of flatten(flow)) {
+      if (errors[n.id]) out[n.id] = { tone: 'danger', text: 'Needs fixing', detail: errors[n.id] }
+      else if (n.confidence !== undefined && n.confidence < NEEDS_REVIEW)
+        out[n.id] = { tone: 'warn', text: confidenceLabel(n.confidence).text, detail: 'Check this against the calls it came from.' }
+    }
+    return out
+  }, [flow, errors])
+
+  /** With "only what needs a look" on, the diagram dims the rest (and keeps
+   * the intents above what's flagged in view, for context). */
+  const dimExcept = useMemo(() => {
+    if (!reviewOnly) return undefined
+    return [...new Set(Object.keys(marks).flatMap((id) => [...ancestorIds(flow, id), id]))]
+  }, [reviewOnly, marks, flow])
+
+  // The outline row for a node picked in the diagram: unfolded already (the
+  // diagram shares the folding), so scroll to it and focus it.
+  function focusOutlineRow(id: string) {
+    const el = [...(treeRef.current?.querySelectorAll<HTMLElement>('[data-node-focus]') ?? [])].find((e) => e.getAttribute('data-node-focus') === id)
+    el?.focus({ preventScroll: true })
+    el?.scrollIntoView?.({ block: 'nearest' })
+  }
+
+  function pickInDiagram(id: string) {
+    setSelected(id)
+    if (view === 'both') focusOutlineRow(id)
+  }
+
+  function removeFromDiagram(id: string) {
+    fromCanvas.current = true
+    const node = findNode(flow, id)
+    if (node && node.children.length > 0) setConfirmDelete(id)
+    else remove(id)
+  }
+
+  const picked = selected ? findNode(flow, selected) : null
+  const editingNode = editing ? findNode(flow, editing) : null
+  const kindWord = (n: FlowNode) => KIND_LABEL[n.kind].toLowerCase()
+
+  const outline = (
+    <>
+      {shown.length > 0 ? (
+        <ul className="flow__tree" aria-label="Conversation flow" ref={treeRef}>
+          {shown.map((n) => row(n, 0))}
+        </ul>
+      ) : (
+        <p className="empty-note">{reviewOnly ? 'Nothing needs a look.' : 'No intents yet. Add the first conversation the agent should handle.'}</p>
+      )}
+    </>
+  )
+
+  const diagram = (
+    <div className="flow__diagram">
+      <FlowCanvas
+        ref={canvas}
+        nodes={flow}
+        label="Conversation flow diagram"
+        description="The Outline view lists the same flow as text."
+        height={view === 'both' ? 'clamp(22rem, 68vh, 40rem)' : undefined}
+        selectedId={selected}
+        onSelect={pickInDiagram}
+        collapsed={collapsed}
+        onCollapsedChange={setCollapsed}
+        marks={marks}
+        dimExcept={dimExcept}
+        editable={!readOnly}
+        onAddChild={(parent, kind) => {
+          fromCanvas.current = true
+          add(parent, kind)
+        }}
+        onRename={(id) => {
+          fromCanvas.current = true
+          setEditing(id)
+          setFresh(null)
+        }}
+        onMove={(id, dir) => {
+          const node = findNode(flow, id)
+          if (node) {
+            fromCanvas.current = true
+            move(node, dir)
+          }
+        }}
+        onDelete={removeFromDiagram}
+        emptyText="No intents yet. Add the first conversation the agent should handle."
+      />
+      {view === 'diagram' && editingNode && !readOnly && (
+        <div className="flow__inspector">
+          <NodeForm
+            key={editingNode.id}
+            node={editingNode}
+            intents={flow.some((n) => n.id === editingNode.id) ? flow.filter((n) => n.id !== editingNode.id) : []}
+            onSave={(patch) => {
+              change(updateNode(flow, editingNode.id, patch))
+              setEditing(null)
+              setFresh(null)
+              setFocusId(editingNode.id)
+            }}
+            onMerge={(into) => {
+              change(mergeIntents(flow, editingNode.id, into))
+              setNote('Intents merged.')
+              setEditing(null)
+              setFocusId(into)
+            }}
+            onDelete={() => remove(editingNode.id)}
+            onCancel={() => cancelEdit(editingNode.id)}
+          />
+        </div>
+      )}
+      {view === 'diagram' && !editingNode && (
+        <NodeDetail
+          node={picked}
+          error={picked ? errors[picked.id] : undefined}
+          onShowCalls={onShowCalls}
+        />
+      )}
+    </div>
+  )
+
   return (
     <div className="flow">
       <p className="sr-only" role="status">
@@ -255,6 +433,16 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
           {review > 0 ? <strong>{review} {review === 1 ? 'needs' : 'need'} a look.</strong> : 'Nothing flagged.'}
         </p>
         <div className="flow__tools">
+          <SegFilter
+            legend="View"
+            options={[
+              { value: 'outline', label: 'Outline' },
+              { value: 'diagram', label: 'Diagram' },
+              { value: 'both', label: 'Side by side' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
           <Switch label="Only what needs a look" checked={reviewOnly} onChange={setReviewOnly} />
           <button type="button" className="btn-text" onClick={() => setCollapsed(new Set())}>
             Expand all
@@ -283,13 +471,36 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
         </div>
       )}
 
-      {shown.length > 0 ? (
-        <ul className="flow__tree" aria-label="Conversation flow">
-          {shown.map((n) => row(n, 0))}
-        </ul>
+      {view === 'both' ? (
+        <div className="flow__split">
+          <div className="flow__split-list">{outline}</div>
+          {diagram}
+        </div>
+      ) : view === 'diagram' ? (
+        diagram
       ) : (
-        <p className="empty-note">{reviewOnly ? 'Nothing needs a look.' : 'No intents yet. Add the first conversation the agent should handle.'}</p>
+        outline
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={`Delete “${findNode(flow, confirmDelete ?? '')?.label || 'this item'}”?`}
+        confirmLabel={`Delete ${findNode(flow, confirmDelete ?? '') ? kindWord(findNode(flow, confirmDelete ?? '')!) : 'item'}`}
+        danger
+        onConfirm={() => {
+          const id = confirmDelete
+          setConfirmDelete(null)
+          if (id) remove(id)
+        }}
+        onCancel={() => {
+          fromCanvas.current = false
+          setConfirmDelete(null)
+        }}
+      >
+        <p>
+          Its {countNodes(findNode(flow, confirmDelete ?? '')?.children ?? [])} nested {countNodes(findNode(flow, confirmDelete ?? '')?.children ?? []) === 1 ? 'item goes' : 'items go'} too.
+        </p>
+      </ConfirmDialog>
 
       {!readOnly && (
         <div>
@@ -299,6 +510,34 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
         </div>
       )}
     </div>
+  )
+}
+
+/** What a node says, how sure AICA is and where it came from: the outline
+ * row's content, for the diagram view where there are no rows. */
+function NodeDetail({ node, error, onShowCalls }: { node: FlowNode | null; error?: string; onShowCalls?(node: FlowNode): void }) {
+  if (!node) return <p className="flow__detail flow__detail--empty">Select a step to see what the agent says and where it came from.</p>
+  const conf = node.confidence !== undefined ? confidenceLabel(node.confidence) : null
+  const calls = node.sourceCallIds.length
+  return (
+    <section className="flow__detail" aria-label={`About ${node.label || 'unnamed'}`}>
+      <p className="flow__title">
+        <span className={`flow__kind flow__kind--${node.kind}`}>{KIND_LABEL[node.kind]}</span>
+        <span className="flow__label">{node.label || <em className="flow__unnamed">Unnamed</em>}</span>
+      </p>
+      {node.kind === 'step' && node.say && <p className="flow__say">“{node.say}”</p>}
+      {node.kind === 'branch' && node.condition && <p className="flow__say">When: {node.condition}</p>}
+      <p className="flow__meta">
+        {conf && <span className={`conf conf--${conf.level}`}>{conf.text}</span>}
+        {calls > 0 && onShowCalls && (
+          <button type="button" className="btn-text flow__calls" aria-label={`Seen in ${calls} ${calls === 1 ? 'call' : 'calls'}: ${node.label}`} onClick={() => onShowCalls(node)}>
+            Seen in {calls} {calls === 1 ? 'call' : 'calls'}
+          </button>
+        )}
+        {calls === 0 && node.confidence === undefined && <span className="flow__added">Added by hand</span>}
+      </p>
+      {error && <p className="field__error flow__error">{error}</p>}
+    </section>
   )
 }
 

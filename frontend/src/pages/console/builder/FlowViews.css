@@ -1,0 +1,29 @@
+/* The flow editor's views: outline, diagram, or both side by side. The
+   outline's own rows are in Builder.css; the diagram is FlowCanvas.css. */
+
+.flow__tools .seg { flex: none; }
+.flow__tools .seg legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.flow__diagram { display: grid; gap: 0.75rem; min-width: 0; align-content: start; }
+.flow__detail { display: grid; gap: 0.3rem; padding: 0.65rem 0.85rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--card); }
+.flow__detail--empty { color: var(--muted); }
+.flow__inspector { min-width: 0; }
+.flow__inspector .flow__form { margin: 0; }
+
+.flow__row.is-selected { background: var(--bg-2); box-shadow: inset 3px 0 0 var(--ink); }
+.flow__row--error.is-selected { box-shadow: inset 3px 0 0 var(--danger-ink); }
+
+/* Side by side: the list and the drawing share the width on a wide screen,
+   and stack on a narrow one (list first, so reading order is unchanged). */
+.flow__split { display: grid; gap: 1rem 1.25rem; align-items: start; }
+.flow__split-list { min-width: 0; }
+@media (min-width: 1100px) {
+  .flow__split { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  .flow__split .flow__diagram { position: sticky; top: 1rem; }
+  .flow__split .flow__row { flex-wrap: wrap; }
+  .flow__split .flow__actions { max-width: none; width: 100%; justify-content: flex-start; padding-left: 2.5rem; }
+}
+
+@media (forced-colors: active) {
+  .flow__row.is-selected { box-shadow: none; border-left: 4px solid Highlight; }
+}

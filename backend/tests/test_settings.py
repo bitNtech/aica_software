@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from app.services import firebase_certificate
-from app.settings import Settings
+from app.core.services import firebase_certificate
+from app.core.config import Settings
 
 KEY = {"type": "service_account", "project_id": "demo", "private_key": "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n"}
 

@@ -5,7 +5,7 @@
   position: relative;
   min-height: 12rem;
   margin-top: 0;
-  font-family: 'DM Mono', monospace;
+  font-family: var(--sans);
   /* bitntech.in's #root centres its text, and the footer was laid out under it. */
   text-align: center;
   line-height: 145%;
@@ -76,16 +76,16 @@
       text-align: center;
       pointer-events: none;
       font-family: var(--sans);
-      font-weight: 800;
+      font-weight: 600;
       font-size: clamp(4rem, 22vw, 22rem);
-      letter-spacing: -0.04em;
+      letter-spacing: -0.02em;
       line-height: 1;
       white-space: nowrap;
-      color: #220934;
+      color: var(--plum);
     }
 
     .brand-watermark em {
-      color: #ff6e42;
+      color: var(--orange);
       font-style: normal;
     }
 
@@ -104,7 +104,7 @@
     }
 
     .what-if p {
-      font-family: 'Bebas Neue', sans-serif;
+      font-family: var(--display);
       font-size: clamp(1.2rem, 3vw, 1.9rem);
       color: #fff;
       opacity: 0.85;
@@ -127,11 +127,11 @@
     .what-if-cta {
       margin-top: 1rem;
       padding: 0.85rem 2rem;
-      border-radius: 999px;
+      border-radius: var(--r-pill);
       background: #220934;
       color: #fff !important;
-      font-weight: 700;
-      font-size: 0.85rem;
+      font-weight: 600;
+      font-size: var(--fs-sm);
       letter-spacing: 0.03em;
       transition: transform 0.18s ease;
     }
@@ -151,7 +151,7 @@
     p {
       color: #f5f7fa;
       text-decoration: none;
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
     }
 
     a:hover {
@@ -162,12 +162,12 @@
       color: white;
       display: block;
       margin-bottom: 0.6rem;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
     }
 
     p {
       margin: 0;
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       color: rgba(245, 247, 250, 0.7);
     }
 

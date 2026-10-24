@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.store import MemberDoc, Membership, OrgDoc, UserDoc
+from app.data.store import MemberDoc, Membership, OrgDoc, UserDoc
 
 from .fakes import make_services
 
@@ -90,8 +90,8 @@ def seed_ops(store, people, slug=SLUG):
     front desk; the request was made by the owner."""
     from datetime import timedelta
 
-    from app.redact import search_tokens
-    from app.store import AppointmentDoc, CallbackDoc, CallDoc, ChangeRequestDoc, HandoffDoc, now
+    from app.domain.redact import search_tokens
+    from app.data.store import AppointmentDoc, CallbackDoc, CallDoc, ChangeRequestDoc, HandoffDoc, now
 
     t = now()
     fd_uid = people["front_desk"][0]
@@ -122,7 +122,7 @@ def seed_ops(store, people, slug=SLUG):
 
 def sample_spec(**over) -> dict:
     """A valid AgentSpec from the catalogue's defaults."""
-    from app import catalogue as c
+    from app.domain import catalogue as c
 
     spec = {
         "typeId": "hospital", "subTypeId": "appointments", "redact": True, "behaviour": c.default_behaviour("Arogya"), "speech": c.default_speech(),
@@ -142,8 +142,8 @@ def seed_library(svc, store, slug=SLUG):
     unused; kn_1 (ready FAQ) is used by agt_1, kn_2 (web) isn't, kn_3 is a
     document waiting for its upload; up_1 is uploaded, up_2 waiting;
     draft_1 is being built; scn_1 tests agt_1."""
-    from app.store import (AgentDoc, CredentialDoc, DraftDoc, KnowledgeDoc, NumberDoc, ScenarioDoc, ToolDoc, UploadDoc, VersionDoc, now)
-    from app import catalogue as c
+    from app.data.store import (AgentDoc, CredentialDoc, DraftDoc, KnowledgeDoc, NumberDoc, ScenarioDoc, ToolDoc, UploadDoc, VersionDoc, now)
+    from app.domain import catalogue as c
 
     t = now()
     spec = sample_spec()

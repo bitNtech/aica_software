@@ -64,7 +64,6 @@ export function AuthLayout({ kicker, title, lede, docTitle, voice, step, footer,
       </a>
 
       <aside className="auth__stage stage" aria-label="About AICA">
-        <div className="auth__orb" aria-hidden="true" />
         <Link to="/login" className="auth__brand" aria-label="AICA by BitNTech — sign in">
           <Wordmark />
         </Link>

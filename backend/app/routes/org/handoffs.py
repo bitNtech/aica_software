@@ -1,7 +1,9 @@
 """/api/orgs/{slug}/handoffs — callers the agent passed to a person (Phase 3).
 
 Handoffs are created by the voice pipeline once its contract is agreed;
-until then they come from the seed script. Everything here needs
+until then they come from the seed script. Anyone who can see calls
+(`calls.viewAll` or `calls.take`) may read the queue, so everyone watching
+Live calls sees who is waiting; taking one or making it a callback needs
 `calls.take`. Taking one marks the call as handled by that person, so it
 shows in their own call history.
 """
@@ -11,13 +13,13 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends
 
-from ...accounts import iso
-from ...errors import ApiError, bad_input
+from ...access.orgs import OrgContext, org_permission
+from ...auth.accounts import iso
+from ...core.errors import ApiError, bad_input
+from ...core.ratelimit import limit_caller
+from ...data.store import CallbackDoc, HandoffDoc, Tx, new_id, now
+from ...domain.redact import details_out, mask_phone, without_name
 from ...models import CallbackOut, CollectedDetailOut, HandoffOut
-from ...orgs import OrgContext, org_permission
-from ...ratelimit import limit_caller
-from ...redact import details_out, mask_phone, without_name
-from ...store import CallbackDoc, HandoffDoc, Tx, new_id, now
 from .callbacks import callback_out
 
 router = APIRouter(prefix="/api/orgs/{slug}/handoffs", tags=["org"])
@@ -52,7 +54,7 @@ def _get(tx: Tx, slug: str, handoff_id: str) -> HandoffDoc:
 
 
 @router.get("", response_model=list[HandoffOut], response_model_by_alias=True)
-def list_handoffs(ctx: OrgContext = Depends(org_permission("calls.take", what="see the handoff queue"))):
+def list_handoffs(ctx: OrgContext = Depends(org_permission("calls.viewAll", "calls.take", what="see who is waiting for a person"))):
     personal = ctx.access.has("calls.personal")
     rows = sorted(ctx.svc.store.list_handoffs(ctx.slug, now() - RECENT), key=lambda h: h.waitingSince)
     return [handoff_out(h, personal) for h in rows]

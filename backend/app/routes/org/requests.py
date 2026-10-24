@@ -14,13 +14,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from ...accounts import iso, link
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member, org_permission
+from ...auth.accounts import iso, link
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...core.services import Services, get_services
+from ...data.store import ChangeRequestDoc, Tx, new_id, now
 from ...models import ChangeReplyOut, ChangeRequestOut, ChangeRequestPatchIn, NewChangeRequestIn, NumberRequestIn, ReplyIn
-from ...orgs import OrgContext, org_member, org_permission
-from ...ratelimit import limit_caller
-from ...services import Services, get_services
-from ...store import ChangeRequestDoc, Tx, new_id, now
 
 router = APIRouter(prefix="/api/orgs/{slug}/requests", tags=["org"])
 

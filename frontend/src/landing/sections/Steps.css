@@ -2,7 +2,7 @@
 .steps__inner { display: grid; gap: 3rem; }
 .steps__head { display: grid; gap: 1rem; align-content: start; }
 .steps__title { font-size: clamp(2.6rem, 1rem + 5vw, 5.6rem); }
-.steps__lede { max-width: 24rem; font-size: 1.05rem; }
+.steps__lede { max-width: 24rem; font-size: var(--fs-lg); }
 
 /* Tall enough that the scroll has something to fill. */
 .steps__track { position: relative; padding: 1rem 0 2rem; }
@@ -18,10 +18,10 @@
   width: 56px;
   height: 56px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--card);
   overflow: hidden;
-  font: 500 0.85rem var(--mono);
+  font: 500 var(--fs-sm) var(--mono);
   color: var(--orange);
   transition: border-color 0.4s var(--ease);
 }
@@ -30,8 +30,8 @@
 .steps__num b { position: relative; font-weight: 500; mix-blend-mode: normal; }
 .steps__item.is-on .steps__num { border-color: var(--orange); }
 .steps__item.is-on .steps__num b { color: var(--orange-ink); }
-.steps__item h3 { font: 800 clamp(1.6rem, 1.1rem + 1.8vw, 2.6rem)/1.05 var(--display); letter-spacing: -0.04em; color: var(--ink); }
-.steps__item p { margin-top: 0.6rem; max-width: 30rem; font-size: 1.05rem; }
+.steps__item h3 { font: 600 clamp(1.6rem, 1.1rem + 1.8vw, 2.6rem)/1.2 var(--display); letter-spacing: -0.01em; color: var(--ink); }
+.steps__item p { margin-top: 0.6rem; max-width: 30rem; font-size: var(--fs-lg); }
 
 @media (min-width: 980px) {
   .steps__inner { grid-template-columns: 0.85fr 1.15fr; gap: 5rem; }

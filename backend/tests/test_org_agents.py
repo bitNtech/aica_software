@@ -6,8 +6,8 @@ from datetime import timedelta
 
 import pytest
 
-from app.reports import record_call
-from app.store import CallDoc, now
+from app.domain.rollups import record_call
+from app.data.store import CallDoc, now
 
 from .orgkit import SLUG, api, env, err, login, master, post, sample_spec, seed, seed_library  # noqa: F401
 
@@ -130,7 +130,7 @@ def test_name_number_and_live(env):
     r = post(client, url, {"numberId": "num_2", "status": "live"}).json()
     assert r["agent"]["status"] == "live" and r["agent"]["phoneNumber"] == "+91 422 400 2000"
     # Someone else's line.
-    from app.store import AgentDoc
+    from app.data.store import AgentDoc
 
     store.save_record(SLUG, "agent", AgentDoc(id="agt_2", name="Lab line", useCase="Reports", status="live", working=sample_spec(), updatedAt=now(), numberId="num_1"))
     n = store.get_record(SLUG, "number", "num_1")
@@ -225,7 +225,7 @@ def test_every_setup_the_console_makes_passes_validation():
     import json
     from pathlib import Path
 
-    from app.agentspec import SpecField
+    from app.domain.agentspec import SpecField
 
     data = json.loads((Path(__file__).parent / "fixtures" / "demo_agents.json").read_text())
     assert len(data["specs"]) >= 3

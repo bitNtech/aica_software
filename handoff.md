@@ -1,7 +1,17 @@
 # Project Handoff
 
 ## Status
-- Latest (2026-10-20, `feat/detected-flow-patterns`): Phases 4 (reports), 5 (library: numbers, tools, secrets, knowledge and upload metadata) and 6 (agents, versions, drafts, scenarios) are built on top of Phases 1–3 (`b34db71`). **Not run against real Firebase, storage or the network yet.**
+- Latest (2026-10-24, `main`, **uncommitted**): the Ops overview (`/ops`) is rebuilt as a platform dashboard for master admin and staff. It's UI only; the backend comes later. See "Ops overview" below. Verified: `tsc -b` clean, vitest 796/796, `npm run build` ok, headless screenshots reviewed (1440 light and dark, 390).
+- Next recommended action: look at `/ops` in a real browser, then agree definitions and plan the backend for `getOverview`/`getLiveOps` (contract in `frontend/src/ops/types.ts`).
+- Previously (2026-10-24, `main`, **uncommitted**): the Operate pages are rebuilt around the people who use them (Phases 0–4 of the rebuild plan, each approved). See "Operate rebuild" below. Verified: `tsc -b` clean, vitest 786/786, `vite build` ok, backend pytest all passing, headless screenshots reviewed (1440 light/dark, 390).
+- Next recommended action: try every Operate page in a real browser (keyboard-only too), then commit. Optional follow-ups are listed in "Operate rebuild".
+- Previously (2026-10-23, `main`, **uncommitted**): backend reorganised into packages (`core/`, `auth/`, `access/`, `data/`, `domain/`, `integrations/`), with the Firestore files in `backend/firestore/`. Approved "proceed with safe and efficient option". Files moved and renamed; no logic changed. The layout and where new code goes are in `backend/README.md` → "Layout"; keep to it on every backend change.
+  - Renames: `settings`→`core/config`, `access`→`access/permissions`, `secrets`→`data/vault` (no longer shadows Python's `secrets`), `reports`→`domain/rollups` (no clash with `routes/org/reports.py`). The `config.py` path to `backend/.env` is adjusted for the deeper folder.
+  - Verified: pytest 601 passed, 3 skipped (same as before); all 56 modules import; frontend parity tests 28/28 and `tsc -b` clean. Path mentions are updated in code comments, `backend/README.md`, `docs/backend-workflow.md`, `docs/cicd.md` and the frontend parity tests; older handoff entries below keep their original paths.
+  - Not verified: a Vercel preview deploy (its FastAPI detection uses `app/main.py`, which didn't move).
+- Previously (2026-10-23, `main`, **uncommitted**): UI clean-up across every page (landing, sign-in, console, ops), approved "proceed" with Rubik as the one font. See "UI clean-up" below.
+- Next recommended action: look over the pages in a real browser (light, dark and phone width), then commit. The Phase 1–6 next step below still stands.
+- Previously (2026-10-20, `feat/detected-flow-patterns`): Phases 4 (reports), 5 (library: numbers, tools, secrets, knowledge and upload metadata) and 6 (agents, versions, drafts, scenarios) are built on top of Phases 1–3 (`b34db71`). **Not run against real Firebase, storage or the network yet.**
 - Next recommended action: set `SECRETS_KEY` and `STORAGE_BUCKET`, create the indexes, try Phases 1–6 on staging, then agree the pipeline contracts (§5) before Phase 7 (bot desk).
 - Latest (2026-10-19, `feat/detected-flow-patterns`, **uncommitted**): Phases 2 (requests to bitNtech) and 3 (calls, notes, callbacks, appointments, handoffs: storage, reading and updating) are built on top of the pushed Phase 1 commit `f9cc1fd`. The stray `not staged for commit:` file (a saved `less` help screen) is removed. **Not run against real Firebase yet.**
 - Next recommended action: create the new indexes in `backend/firestore.indexes.json`, try Phases 1–3 on staging (seed with `app.scripts.seed_operations`), then agree the pipeline contracts in `docs/backend-workflow.md` §5 before Phase 4 (reports).
@@ -27,6 +37,64 @@
 
 
 
+
+## Ops overview (2026-10-24, approved "proceed"; UI only)
+
+- **Built:** `/ops` puts the page in this order:
+  - a period filter (Today / 7 / 30 days) and a jump bar;
+  - 8 KPI cards;
+  - Needs you: sign-ups awaiting approval, organisations needing attention, critical alerts;
+  - Live operations: calls in progress, callers waiting for a person, recent failures. These refresh every 15 s;
+  - Analytics: call volume, successful vs failed, outcomes and handoff rate, reply time, usage by organisation, agent performance;
+  - Organisations: recently registered, by status, busiest, then **the full list with every earlier action (act as owner, suspend, restore, review), unchanged**;
+  - Agents: published, draft and inactive counts, errors or slow replies, recently updated;
+  - Recent activity: one timeline you can filter. Admin actions show for the master admin only;
+  - Platform health: ASR, LLM, TTS and telephony, plus active incidents.
+- **Data:** organisation figures come from the real `listOrgs()`. Everything else comes from two new `OpsDataClient` methods, `getOverview(days)` and `getLiveOps()`, which are demo-only for now. Every panel that uses them shows a "Demo data" label.
+  - The types in `frontend/src/ops/types.ts` are the proposed backend contract.
+  - The demo builds on the same call log as `/ops/usage`, so totals match; a test checks this.
+- **Definitions used (to confirm before the backend):**
+  - success means a call was neither dropped nor a technical failure;
+  - handoff rate is calls handed over, emergencies included;
+  - agent "errors" means more than 5% of calls failed over the last 7 days (with at least 20 calls); "degraded" means its slowest replies are over twice its usual;
+  - telephony latency is the time to connect a call.
+  - Active calls and telephony have no real source anywhere yet.
+- **Files:** `ops/types.ts`, `ops/demoOpsClient.ts` (also moved the status helpers into `serviceHealth`/`failuresBack` with no behaviour change), `pages/ops/OpsOverviewPage.tsx`, `pages/ops/overview/*` (new), `test/ops-overview.test.tsx` (new).
+- **Not verified:** a real browser by a person, a screen reader, the live backend (no endpoints exist).
+- **Follow-ups:**
+  - plan the backend endpoints;
+  - the demo duplicates the sample agents' version history across both sample hospitals, so the activity timeline repeats entries;
+  - consider remembering the chosen period per viewer.
+
+## Operate rebuild (2026-10-23 to 24, approved per phase)
+
+An earlier same-day redesign of these pages was rejected and reverted (Phase 0); this rebuild replaced it. Built by Sonnet subagents from a reviewed plan; every phase checked with tsc, vitest, build and screenshots.
+- **Phase 1, foundation** (`components/console/`): no 1360px cap; `SplitView` (resizable, Drawer under 1100px), `Drawer`, `Toolbar`, `DataTable`, `StatusPill`, `KpiCard`/`Sparkline`, `Timeline`, `WaitTimer`, `Skeleton`, `Toast` (Undo), `KeyboardHelp` (`?`), `UpdatedAgo`; sidebar count badges from one 15 s poll (`console/useAttention.tsx`) and the waiting count in the tab title. Dev-only gallery at `/o/:slug/dev/ui`.
+- **Phase 2:** Live calls absorbs the Handoff queue (one queue: emergencies, waiting, upset, in progress, recent; summary, details, transcript, take/guide/hand over/callback; opt-in alerts). `/handoffs` redirects to `/live`; the `handoffs` page key is gone. Home is role-aware ("Your shift" for front desk; dashboard grid with every earlier report section, sparklines, funnel, topic gaps, agents table, "What changed").
+  - **Backend change (approved):** `GET /api/orgs/{slug}/handoffs` now allows `calls.viewAll` or `calls.take` (take and to-callback still need `calls.take`), so everyone watching Live calls sees who is waiting. `tests/test_permission_matrix.py` updated.
+- **Phase 3:** Callbacks (urgency queue + detail, caller history by last five digits, source call, timeline, log with Undo, `N` next, bulk give, edge-case flags) and Appointments (Day by doctor default, Week, List; needs-check panel; problems; drawer with booking call and other appointments; free-slot suggestions; capacity bars; day-sheet CSV).
+- **Phase 4:** Bot desk (line board with figures and every-line actions, notices with templates/schedule/preview, 14-day doctor calendar with affected appointments, flag triage with call excerpt, desk activity), FlowCanvas v2 (`components/console/flow/`: shapes, edge labels, minimap, find, fold, path highlight, TB/LR, full screen; Outline/Diagram/Side by side in the Flow tab and builder), Call history (table + preview with `?call=`, client-side language/sentiment/success filters, patterns against the designed flow, edit-as-diagram request) and Call detail (path on the designed flow, step → transcript jump (approximate), transcript search, tools timeline).
+- **Demo-only additions:** some sample callbacks and appointments are linked to sample calls on first read (`linkSamples` in `demoClient.ts`); `resolveFlag` accepts `status: 'open'` (reopen/Undo).
+- **Not verified:** a real browser by a person, keyboard-only and screen-reader passes, real touch and Fullscreen API, the real backend for callbacks/appointments/calls with this UI.
+- **Follow-ups (optional):** callback outcome kinds and rescheduling, appointment arrived/no-show and cancel reason, removing the backend `/handoffs` endpoints, live presence — each needs a backend plan. Desk activity matching relies on the demo's wording (`isDeskEntry` in `operate/desk/logic.ts`). Unused `.tt-*`, `.op-row--appt`, `.detected-flow__*` and `.op-report` rules remain in `Operate.css`. Call history shows several pattern banners stacked above the table.
+
+## UI clean-up (2026-10-23, approved "proceed": every page, Rubik)
+
+- **Built (CSS only, plus the font link and one decorative element):**
+  - one family: Rubik (Google Fonts) for text and headings, replacing Archivo, DM Sans and DM Mono; the monospace font is now the system one (`ui-monospace`), and Noto Sans Tamil stays;
+  - `styles/tokens.css` (and the same tokens in `landing/index.css`): a 7-step type scale `--fs-xs`…`--fs-3xl`, radii `--r-xs/sm/md/lg`, `--shadow`, `--shadow-lg`, and `--field-h` cut from 52px to 36px (44px on touch screens, where inputs also go back to 16px so iOS doesn't zoom);
+  - every raw font size and radius in the app's CSS mapped onto those tokens. There were about 35 sizes and 25 radii;
+  - the uppercase, letter-spaced mono labels (kickers, chips, table heads, `dt`s) are now plain small sans text; weights are 600 for headings and numbers and 500 for emphasis; heading letter-spacing is tamer;
+  - compact, flat controls: 8px-radius buttons without the sweep or press-scale effects, a segmented filter in one bordered group, smaller switches, checkboxes and tabs, tighter card, row and dialog padding;
+  - the console sidebar is 220px with 32px links, so "Billing and plan" no longer gets cut off at 900px tall; the page kicker is visually hidden (the sidebar already names the section), and page titles are 24px;
+  - **bug fixed:** the Ops sidebar was dark (`--night`) while reading paper text colours, so the wordmark, active link, user name and Sign out were plum on black and nearly invisible. It now uses the same paper sidebar as the console, keeping the orange hairline;
+  - **bug fixed:** the detected-flow chart used fixed light colours (white cards, indigo badges), which looked wrong in dark mode; it now uses theme tokens;
+  - phone fixes: numbers in report tables no longer break mid-figure ("11 / 1"), and the period filter scrolls sideways instead of wrapping;
+  - sign-in: the blue orb is removed (`AuthLayout.tsx` and its CSS), the stage is plain night, and the headings are smaller;
+  - landing: smaller hero and section headlines, no Archivo width animation (the hero now fades up), outlined "ghost" words are now muted text, and the buttons are flat.
+- **Verified:** `tsc -b` clean; vitest 328/328; `npm run build` ok. Headless Chrome screenshots of 33 pages in demo mode, before and after, light at 1280px, dark at 1280px and light at 390px, all reviewed.
+- **Not verified:** a real browser by a person, Safari/iOS, Windows high-contrast mode. Below-the-fold landing sections are blank in headless screenshots before and after the change (scroll reveal), so they weren't checked visually.
+- **Not done:** the 7 inline `style={{…}}` uses were left in place because they all carry runtime values (bar widths, chart tooltip position, CSS variables).
 
 ## Backend Phases 4–6 (2026-10-20, approved "proceed, do everything you can")
 

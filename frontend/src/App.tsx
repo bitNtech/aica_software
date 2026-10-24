@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
@@ -26,7 +26,6 @@ import ActivityPage from './pages/console/manage/ActivityPage'
 import OrgSettingsPage from './pages/console/manage/OrgSettingsPage'
 import BillingPage from './pages/console/manage/BillingPage'
 import CallbacksPage from './pages/console/operate/CallbacksPage'
-import HandoffsPage from './pages/console/operate/HandoffsPage'
 import LiveCallsPage from './pages/console/operate/LiveCallsPage'
 import BotDeskPage from './pages/console/operate/BotDeskPage'
 import RequestsPage from './pages/console/RequestsPage'
@@ -48,6 +47,10 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import SignupPage from './pages/SignupPage'
 import { ForbiddenPage, NotFoundPage } from './pages/SystemPage'
 import { VerifyEmailPage, VerifyEmailSentPage } from './pages/VerifyEmailPages'
+
+// The component gallery exists only in development: the dead branch is
+// removed from a production build, chunk and all.
+const UiKitPage = import.meta.env.DEV ? lazy(() => import('./pages/console/dev/UiKitPage')) : null
 
 const guest = (page: ReactNode) => <RedirectIfSignedIn>{page}</RedirectIfSignedIn>
 const member = (page: ReactNode) => <RequireAuth>{page}</RequireAuth>
@@ -104,7 +107,8 @@ export default function App() {
         <Route path="integrations" element={org('integrations', <ToolsPage />)} />
         <Route path="numbers" element={org('numbers', <NumbersPage />)} />
         <Route path="live" element={org('live', <LiveCallsPage />)} />
-        <Route path="handoffs" element={org('handoffs', <HandoffsPage />)} />
+        {/* The handoff queue is part of Live calls now; old links and bookmarks land there. */}
+        <Route path="handoffs" element={<Navigate to="../live" replace />} />
         <Route path="callbacks" element={org('callbacks', <CallbacksPage />)} />
         <Route path="appointments" element={org('appointments', <AppointmentsPage />)} />
         <Route path="calls" element={org('calls', <CallHistoryPage />)} />
@@ -114,6 +118,17 @@ export default function App() {
         <Route path="activity" element={org('activity', <ActivityPage />)} />
         <Route path="settings" element={org('settings', <OrgSettingsPage />)} />
         <Route path="billing" element={org('billing', <BillingPage />)} />
+        {UiKitPage && (
+          <Route
+            path="dev/ui"
+            element={org(
+              'home',
+              <Suspense fallback={null}>
+                <UiKitPage />
+              </Suspense>,
+            )}
+          />
+        )}
       </Route>
 
       {/* bitNtech: master admin and staff */}

@@ -37,7 +37,7 @@ describe('console frame', () => {
     expect(screen.getByText(/agents isn't part of the front desk role here/i)).toBeInTheDocument()
     expect(within(nav()).queryByRole('link', { name: /agents/i })).not.toBeInTheDocument()
     // Their pages are the Operate ones.
-    expect(within(nav()).getByRole('link', { name: /handoff queue/i })).toBeInTheDocument()
+    expect(within(nav()).getByRole('link', { name: /live calls/i })).toBeInTheDocument()
   })
 
   it('offers the organisation switcher only to people in several organisations', async () => {

@@ -84,7 +84,7 @@ export function createHttpConsoleClient(
     const err = ((await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null)?.error
     throw new AuthError((err?.code as AuthErrorCode) ?? 'unknown', err?.message ?? 'Something went wrong on our side. Try again in a moment.')
   }
-  /** Where and how the browser sends a file straight to storage (backend/app/blobs.py). */
+  /** Where and how the browser sends a file straight to storage (backend/app/data/blobs.py). */
   type Upload = { url: string; method: 'PUT'; headers: Record<string, string> }
   const put = async (upload: Upload, body: Blob, name: string) => {
     let res: Response

@@ -3,13 +3,37 @@ import { seedAgents } from '../console/demo/agents'
 import { seedCalls } from '../console/demo/calls'
 import { seedKnowledge } from '../console/demo/library'
 import { seedBilling } from '../console/demo/manage'
-import { callLog, hash, rng, seedMembers, type LogContext } from '../console/demo/operations'
+import { callLog, hash, liveCalls, rng, seedHandoffs, seedMembers, type LogContext } from '../console/demo/operations'
 import { currentPlans, MODEL_OPTIONS, platform, savePlatform } from '../console/demo/platform'
 import { copy, DAY, makeWait } from '../console/demo/runtime'
 import { seedDetail } from '../console/demo/specs'
 import { VOICES } from '../console/demo/templates'
-import type { Plan } from '../console/types'
-import type { Health, OpsDataClient, OpsTemplate, OrgDetail, OrgJob, OrgStatusChange, OrgUsage, ServiceFailure, ServiceHealth, UsageDays } from './types'
+import type { CallOutcome, Plan } from '../console/types'
+import type {
+  AgentHealth,
+  Health,
+  Incident,
+  LiveOps,
+  LiveOpsFailure,
+  OpsDataClient,
+  OpsTemplate,
+  OrgAttention,
+  OrgDetail,
+  OrgJob,
+  OrgStatusChange,
+  OrgUsage,
+  OverviewActivity,
+  OverviewAgent,
+  OverviewBucket,
+  OverviewDays,
+  OverviewOutcome,
+  PlatformAlert,
+  PlatformOverview,
+  PlatformService,
+  ServiceFailure,
+  ServiceHealth,
+  UsageDays,
+} from './types'
 
 /**
  * Sample data for the Ops pages without an API yet. No request leaves the
@@ -40,6 +64,9 @@ const ORGS: Record<string, { name: string; status: OrgStatus; createdDays: numbe
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString()
 const notFound = (what: string) => new AuthError('invalid_input', `That ${what} doesn't exist any more.`)
 
+/** The organisation's call log, with the lab-report agent paused 9 days ago. */
+const logCtx = (slug: string): LogContext => ({ orgSlug: slug, paused: new Set(), pauses: { agt_reports: [{ from: Date.now() - 9 * DAY, to: null }] } })
+
 /** Call minutes and counts per IST day for one organisation, oldest first. */
 function dailyUse(slug: string, days: number): { calls: number[]; minutes: number[] } {
   const today = istDay(Date.now())
@@ -47,8 +74,7 @@ function dailyUse(slug: string, days: number): { calls: number[]; minutes: numbe
   const seconds = new Array<number>(days).fill(0)
   if (slug === 'arogya-demo') {
     // The same call log the organisation's own reports read.
-    const ctx: LogContext = { orgSlug: slug, paused: new Set(), pauses: { agt_reports: [{ from: Date.now() - 9 * DAY, to: null }] } }
-    for (const c of callLog(ctx, days)) {
+    for (const c of callLog(logCtx(slug), days)) {
       const i = days - 1 - (today - istDay(Date.parse(c.startedAt)))
       if (i < 0 || i >= days) continue
       calls[i]++
@@ -111,6 +137,138 @@ const FAILURE_TEXT: Record<ServiceHealth['id'], string[]> = {
   voice: ['Reply took over 3 seconds to start', 'Timed out after 5 seconds'],
   language: ['Timed out after 8 seconds', 'Reply was cut off'],
 }
+
+/** One service over the last 30 minutes and hour, as the status page shows it. */
+function serviceHealth(s: (typeof SERVICES)[number], minute: number): ServiceHealth {
+  const recent = Array.from({ length: 30 }, (_, i) => serviceAt(s, minute - 29 + i))
+  const last15 = recent.slice(-15)
+  const hour = Array.from({ length: 60 }, (_, i) => serviceAt(s, minute - 59 + i))
+  const errorRate = hour.reduce((a, x) => a + x.errors, 0) / hour.length
+  const p95 = Math.round(last15.reduce((a, x) => a + x.p95, 0) / last15.length)
+  const health: Health = p95 > s.p95 * 2 || errorRate > 0.02 ? 'degraded' : 'ok'
+  return {
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    health,
+    p50: Math.round(last15.reduce((a, x) => a + x.p50, 0) / last15.length),
+    p95,
+    errorRate,
+    requestsLastHour: Math.round(s.perHour * (0.9 + rng(hash(`${s.id}:${Math.floor(minute / 10)}`))() * 0.2)),
+    p95ByMinute: recent.map((x) => x.p95),
+    ...(health !== 'ok' ? { note: 'Replies are slow to start. Agents still answer; callers hear a longer pause.' } : {}),
+  }
+}
+
+/** Failures in the `minutes` up to `minute`, newest first, at most `max`. */
+function failuresBack(minute: number, minutes: number, max: number): ServiceFailure[] {
+  const out: ServiceFailure[] = []
+  for (let m = minute; m > minute - minutes && out.length < max; m -= 1) {
+    const r = rng(hash(`fail:${m}`))
+    const slow = slowVoice(m)
+    if (r() > (slow ? 0.55 : 0.985)) {
+      const svc = slow && r() < 0.8 ? SERVICES[1] : SERVICES[Math.floor(r() * 3)]
+      const texts = FAILURE_TEXT[svc.id]
+      out.push({ id: `f_${m}`, at: new Date(m * 60_000 + Math.floor(r() * 59_000)).toISOString(), service: svc.name, org: ORG_NAMES[Math.floor(r() * 2)], what: texts[Math.floor(r() * texts.length)] })
+    }
+  }
+  return out
+}
+
+/** The phone lines: time to connect a call, steady apart from noise. */
+function telephony(minute: number): PlatformService {
+  const at = (m: number) => {
+    const r = rng(hash(`tel:${m}`))
+    return { p50: Math.round(140 * (0.9 + r() * 0.2)), p95: Math.round(380 * (0.85 + r() * 0.3)), errors: 0.001 + r() * 0.003 }
+  }
+  const recent = Array.from({ length: 30 }, (_, i) => at(minute - 29 + i))
+  const last15 = recent.slice(-15)
+  const hour = Array.from({ length: 60 }, (_, i) => at(minute - 59 + i))
+  return {
+    id: 'telephony',
+    name: 'Telephony',
+    health: 'ok',
+    errorRate: hour.reduce((a, x) => a + x.errors, 0) / hour.length,
+    p50: Math.round(last15.reduce((a, x) => a + x.p50, 0) / last15.length),
+    p95: Math.round(last15.reduce((a, x) => a + x.p95, 0) / last15.length),
+    p95ByMinute: recent.map((x) => x.p95),
+  }
+}
+
+// ---------------------------------------------------------------- overview
+
+/** Calls in each IST hour, relative: quiet at night, busiest late morning. */
+const HOUR_WEIGHT = [0.2, 0.1, 0.1, 0.1, 0.2, 0.4, 1, 2, 4, 6, 7, 7, 6, 5, 5, 5.5, 6, 5, 4, 3, 2, 1.2, 0.6, 0.3]
+const OUTCOMES: CallOutcome[] = ['resolved', 'booked', 'callback', 'handed_over', 'emergency', 'dropped']
+const OUTCOME_WEIGHT = [38, 27, 9, 12, 1, 5]
+
+function pick<T>(r: () => number, xs: T[], weights: number[]): T {
+  let x = r() * weights.reduce((a, b) => a + b, 0)
+  for (let i = 0; i < xs.length; i++) {
+    x -= weights[i]
+    if (x < 0) return xs[i]
+  }
+  return xs[xs.length - 1]
+}
+
+const hourOf = (ms: number) => Math.floor(((ms + IST) % DAY) / 36e5)
+const clock = (h: number) => `${h % 12 || 12} ${h % 24 < 12 ? 'am' : 'pm'}`
+
+interface CallRec {
+  at: number
+  day: number
+  hour: number
+  agentId: string
+  outcome: OverviewOutcome
+  sec: number
+}
+
+/** A technical failure on top of how the call went. The booking system
+ * behind the appointments line fails more often, so one agent shows errors. */
+const failedCall = (id: string, agentId: string) => rng(hash(`${id}:fail`))() < (agentId === 'agt_appointments' ? 0.08 : 0.02)
+
+/** Every call one organisation took from IST day `from` until now. */
+function orgCalls(slug: string, from: number): CallRec[] {
+  const today = istDay(Date.now())
+  const out: CallRec[] = []
+  if (slug === 'arogya-demo') {
+    for (const c of callLog(logCtx(slug), today - from + 1)) {
+      const at = Date.parse(c.startedAt)
+      const day = istDay(at)
+      if (day < from) continue
+      out.push({ at, day, hour: hourOf(at), agentId: c.agentId, outcome: failedCall(c.id, c.agentId) ? 'failed' : c.outcome, sec: c.durationSec })
+    }
+  } else if (slug === 'marutham-demo') {
+    // As many a day as the usage page counts, until its suspension.
+    const stop = today - (ORGS[slug].suspendedDays ?? 0)
+    for (let d = from; d < stop; d++) {
+      const r = rng(hash(`${slug}:${d}`))
+      const calls = Math.round(38 + r() * 30)
+      const sec = Math.round(110 + r() * 40)
+      for (let i = 0; i < calls; i++) {
+        const q = rng(hash(`${slug}:${d}:${i}`))
+        const hour = pick(q, [...HOUR_WEIGHT.keys()], HOUR_WEIGHT)
+        const agentId = q() < 0.6 ? 'agt_reception' : 'agt_appointments'
+        const outcome = pick(q, OUTCOMES, OUTCOME_WEIGHT)
+        out.push({ at: d * DAY - IST + hour * 36e5 + Math.floor(q() * 36e5), day: d, hour, agentId, outcome: failedCall(`${slug}:${d}:${i}`, agentId) ? 'failed' : outcome, sec })
+      }
+    }
+  }
+  return out
+}
+
+/** Typical and slowest-1-in-20 reply for some calls: steady, a little noise. */
+function reply(key: string, base: number) {
+  const r = rng(hash(key))
+  const p50 = Math.round(base * (0.92 + r() * 0.16))
+  return { p50, p95: Math.round(p50 * (1.7 + r() * 0.3)) }
+}
+
+const ok = (c: CallRec) => c.outcome !== 'failed' && c.outcome !== 'dropped'
+const rate = (part: number, all: number) => (all ? part / all : null)
+
+/** Builder drafts the console seeds for organisations with agents (demoClient's seedDrafts). */
+const DRAFT = { id: 'draft_billing', name: 'Billing and insurance', useCase: 'Billing and insurance', startedDaysAgo: 2, updatedHoursAgo: 12 }
 
 export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}): OpsDataClient {
   const wait = makeWait(latency)
@@ -350,44 +508,263 @@ export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}
       staff()
       const now = Date.now()
       const minute = Math.floor(now / 60_000)
-      const services: ServiceHealth[] = SERVICES.map((s) => {
-        const recent = Array.from({ length: 30 }, (_, i) => serviceAt(s, minute - 29 + i))
-        const last15 = recent.slice(-15)
-        const hour = Array.from({ length: 60 }, (_, i) => serviceAt(s, minute - 59 + i))
-        const errorRate = hour.reduce((a, x) => a + x.errors, 0) / hour.length
-        const p95 = Math.round(last15.reduce((a, x) => a + x.p95, 0) / last15.length)
-        const health: Health = p95 > s.p95 * 2 || errorRate > 0.02 ? 'degraded' : 'ok'
-        return {
-          id: s.id,
-          name: s.name,
-          role: s.role,
-          health,
-          p50: Math.round(last15.reduce((a, x) => a + x.p50, 0) / last15.length),
-          p95,
-          errorRate,
-          requestsLastHour: Math.round(s.perHour * (0.9 + rng(hash(`${s.id}:${Math.floor(minute / 10)}`))() * 0.2)),
-          p95ByMinute: recent.map((x) => x.p95),
-          ...(health !== 'ok' ? { note: 'Replies are slow to start. Agents still answer; callers hear a longer pause.' } : {}),
-        }
-      })
+      const services = SERVICES.map((s) => serviceHealth(s, minute))
       const qr = rng(hash(`queue:${Math.floor(minute / 2)}`))
       const waiting = Math.floor(qr() * 6)
-      const failures: ServiceFailure[] = []
-      for (let m = minute; m > minute - 24 * 60 && failures.length < 12; m -= 1) {
-        const r = rng(hash(`fail:${m}`))
-        const slow = slowVoice(m)
-        if (r() > (slow ? 0.55 : 0.985)) {
-          const svc = slow && r() < 0.8 ? SERVICES[1] : SERVICES[Math.floor(r() * 3)]
-          const texts = FAILURE_TEXT[svc.id]
-          failures.push({ id: `f_${m}`, at: new Date(m * 60_000 + Math.floor(r() * 59_000)).toISOString(), service: svc.name, org: ORG_NAMES[Math.floor(r() * 2)], what: texts[Math.floor(r() * texts.length)] })
-        }
-      }
+      const failures = failuresBack(minute, 24 * 60, 12)
       return copy({
         checkedAt: new Date(now).toISOString(),
         services,
         queue: { health: waiting > 4 ? 'degraded' : 'ok', waiting, oldestWaitSec: waiting ? Math.round(20 + qr() * 160) : 0, processedLastHour: Math.round(30 + qr() * 25), failedLastHour: Math.floor(qr() * 2) },
         failures,
       })
+    },
+
+    async getOverview(days: OverviewDays) {
+      await wait()
+      staff()
+      const now = Date.now()
+      const today = istDay(now)
+      const hourNow = hourOf(now)
+      const counted = Object.entries(ORGS).filter(([, o]) => o.status === 'active' || o.status === 'suspended')
+      // One read of each organisation's calls covers the period, the one before, and the last 30 days.
+      const from = today - Math.max(days * 2, 30) + 1
+      const all = new Map(counted.map(([slug]) => [slug, orgCalls(slug, from)]))
+      const flat = [...all.values()].flat()
+
+      const start = today - days + 1
+      const inPeriod = (c: CallRec) => c.day >= start
+      // Today: up to this hour, against yesterday up to the same time.
+      const inPrevious = (c: CallRec) => (days === 1 ? c.day === today - 1 && c.at <= now - DAY : c.day >= start - days && c.day < start)
+
+      const buckets: OverviewBucket[] =
+        days === 1
+          ? Array.from({ length: hourNow + 1 }, (_, h) => ({ label: clock(h), name: `${clock(h)} to ${clock(h + 1)}` }))
+          : Array.from({ length: days }, (_, i) => {
+              const date = new Date(`${isoDay(start + i)}T12:00:00`)
+              return { label: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), name: date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }) }
+            })
+      const bucketOf = (c: CallRec) => (days === 1 ? c.hour : c.day - start)
+      const succeeded = new Array<number>(buckets.length).fill(0)
+      const failed = new Array<number>(buckets.length).fill(0)
+      const outcomes: Record<OverviewOutcome, number> = { resolved: 0, booked: 0, callback: 0, handed_over: 0, emergency: 0, dropped: 0, failed: 0 }
+      const period = flat.filter(inPeriod)
+      for (const c of period) {
+        const b = bucketOf(c)
+        if (b < 0 || b >= buckets.length) continue
+        if (ok(c)) succeeded[b]++
+        else failed[b]++
+        outcomes[c.outcome]++
+      }
+      const replies = buckets.map((_, i) => (succeeded[i] + failed[i] ? reply(`overview:${days}:${i}:${start}`, 900) : null))
+      const weighted = (k: 'p50' | 'p95') => {
+        let sum = 0
+        let n = 0
+        replies.forEach((r, i) => {
+          if (!r) return
+          sum += r[k] * (succeeded[i] + failed[i])
+          n += succeeded[i] + failed[i]
+        })
+        return n ? Math.round(sum / n) : null
+      }
+      const previous = flat.filter(inPrevious)
+
+      const todayCalls = flat.filter((c) => c.day === today)
+      const byHour = new Array<number>(hourNow + 1).fill(0)
+      for (const c of todayCalls) if (c.hour <= hourNow) byHour[c.hour]++
+
+      // Agents, judged for health on the last 7 days whatever the period.
+      const minute = Math.floor(now / 60_000)
+      const voiceSlow = slowVoice(minute)
+      const agents: OverviewAgent[] = counted.flatMap(([slug, o]) => {
+        const seeded = seedAgents(slug)
+        if (seeded.length === 0) return []
+        const calls = all.get(slug)!
+        const rows: OverviewAgent[] = seeded.map((a) => {
+          const mine = calls.filter((c) => c.agentId === a.id)
+          const p = mine.filter(inPeriod)
+          const week = mine.filter((c) => c.day > today - 7)
+          const weekFailed = week.filter((c) => c.outcome === 'failed').length
+          const r = p.length ? reply(`${slug}:${a.id}:reply`, 880) : null
+          let health: AgentHealth = 'ok'
+          let issue: string | undefined
+          if (week.length >= 20 && weekFailed / week.length > 0.05) {
+            health = 'errors'
+            issue = `${Math.round((weekFailed / week.length) * 100)}% of calls in the last 7 days failed: the booking system didn’t answer, so callers were offered a callback.`
+          } else if (voiceSlow && a.status === 'live' && o.status === 'active' && a.id === 'agt_reception') {
+            health = 'degraded'
+            issue = 'Its slowest replies are over twice its usual while the voice service is slow.'
+          }
+          return {
+            orgSlug: slug,
+            orgName: o.name,
+            id: a.id,
+            name: a.name,
+            status: a.status,
+            orgSuspended: o.status === 'suspended',
+            version: a.version,
+            updatedAt: a.updatedAt,
+            calls: p.length,
+            successRate: rate(p.filter(ok).length, p.length),
+            handoffRate: rate(p.filter((c) => c.outcome === 'handed_over' || c.outcome === 'emergency').length, p.length),
+            replyP50Ms: r?.p50 ?? null,
+            replyP95Ms: r ? (health === 'degraded' ? r.p95 * 2 + 300 : r.p95) : null,
+            errorRate: rate(p.filter((c) => c.outcome === 'failed').length, p.length),
+            health,
+            ...(issue ? { issue } : {}),
+          }
+        })
+        rows.push({
+          orgSlug: slug,
+          orgName: o.name,
+          id: DRAFT.id,
+          name: DRAFT.name,
+          status: 'draft',
+          orgSuspended: o.status === 'suspended',
+          version: null,
+          updatedAt: new Date(now - DRAFT.updatedHoursAgo * 36e5).toISOString(),
+          calls: 0,
+          successRate: null,
+          handoffRate: null,
+          replyP50Ms: null,
+          replyP95Ms: null,
+          errorRate: null,
+          health: 'ok',
+        })
+        return rows
+      })
+
+      const orgs = counted
+        .map(([slug, o]) => {
+          const p = all.get(slug)!.filter(inPeriod)
+          return {
+            slug,
+            name: o.name,
+            status: o.status,
+            calls: p.length,
+            minutes: Math.round(p.reduce((a, c) => a + c.sec, 0) / 60),
+            successRate: rate(p.filter(ok).length, p.length),
+            handoffRate: rate(p.filter((c) => c.outcome === 'handed_over' || c.outcome === 'emergency').length, p.length),
+          }
+        })
+        .sort((a, b) => b.calls - a.calls)
+
+      // Organisations that need someone at bitNtech to look.
+      const attention: OrgAttention[] = []
+      for (const [slug, o] of counted) {
+        for (const a of agents) if (a.orgSlug === slug && a.health === 'errors') attention.push({ slug, name: o.name, tone: 'danger', reason: `${a.name}: ${a.issue}` })
+        if (o.status === 'suspended') attention.push({ slug, name: o.name, tone: 'warn', reason: `Suspended ${o.suspendedDays} days ago. ${o.reason ?? ''}`.trim() })
+        const failedJobs = jobsOf(slug).filter((j) => j.status === 'failed').length
+        if (failedJobs) attention.push({ slug, name: o.name, tone: 'warn', reason: `${failedJobs} upload${failedJobs === 1 ? '' : 's'} couldn’t be processed.` })
+        if (o.status === 'active') {
+          const plan = currentPlans().find((x) => x.id === seedBilling(slug).plan)
+          const minutes30 = all.get(slug)!.filter((c) => c.day > today - 30).reduce((a, c) => a + c.sec, 0) / 60
+          const share = plan ? minutes30 / plan.minutes : 0
+          if (share >= 0.8) attention.push({ slug, name: o.name, tone: share >= 1 ? 'danger' : 'warn', reason: `Used ${Math.round(share * 100)}% of the ${plan!.name} plan’s minutes in the last 30 days.` })
+        }
+      }
+      attention.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === 'danger' ? -1 : 1))
+
+      // What happened: agents built and published, and admin decisions.
+      const activity: OverviewActivity[] = []
+      for (const [slug, o] of counted) {
+        const seeded = seedAgents(slug)
+        if (seeded.length === 0) continue
+        const calls = seedCalls(slug)
+        for (const a of seeded) {
+          for (const v of seedDetail(slug, a, calls)?.versions ?? []) {
+            activity.push({ id: `pub_${slug}_${a.id}_${v.version}`, at: v.publishedAt, kind: 'agent_published', who: v.publishedBy, what: `Published ${a.name} v${v.version} for ${o.name}${v.note ? `: ${v.note}` : ''}`, orgSlug: slug })
+          }
+        }
+        activity.push({ id: `new_${slug}_${DRAFT.id}`, at: new Date(now - DRAFT.startedDaysAgo * DAY).toISOString(), kind: 'agent_created', who: 'Vikram S (bitNtech)', what: `Started a new agent, ${DRAFT.name}, for ${o.name}`, orgSlug: slug })
+      }
+      if (!viewer || viewer.platformRole === 'master_admin') {
+        for (const [slug, o] of Object.entries(ORGS)) {
+          for (const h of history(slug)) {
+            if (h.status === 'active') activity.push({ id: `adm_${slug}_ok`, at: h.at, kind: 'admin', who: h.by, what: `Approved ${o.name}’s sign-up`, orgSlug: slug })
+            if (h.status === 'suspended') activity.push({ id: `adm_${slug}_susp`, at: h.at, kind: 'admin', who: h.by, what: `Suspended ${o.name}${h.reason ? `: “${h.reason}”` : ''}`, orgSlug: slug })
+          }
+        }
+        const p = platform()
+        if (p.updatedBy) activity.push({ id: 'adm_platform', at: p.updatedAt, kind: 'admin', who: p.updatedBy, what: 'Changed the platform settings (models, voices or plans)' })
+      }
+      activity.sort((a, b) => b.at.localeCompare(a.at))
+
+      const overview: PlatformOverview = {
+        days,
+        generatedAt: new Date(now).toISOString(),
+        buckets,
+        succeeded,
+        failed,
+        replyP50ByBucket: replies.map((r) => r?.p50 ?? null),
+        replyP95ByBucket: replies.map((r) => r?.p95 ?? null),
+        totals: {
+          calls: period.length,
+          succeeded: period.filter(ok).length,
+          minutes: Math.round(period.reduce((a, c) => a + c.sec, 0) / 60),
+          replyP50Ms: weighted('p50'),
+          replyP95Ms: weighted('p95'),
+        },
+        previous: { calls: previous.length, succeeded: previous.filter(ok).length, replyP95Ms: previous.length ? reply(`overview-prev:${days}:${start}`, 900).p95 : null },
+        outcomes,
+        today: { calls: todayCalls.length, byHour, yesterdaySoFar: flat.filter((c) => c.day === today - 1 && c.at <= now - DAY).length },
+        orgs,
+        agents,
+        attention,
+        activity: activity.slice(0, 40),
+      }
+      return copy(overview)
+    },
+
+    async getLiveOps() {
+      await wait()
+      staff()
+      const now = Date.now()
+      const minute = Math.floor(now / 60_000)
+      const slugOf = (name: string) => Object.entries(ORGS).find(([, o]) => o.name === name)?.[0] ?? null
+      const live = Object.entries(ORGS)
+        .filter(([, o]) => o.status === 'active')
+        .flatMap(([slug, o]) =>
+          liveCalls(slug, {}, new Set(['agt_reports'])).map((c) => ({ id: c.id, orgSlug: slug, orgName: o.name, agentName: c.agentName, startedAt: c.startedAt, intent: c.intent, flagged: c.flagged, takenBy: c.takenBy })),
+        )
+      const handoffs = Object.entries(ORGS)
+        .filter(([, o]) => o.status === 'active')
+        .flatMap(([slug, o]) =>
+          seedHandoffs(slug)
+            .filter((h) => h.status === 'waiting')
+            .map((h) => ({ id: h.id, orgSlug: slug, orgName: o.name, agentName: h.agentName, reason: h.reason, waitingSince: h.waitingSince, emergency: h.emergency })),
+        )
+        .sort((a, b) => Number(b.emergency) - Number(a.emergency) || a.waitingSince.localeCompare(b.waitingSince))
+      const failures: LiveOpsFailure[] = failuresBack(minute, 120, 20).map((f) => ({ ...f, orgSlug: slugOf(f.org) }))
+      const services: PlatformService[] = [
+        ...SERVICES.map((s) => {
+          const h = serviceHealth(s, minute)
+          return { id: h.id, name: h.name, health: h.health, errorRate: h.errorRate, p50: h.p50, p95: h.p95, p95ByMinute: h.p95ByMinute, ...(h.note ? { note: h.note } : {}) }
+        }),
+        telephony(minute),
+      ]
+      const incidents: Incident[] = []
+      if (slowVoice(minute)) {
+        const began = minute - ((minute % 180) - 100)
+        incidents.push({
+          id: `inc_voice_${began}`,
+          title: 'Voice replies are slow to start',
+          service: 'voice',
+          startedAt: new Date(began * 60_000).toISOString(),
+          status: minute - began < 10 ? 'investigating' : 'monitoring',
+          update: minute - began < 10 ? 'The voice provider is looking into it. Calls still connect; callers hear a longer pause.' : 'The provider has moved traffic to another region. Watching replies come back to normal.',
+        })
+      }
+      const alerts: PlatformAlert[] = []
+      for (const h of handoffs.filter((x) => x.emergency))
+        alerts.push({ id: `al_${h.id}`, severity: 'critical', title: 'An emergency call is waiting for a person', detail: `${h.orgName}, ${h.agentName}: ${h.reason}`, at: h.waitingSince, href: `/ops/orgs/${h.orgSlug}` })
+      for (const s of services.filter((x) => x.health !== 'ok'))
+        alerts.push({ id: `al_${s.id}`, severity: s.health === 'down' ? 'critical' : 'warning', title: `${s.name} is ${s.health === 'down' ? 'down' : 'slow'}`, detail: s.note ?? 'Replies are slower than usual.', at: new Date(now).toISOString(), href: '/ops/status' })
+      const lastHour = failures.filter((f) => Date.parse(f.at) > now - 36e5).length
+      if (lastHour >= 5) alerts.push({ id: 'al_failures', severity: 'warning', title: `${lastHour} call failures in the last hour`, detail: 'More than usual. See which service and organisation below.', at: new Date(now).toISOString(), href: '/ops/status' })
+      alerts.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'critical' ? -1 : 1))
+      const out: LiveOps = { checkedAt: new Date(now).toISOString(), calls: live, handoffs, failures, services, incidents, alerts }
+      return copy(out)
     },
   }
 }

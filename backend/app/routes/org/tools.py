@@ -8,7 +8,7 @@ call, and the secrets those tools send (Phase 5).
   on or off, deleting, testing). Built-in tools can be switched off, not
   deleted.
 - Secrets are set and deleted with `library.secrets`. They are encrypted
-  at rest (app/secrets.py), and every change is in the activity log.
+  at rest (app/data/vault.py), and every change is in the activity log.
 - A tool or secret can't be deleted while something uses it.
 """
 from __future__ import annotations
@@ -19,15 +19,15 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends
 from pydantic import Field
 
-from ...catalogue import BUILTIN_TOOLS
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member, org_permission
+from ...auth.accounts import iso
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import CredentialDoc, ToolDoc, Tx, new_id, now
+from ...domain.catalogue import BUILTIN_TOOLS
+from ...domain.usage import tool_users, usage_map
+from ...integrations.toolhttp import run_test
 from ...models import Camel
-from ...orgs import OrgContext, org_member, org_permission
-from ...ratelimit import limit_caller
-from ...store import CredentialDoc, ToolDoc, Tx, new_id, now
-from ...toolhttp import run_test
-from ...usage import tool_users, usage_map
-from ...accounts import iso
 
 router = APIRouter(prefix="/api/orgs/{slug}", tags=["org"])
 WRITE_LIMIT = Depends(limit_caller("org-tools", 30))
@@ -219,7 +219,7 @@ def delete_tool(tool_id: str, ctx: OrgContext = Depends(org_member)):
 
 @router.post("/tools/{tool_id}/test", dependencies=[Depends(limit_caller("org-tool-test", 5))])
 def test_tool(tool_id: str, body: ToolTestIn, ctx: OrgContext = Depends(org_member)):
-    """Runs the tool once with sample inputs, from AICA's servers (app/toolhttp.py)."""
+    """Runs the tool once with sample inputs, from AICA's servers (app/integrations/toolhttp.py)."""
     _master(ctx, "test tools")
     t = next((x for x in all_tools(ctx.svc.store, ctx.slug) if x.id == tool_id), None)
     if not t:

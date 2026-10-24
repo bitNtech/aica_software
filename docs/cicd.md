@@ -113,7 +113,7 @@ Deploy jobs **skip** until both project IDs are set, so CI works on its own befo
 
 ### 3. Firebase and Google
 
-- Paste `backend/firestore.rules` into the Firebase project, create the indexes in `backend/firestore.indexes.json`, and seed master admins with `app.scripts.seed_master`.
+- Paste `backend/firestore/firestore.rules` into the Firebase project, create the indexes in `backend/firestore/indexes.json`, and seed master admins with `app.scripts.seed_master`.
 - **Google sign-in** needs the redirect URI registered on the OAuth client: `https://api.aica.bitntech.in/api/auth/google/callback`. Set `API_URL` explicitly on the backend so this stays stable. Locally it's `http://localhost:5173/api/auth/google/callback`, through the Vite proxy.
 
 ## Day to day
@@ -137,6 +137,6 @@ To try the split locally: run the API on `:8000` with `APP_URL=http://localhost:
 ## Known limitations
 
 - **No staging:** a PR is checked by CI only, never deployed, so the first time a change runs on Vercel is in production. Test locally (above) before merging anything that touches deployment, cookies or environment variables.
-- **Rate limiting is in-process** (`app/ratelimit.py`), so it doesn't hold across serverless instances. The per-email login lockout is in Firestore and still works. A shared limiter, such as Redis or Upstash, needs its own plan.
+- **Rate limiting is in-process** (`app/core/ratelimit.py`), so it doesn't hold across serverless instances. The per-email login lockout is in Firestore and still works. A shared limiter, such as Redis or Upstash, needs its own plan.
 - **Cold starts:** each new backend instance initialises firebase-admin and checks that the Firestore database exists.
 - **Actions are pinned to version tags, not commit hashes.** Dependabot keeps them current. The gitleaks binary is pinned by version and SHA-256.

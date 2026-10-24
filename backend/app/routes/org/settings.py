@@ -14,12 +14,12 @@ from datetime import date
 
 from fastapi import APIRouter, Depends
 
-from ...accounts import iso
-from ...errors import bad_input
+from ...access.orgs import OrgContext, org_permission
+from ...auth.accounts import iso
+from ...core.errors import bad_input
+from ...core.ratelimit import limit_caller
+from ...data.store import OrgDoc, Tx, now
 from ...models import ClosedDayOut, DayHoursOut, OrgSettingsIn, OrgSettingsOut
-from ...orgs import OrgContext, org_permission
-from ...ratelimit import limit_caller
-from ...store import OrgDoc, Tx, now
 
 router = APIRouter(prefix="/api/orgs/{slug}/settings", tags=["org"])
 

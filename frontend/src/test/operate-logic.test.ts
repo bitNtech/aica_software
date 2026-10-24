@@ -111,7 +111,12 @@ describe('demo client: who sees and does what', () => {
     await expect(desk.addCallNote(ORG, 'call_1_999', 'Hi')).rejects.toThrow(/doesn't exist/i)
     const viewer = client({ id: 'u_viewer', name: 'Arun V', role: 'viewer' })
     await expect(viewer.updateAppointment(ORG, 'apt_3', { status: 'confirmed' })).rejects.toThrow(/permission to/i)
-    await expect(viewer.listLiveCalls(ORG)).rejects.toThrow(/permission to/i)
+    // A viewer can watch live calls, but not act on them.
+    await expect(viewer.listLiveCalls(ORG)).resolves.toBeInstanceOf(Array)
+    await expect(viewer.takeOverCall(ORG, 'live_handoff_1')).rejects.toThrow(/permission to/i)
+    // Anyone who can see calls may see who is waiting; taking one is still refused.
+    expect((await viewer.listHandoffs(ORG)).length).toBeGreaterThan(0)
+    await expect(viewer.takeHandoff(ORG, 'ho_2')).rejects.toThrow(/permission to/i)
     const a = client(admin)
     await expect(a.updateAppointment(ORG, 'apt_3', { date: '2026-02-31' })).rejects.toThrow(/real date/i)
     await a.handoffToCallback(ORG, 'ho_2')

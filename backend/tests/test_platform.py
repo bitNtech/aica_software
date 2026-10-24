@@ -7,18 +7,18 @@ import logging
 
 from fastapi.testclient import TestClient
 
-from app import access
-from app.logs import JsonFormatter
+from app.access import permissions as access
+from app.core.logs import JsonFormatter
 from app.main import create_app
 from app.scripts.backfill_members import backfill
-from app.store import Membership, UserDoc
+from app.data.store import Membership, UserDoc
 
 from .fakes import make_services
 from .orgkit import PW, SLUG, api, env, login, make_org, post, seed, token_of  # noqa: F401
 
 
 def _settings(**kw):
-    from app.settings import Settings
+    from app.core.config import Settings
 
     return Settings(_env_file=None, app_url="https://aica.example", firebase_web_api_key="x", **kw)
 
@@ -90,7 +90,7 @@ def test_the_limiter_fails_open(env, caplog):
 def test_client_ip_is_trusted_from_vercel_only():
     from types import SimpleNamespace
 
-    from app.ratelimit import client_ip
+    from app.core.ratelimit import client_ip
 
     req = SimpleNamespace(headers={"x-real-ip": "203.0.113.9"}, client=SimpleNamespace(host="10.0.0.1"))
     local = SimpleNamespace(settings=_settings())
@@ -103,7 +103,7 @@ def test_client_ip_is_trusted_from_vercel_only():
 
 
 def test_request_logs_carry_ids_and_no_personal_data(caplog):
-    from app.logs import configure
+    from app.core.logs import configure
 
     configure("json")
     svc, fb, store, mailer = make_services()
@@ -142,7 +142,7 @@ def test_vercel_defaults_to_json_logs():
 
 def test_httpx_request_urls_are_not_logged():
     """The Identity Toolkit's URLs carry the web API key."""
-    from app.logs import configure
+    from app.core.logs import configure
 
     configure("text")
     assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)

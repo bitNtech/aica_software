@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 // @ts-ignore -- Vercel builds frontend/ on its own, without backend/, and the
 // build typechecks tests too. Tests run (CI, locally) with the whole repo.
-import shared from '../../../backend/app/catalogue.json'
+import shared from '../../../backend/app/domain/catalogue.json'
 import { defaultAnalysis, defaultPipeline } from '../console/demo/agentConfig'
 import { seedTools } from '../console/demo/library'
 import { defaultGuardrails, defaultSpeech } from '../console/demo/specs'
 import { AGENT_TYPES, defaultBehaviour, VOICES } from '../console/demo/templates'
 
 /**
- * The backend starts new agents from backend/app/catalogue.json; the demo
+ * The backend starts new agents from backend/app/domain/catalogue.json; the demo
  * from the functions here. They must say the same, or an agent built on the
  * server differs from what the console shows and tests.
  */

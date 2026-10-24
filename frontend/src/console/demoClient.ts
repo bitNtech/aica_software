@@ -11,6 +11,7 @@ import type {
   Appointment,
   Billing,
   Callback,
+  CallSummary,
   CallNote,
   ChangeRequest,
   ConsoleClient,
@@ -38,7 +39,7 @@ import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
 import { passagesOf, search, seedCredentials } from './demo/passages'
-import { callLog, callRecord, DEPARTMENTS, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
+import { callLog, callRecord, DEPARTMENTS, handoffCalls, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
 import { defaultPipeline } from './demo/agentConfig'
 import { seedChangeRequests } from './demo/requests'
 import { seedDoctorChanges, seedFlags, seedNotices, type LineMode } from './demo/desk'
@@ -426,6 +427,30 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     const d = org(o)
     return { orgSlug: o, paused: new Set(d.agents.filter((a) => a.status === 'paused').map((a) => a.id)), pauses: d.pauses }
   }
+  /** Ties some sample callbacks and appointments to sample calls, once per
+   * organisation, so "where it came from" and the booking call show
+   * something: the seeds can't, as call ids depend on the date. Only the
+   * link is set; the callers' own names and numbers stay as seeded. */
+  const linked = new Set<string>()
+  const linkSamples = (o: string) => {
+    if (linked.has(o)) return
+    linked.add(o)
+    const d = org(o)
+    const calls = callLog(logContext(o), 3)
+    const take = (test: (c: CallSummary) => boolean) => {
+      const i = calls.findIndex(test)
+      return i < 0 ? undefined : calls.splice(i, 1)[0]
+    }
+    // Anand's insurance question: an unnamed billing call from before he asked.
+    const anand = d.callbacks.find((c) => c.id === 'cb_5' && !c.callId)
+    const billing = anand && take((c) => /bill|insurance/i.test(c.intent) && !c.callerName && Date.parse(c.startedAt) < Date.parse(anand.requestedAt))
+    if (anand && billing) anand.callId = billing.id
+    // The first few bookings the agents made link to booking calls.
+    for (const a of d.appointments.filter((x) => x.bookedBy === 'agent' && !x.callId).slice(0, 4)) {
+      const call = take((c) => c.outcome === 'booked')
+      if (call) a.callId = call.id
+    }
+  }
   /** Writes to the organisation's activity log, as the server would. */
   const log = (o: string, area: ActivityEntry['area'], text: string, detail?: string) => {
     org(o).activity.unshift({
@@ -537,9 +562,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     findAgent(o, agentId)
     return (org(o).scenarios[agentId] ??= seedScenarios(agentId))
   }
-  const findLive = (o: string, id: string): LiveCall => {
+  /** Calls in progress: the lines' own, and the ones behind the handovers. */
+  const liveOf = (o: string): LiveCall[] => {
     const d = org(o)
-    const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
+    const off = liveOff(o)
+    return [...liveCalls(o, d.liveTaken, off, d.live), ...handoffCalls(d.handoffs, d.liveTaken, off, d.live)]
+  }
+  const findLive = (o: string, id: string): LiveCall => {
+    const call = liveOf(o).find((c) => c.id === id)
     if (!call) throw new AuthError('invalid_input', 'That call has ended.')
     return call
   }
@@ -1319,16 +1349,16 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listLiveCalls(o) {
       await wait()
-      allowPerm(o, 'calls.take', 'see live calls')
-      const d = org(o)
-      return copy(liveCalls(o, d.liveTaken, liveOff(o), d.live))
+      // Anyone who may see calls can watch; taking and guiding need calls.take.
+      allowPerm(o, ['calls.take', 'calls.viewAll'], 'see live calls')
+      return copy(liveOf(o))
     },
 
     async takeOverCall(o, id) {
       await wait()
       allowPerm(o, 'calls.take', 'take calls')
       const d = org(o)
-      const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
+      const call = liveOf(o).find((c) => c.id === id)
       if (!call) throw new AuthError('invalid_input', 'That call has ended.')
       if (call.takenBy && call.takenBy !== by()) throw new AuthError('invalid_input', `${call.takenBy} has already taken this call.`)
       d.liveTaken[id] = by()
@@ -1338,8 +1368,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listHandoffs(o) {
       await wait()
-      allowPerm(o, 'calls.take', 'see the handoff queue')
-      return copy([...org(o).handoffs].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince)))
+      allowPerm(o, ['calls.viewAll', 'calls.take'], 'see who is waiting for a person')
+      // As the server does: a personal value is blank for someone without calls.personal.
+      const personal = !viewer || has(o, 'calls.personal')
+      return copy(
+        [...org(o).handoffs]
+          .sort((a, b) => a.waitingSince.localeCompare(b.waitingSince))
+          .map((h) => (personal ? h : { ...h, details: h.details.map((x) => (x.personal ? { ...x, value: '' } : x)) })),
+      )
     },
 
     async takeHandoff(o, id) {
@@ -1351,6 +1387,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       h.status = 'taken'
       h.takenBy = by()
       h.takenAt = new Date().toISOString()
+      // Its call goes to them too.
+      org(o).liveTaken[h.callId] = by()
       keep()
       return copy(h)
     },
@@ -1387,6 +1425,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listCallbacks(o) {
       await wait()
+      linkSamples(o)
       const d = org(o)
       // Without "Assign callbacks": theirs, and ones nobody has yet.
       const own = !has(o, 'callbacks.assign')
@@ -1405,7 +1444,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const member = patch.assignedTo ? d.members.find((m) => m.id === patch.assignedTo && m.status === 'active') : null
       if (patch.assignedTo && !member) throw notFound('team member')
       if (member && member.role === 'viewer') throw new AuthError('invalid_input', `${member.name} is a viewer and can’t make calls for the team.`)
-      if (own && patch.assignedTo !== undefined && patch.assignedTo !== viewer?.id)
+      // They can take one for themselves, or give it back (null), as the API allows.
+      if (own && patch.assignedTo !== undefined && patch.assignedTo !== null && patch.assignedTo !== viewer?.id)
         throw new AuthError('forbidden', 'You can take callbacks for yourself, not assign them to others.')
       if (patch.note !== undefined && !patch.note.trim() && !patch.attempt) throw new AuthError('invalid_input', 'Write the note first.')
 
@@ -1424,6 +1464,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listAppointments(o, from, to) {
       await wait()
+      linkSamples(o)
       return copy(org(o).appointments.filter((a) => a.date >= from && a.date <= to).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
     },
 
@@ -1699,6 +1740,15 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       allowPerm(o, ['agents.configure', 'library.knowledge'], 'resolve flagged answers')
       const f = org(o).flags.find((x) => x.id === id)
       if (!f) throw notFound('flagged answer')
+      if (resolution.status === 'open') {
+        if (f.status === 'open') throw new AuthError('invalid_input', 'This is already open.')
+        f.status = 'open'
+        delete f.resolution
+        log(o, 'agents', 'Reopened a flagged answer')
+        const back = desk(o)
+        keep()
+        return back
+      }
       if (f.status !== 'open') throw new AuthError('invalid_input', `${f.resolution?.by ?? 'Someone'} has already dealt with this.`)
       const note = resolution.note.trim()
       if (note.length > 300) throw new AuthError('invalid_input', 'Keep the note under 300 characters.')

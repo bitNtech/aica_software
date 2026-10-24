@@ -28,7 +28,6 @@ export type PageKey =
   | 'numbers'
   | 'desk'
   | 'live'
-  | 'handoffs'
   | 'callbacks'
   | 'appointments'
   | 'calls'
@@ -86,7 +85,7 @@ export const PERMISSIONS: Record<Permission, PermissionMeta> = {
   'library.secrets': { label: 'Replace system secrets', description: 'Set the keys your connected systems use. Values are never shown.', group: 'agents', defaults: MANAGERS, grantable: MANAGERS },
   'desk.bot': { label: 'Switch lines to staff', description: 'Send a line’s calls to people instead of the agent, and back.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'desk.notices': { label: 'Post notices', description: 'Today’s notices and doctor changes the agents tell callers about.', group: 'desk', defaults: STAFF, grantable: STAFF },
-  'calls.take': { label: 'Take calls', description: 'Live calls and the handoff queue: listen, guide the agent, take over.', group: 'desk', defaults: STAFF, grantable: STAFF },
+  'calls.take': { label: 'Take calls', description: 'Live calls and callers waiting for a person: guide the agent, hand over, take over.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'callbacks.assign': { label: 'Assign callbacks', description: 'See every callback and give them to anyone. Without it: their own.', group: 'desk', defaults: ['owner', 'admin', 'supervisor'], grantable: STAFF },
   'appointments.manage': { label: 'Manage appointments', description: 'Confirm, change and cancel bookings made on calls.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'calls.viewAll': { label: 'See every call', description: 'The whole call history. Without it: only calls they handled.', group: 'calls', defaults: ['owner', 'admin', 'supervisor', 'viewer'], grantable: EVERYONE },
@@ -155,8 +154,8 @@ const PAGE_RULE: Record<PageKey, (a: Access) => AccessLevel | null> = {
   numbers: (a) => (has(a, 'library.numbers') ? 'edit' : has(a, 'agents.view') && a.role !== 'viewer' ? 'read' : null),
   // Operate
   desk: (a) => (a.platform ? null : has(a, 'desk.bot') || has(a, 'desk.notices') ? 'edit' : null),
-  live: (a) => (has(a, 'calls.take') ? 'edit' : null),
-  handoffs: (a) => (has(a, 'calls.take') ? 'edit' : null),
+  // Everyone who may see calls can watch the queue; taking and guiding need calls.take.
+  live: (a) => (has(a, 'calls.take') ? 'edit' : has(a, 'calls.viewAll') ? 'read' : null),
   callbacks: (a) => (has(a, 'callbacks.assign') ? 'edit' : has(a, 'calls.take') ? 'own' : null),
   appointments: (a) => (has(a, 'appointments.manage') ? 'edit' : has(a, 'calls.viewAll') ? 'read' : null),
   calls: (a) => (has(a, 'calls.viewAll') ? 'read' : has(a, 'calls.take') ? 'own' : null),
@@ -183,7 +182,6 @@ export const PAGE_LABEL: Record<PageKey, string> = {
   numbers: 'Phone numbers',
   desk: 'the Bot desk',
   live: 'Live calls',
-  handoffs: 'the Handoff queue',
   callbacks: 'Callbacks',
   appointments: 'Appointments',
   calls: 'Call history',
@@ -248,6 +246,7 @@ export type ConsoleAction =
   | 'desk.notices'
   | 'desk.resolveFlags'
   | 'call.takeOver'
+  | 'call.seeWaiting'
   | 'call.playRecording'
   | 'call.notes'
   | 'call.personal'
@@ -274,6 +273,8 @@ const ACTION_RULE: Record<ConsoleAction, (a: Access) => boolean> = {
   // A flagged answer is fixed by changing the agent or its knowledge.
   'desk.resolveFlags': (a) => has(a, 'agents.configure') || has(a, 'library.knowledge'),
   'call.takeOver': (a) => has(a, 'calls.take'),
+  // Who is waiting for a person: anyone who can see calls (GET /handoffs).
+  'call.seeWaiting': (a) => has(a, 'calls.take') || has(a, 'calls.viewAll'),
   // Without the permission: only calls they handled; the page checks per call.
   'call.playRecording': (a) => has(a, 'calls.recordings') || has(a, 'calls.take'),
   'call.notes': (a) => a.role !== 'viewer' && (has(a, 'calls.take') || has(a, 'calls.viewAll')),
@@ -311,8 +312,7 @@ export const NAV: NavSection[] = [
     heading: 'Operate',
     items: [
       { page: 'desk', label: 'Bot desk', path: 'desk', description: 'Each line’s agent, today’s notices and doctor changes.' },
-      { page: 'live', label: 'Live calls', path: 'live', description: 'Calls the agents are on now.' },
-      { page: 'handoffs', label: 'Handoff queue', path: 'handoffs', description: 'Callers waiting for a person.' },
+      { page: 'live', label: 'Live calls', path: 'live', description: 'Calls the agents are on now, and callers waiting for a person.' },
       { page: 'callbacks', label: 'Callbacks', path: 'callbacks', description: 'Missed calls and people to call back.' },
       { page: 'appointments', label: 'Appointments', path: 'appointments', description: 'Bookings made on calls, to check.' },
       { page: 'calls', label: 'Call history', path: 'calls', description: 'Every call, with its transcript and what happened.' },

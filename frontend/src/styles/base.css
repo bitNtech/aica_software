@@ -18,8 +18,7 @@ body {
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  font: 400 1rem/1.55 var(--sans);
-  letter-spacing: 0.005em;
+  font: 400 var(--fs-md)/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -52,13 +51,16 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
   position: fixed; top: 0; left: 0; z-index: 1000;
   padding: 0.85rem 1.25rem;
   background: var(--plum); color: #fff;
-  font: 600 0.85rem var(--sans);
+  font: 500 var(--fs-sm) var(--sans);
   text-decoration: none;
-  border-radius: 0 0 8px 0;
+  border-radius: 0 0 var(--r-md) 0;
   transform: translateY(-120%);
   transition: transform 0.18s var(--ease);
 }
 .skip-link:focus-visible { transform: none; outline-offset: -4px; }
+
+/* Figures that change or line up in columns: every digit the same width. */
+.num { font-variant-numeric: tabular-nums; }
 
 /* ---- the site's mono kicker: "AICA / SIGN IN" ---- */
 
@@ -66,9 +68,7 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
   display: inline-flex;
   align-items: center;
   gap: 0.6em;
-  font: 500 0.7rem/1.4 var(--mono);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font: 500 var(--fs-xs)/1.4 var(--sans);
   color: var(--orange-text, var(--orange));
 }
 .label i { font-style: normal; opacity: 0.55; color: currentColor; }
@@ -78,19 +78,19 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 
 .display {
   font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 0.95;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   color: var(--ink);
   text-wrap: balance;
 }
-.display em { font-style: normal; color: var(--orange-text, var(--orange)); }
+.display em { font-style: normal; color: inherit; }
 
 /* ---- links ---- */
 
 .link {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--orange) 70%, transparent);
   text-decoration-thickness: 1.5px;
@@ -99,44 +99,33 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 }
 .link:hover { text-decoration-color: var(--orange); }
 
-/* ---- buttons: bitntech.in's pills ---- */
+/* ---- buttons: compact, flat ---- */
 
 .btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
+  gap: 0.45rem;
   min-height: var(--field-h);
-  padding: 0.85rem 1.6rem;
+  padding: 0 0.9rem;
   border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  font: 700 1rem/1.1 var(--sans);
-  letter-spacing: -0.005em;
+  border-radius: var(--r-md);
+  font: 500 var(--fs-md)/1.1 var(--sans);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   isolation: isolate;
-  transition: transform 0.3s var(--out), border-color 0.25s var(--ease), color 0.25s var(--ease), background-color 0.25s var(--ease), opacity 0.2s var(--ease);
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background-color 0.15s var(--ease), opacity 0.15s var(--ease);
 }
 .btn .arrow { display: inline-block; transition: transform 0.35s var(--out); }
 .btn:hover .arrow { transform: translateX(3px); }
-.btn:active { transform: scale(0.98); }
 .btn[aria-disabled='true'], .btn:disabled { cursor: not-allowed; }
 .btn:disabled:not([aria-busy='true']) { opacity: 0.5; }
 .btn--block { width: 100%; }
 
 .btn--orange { background: var(--orange); color: var(--orange-ink); }
-/* A lighter fill sweeps in from the left on hover. */
-.btn--orange::before {
-  content: '';
-  position: absolute; inset: 0; z-index: -1;
-  background: var(--orange-2);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s var(--out);
-}
-.btn--orange:hover:not(:disabled)::before { transform: scaleX(1); }
+.btn--orange:hover:not(:disabled) { background: var(--orange-2); }
 
 .btn--plum { background: var(--ink); color: var(--bg); }
 .btn--plum:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 88%, var(--orange)); }
@@ -144,10 +133,10 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 .btn--danger { background: var(--danger-ink); color: var(--bg); }
 .btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-ink) 85%, var(--ink)); }
 
-.btn--line { border-color: var(--line-strong); color: var(--ink); background: transparent; }
+.btn--line { border-color: var(--line-strong); color: var(--ink); background: var(--card, transparent); }
 .btn--line:hover:not(:disabled) { border-color: var(--ink); }
 
-.btn--sm { min-height: 42px; padding: 0.6rem 1.15rem; font-size: 0.875rem; }
+.btn--sm { min-height: calc(var(--field-h) - 6px); padding: 0 0.7rem; font-size: var(--fs-sm); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -167,7 +156,7 @@ a, button, label, input { touch-action: manipulation; -webkit-tap-highlight-colo
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--line-strong);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }

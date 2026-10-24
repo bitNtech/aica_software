@@ -4,8 +4,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.sessions import COOKIE
-from app.store import OrgDoc, UserDoc
+from app.auth.sessions import COOKIE
+from app.data.store import OrgDoc, UserDoc
 
 from .fakes import make_services
 
@@ -47,7 +47,7 @@ def seed_master(fb, store, email="support@bitntech.in"):
 def seed_org(fb, store, slug="arogya", status="active", verified=True):
     uid = fb.add(f"owner@{slug}.in", PW, verified=verified)
     store.save_org(OrgDoc(slug=slug, name=slug.title(), city="Coimbatore", type="hospital", languages=["tamil"], status=status, ownerUid=uid))
-    store.save_user(UserDoc(uid=uid, name="Owner", email=f"owner@{slug}.in", memberships=[__import__("app.store", fromlist=["Membership"]).Membership(slug, "owner")]))
+    store.save_user(UserDoc(uid=uid, name="Owner", email=f"owner@{slug}.in", memberships=[__import__("app.data.store", fromlist=["Membership"]).Membership(slug, "owner")]))
     return uid
 
 
