@@ -185,6 +185,15 @@ export interface ConsoleClient {
   updateCallback(orgSlug: string, id: string, patch: CallbackPatch): Promise<Callback>
   listAppointments(orgSlug: string, from: string, to: string): Promise<Appointment[]>
   updateAppointment(orgSlug: string, id: string, patch: AppointmentPatch): Promise<Appointment>
+  /** A booking made by hand (an agent's arrive on their own, from its calls). */
+  createAppointment(orgSlug: string, input: NewAppointment): Promise<Appointment>
+  /** Absent: the console can't read them (an older client). */
+  getBookingSettings?(orgSlug: string): Promise<BookingSettings>
+  updateBookingSettings?(orgSlug: string, input: BookingSettings): Promise<BookingSettings>
+  /** Runs the end-of-day automatic confirmation now. */
+  runAutoConfirm?(orgSlug: string): Promise<AutoConfirmResult>
+  /** Sends a failed callback or message to the patient again. */
+  retryPatientUpdate?(orgSlug: string, appointmentId: string, updateId: string): Promise<Appointment>
   /** Front desk see only calls they handled. */
   listCallLog(orgSlug: string, query: CallQuery): Promise<CallLogPage>
   getCallRecord(orgSlug: string, id: string): Promise<CallRecord>
@@ -225,6 +234,10 @@ export interface ConsoleClient {
   /** Upgrades apply now; downgrades at renewal. `null` cancels a pending change. */
   changePlan(orgSlug: string, planId: PlanId | null): Promise<Billing>
   updateBillingDetails(orgSlug: string, details: BillingDetails): Promise<Billing>
+
+  /** Who gets the organisation's alerts, by email. */
+  getAlertSettings(orgSlug: string): Promise<AlertSettings>
+  updateAlertSettings(orgSlug: string, input: AlertSettingsInput): Promise<AlertSettings>
 
   /** Who is using the console, for "by" fields and what front desk see.
    * A real server knows this from the session. */
@@ -810,7 +823,68 @@ export interface CallbackPatch {
   note?: string
 }
 
-export type AppointmentStatus = 'needs_check' | 'booked' | 'confirmed' | 'cancelled'
+/**
+ * pending: booked, not yet confirmed with the patient. rescheduled: moved to
+ * a new date, time or doctor, and the new slot not yet confirmed. completed
+ * and no_show are recorded after the appointment's time. declined: a
+ * request the hospital turned down (the agent tells the patient why).
+ */
+export type AppointmentStatus = 'pending' | 'confirmed' | 'rescheduled' | 'completed' | 'no_show' | 'cancelled' | 'declined'
+
+/** How it was booked: by an agent on a call, by the front desk on a phone call, or entered by hand. */
+export type BookingSource = 'ai_call' | 'front_desk' | 'manual'
+
+export type AppointmentType = 'new_visit' | 'follow_up' | 'procedure' | 'test'
+
+/** One thing that happened to an appointment, newest first in `history`. */
+export interface AppointmentChange {
+  at: string
+  /** Who, by name: a person, or the agent that booked it. */
+  by: string
+  kind: 'created' | 'confirmed' | 'rescheduled' | 'cancelled' | 'completed' | 'no_show' | 'restored' | 'edited' | 'undone' | 'declined' | 'notified'
+  /** What changed, in words: "Moved from Tue 4 Nov, 10:00 am with Dr. Rao". */
+  text: string
+  /** Why, when one was given (rescheduling and cancelling ask). */
+  reason?: string
+}
+
+/** How soon the patient needs to be seen, as the ranking judged it. */
+export type PriorityLevel = 'urgent' | 'high' | 'normal' | 'routine'
+
+/**
+ * Where a request stands among others for the same doctor and time, set by
+ * the LLM from what the agent gathered on each call. Only requests that
+ * share a time are ranked.
+ */
+export interface AppointmentRank {
+  /** 1 is the patient who most needs the time. */
+  position: number
+  of: number
+  level: PriorityLevel
+  /** The LLM's reasons, in a sentence or two. */
+  reasons: string
+  rankedAt: string
+}
+
+/** How the patient is told: the agent calls back, or a WhatsApp message. */
+export type PatientUpdateChannel = 'callback' | 'whatsapp'
+/** callback: queued → in_progress → done | no_answer | failed. whatsapp: queued → sent → delivered → read | failed. */
+export type PatientUpdateState = 'queued' | 'in_progress' | 'done' | 'no_answer' | 'sent' | 'delivered' | 'read' | 'failed'
+
+/** One message to the patient about their booking, after the hospital decided on it. */
+export interface PatientUpdate {
+  id: string
+  about: 'confirmed' | 'declined' | 'moved'
+  channel: PatientUpdateChannel
+  state: PatientUpdateState
+  /** When it was queued (this attempt). */
+  at: string
+  /** When its state last changed. */
+  updatedAt?: string
+  attempts: number
+  /** Why it failed, or what happens next: "Not on WhatsApp", "Trying again at 7:30 pm". */
+  detail?: string
+}
 
 export interface Appointment {
   id: string
@@ -822,12 +896,32 @@ export interface Appointment {
   date: string
   time: string
   status: AppointmentStatus
-  /** Why it needs a check, e.g. "The caller wasn't sure of the date." */
+  /** Why it needs a person to check it, e.g. "The caller wasn't sure of the
+   * date." Set by the agent; only shown while pending or rescheduled. */
   checkReason?: string
+  /** Absent from older records: read as ai_call when an agent booked it, else front_desk. */
+  source?: BookingSource
+  /** Older field, kept in step with `source`: agent for ai_call, staff otherwise. */
   bookedBy: 'agent' | 'staff'
   agentName: string | null
   callId: string | null
+  type?: AppointmentType
+  /** Why the patient is coming, in their words or the desk's. */
+  visitReason?: string
+  /** Why it was cancelled, when it was. */
+  cancelReason?: string
+  /** Why the request was turned down, when it was. */
+  declineReason?: string
+  /** Its place among requests for the same doctor and time (agent bookings). */
+  rank?: AppointmentRank
+  /** Who confirmed it: a person, or the end-of-day automatic confirmation. */
+  confirmedBy?: 'staff' | 'auto'
+  /** What the patient has been told, newest first. */
+  updates?: PatientUpdate[]
   createdAt: string
+  updatedAt?: string
+  updatedBy?: string
+  history?: AppointmentChange[]
   note?: string
 }
 
@@ -837,6 +931,62 @@ export interface AppointmentPatch {
   time?: string
   department?: string
   doctor?: string
+  note?: string
+  type?: AppointmentType
+  visitReason?: string
+  /** Why: required to reschedule or cancel; kept in the history. */
+  changeReason?: string
+  /** Puts back an earlier state exactly (Undo), skipping the usual order of statuses. */
+  undo?: boolean
+}
+
+/**
+ * How an organisation handles the agent's requests: confirmed by staff, or
+ * automatically each evening (the top-ranked request in each time), and how
+ * the patient is told afterwards.
+ */
+export interface BookingSettings {
+  confirm: 'staff' | 'auto'
+  /** HH:mm, local: when the automatic confirmation runs each day. */
+  autoAt: string
+  /** Leave urgent requests for a person to confirm. */
+  autoSkipUrgent: boolean
+  /** Leave requests the agent flagged for a check for a person. */
+  autoSkipFlagged: boolean
+  /** The other requests for a time that went to someone else: offered the next free time, or declined. */
+  others: 'offer' | 'decline'
+  /** The agent calls the patient back to tell them. */
+  callback: boolean
+  /** A WhatsApp message as well. */
+  whatsapp: boolean
+  /** An unanswered callback is tried once more, 30 minutes later. */
+  retryCallback: boolean
+  updatedAt?: string
+  updatedBy?: string
+}
+
+/** What an automatic confirmation run did. */
+export interface AutoConfirmResult {
+  confirmed: number
+  offered: number
+  declined: number
+  /** Left for a person (urgent or flagged, as the settings say). */
+  left: number
+}
+
+export interface NewAppointment {
+  patientName: string
+  phone: string
+  doctor: string
+  department: string
+  date: string
+  time: string
+  type: AppointmentType
+  visitReason: string
+  /** front_desk when booked during a phone call; manual otherwise. */
+  source: Exclude<BookingSource, 'ai_call'>
+  /** Confirmed with the patient already. */
+  confirmed: boolean
   note?: string
 }
 
@@ -1286,3 +1436,40 @@ export interface Billing {
   details: BillingDetails
   invoices: Invoice[]
 }
+
+/** Organisation-wide alerts, sent by email. Each person can still turn
+ * their own emails off on their profile. */
+export type AlertKey =
+  | 'emergency'
+  | 'handoff_waiting'
+  | 'handoff_missed'
+  | 'callback_overdue'
+  | 'agent_failing'
+  | 'usage_threshold'
+  | 'invoice'
+  | 'daily_summary'
+  | 'weekly_report'
+  | 'agent_published'
+  | 'team_changes'
+
+export interface AlertRule {
+  key: AlertKey
+  enabled: boolean
+  /** Everyone with these roles gets it… */
+  roles: Role[]
+  /** …and these people too, by member id. */
+  memberIds: string[]
+  /** handoff_waiting: minutes waiting; callback_overdue: minutes overdue;
+   * usage_threshold: percent of the plan's minutes. */
+  threshold?: number
+}
+
+export interface AlertSettings {
+  rules: AlertRule[]
+  /** No alerts between these times (local), except emergencies. */
+  quietHours: { enabled: boolean; from: string; to: string }
+  updatedAt: string
+  updatedBy: string
+}
+
+export type AlertSettingsInput = Pick<AlertSettings, 'rules' | 'quietHours'>

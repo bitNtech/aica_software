@@ -3,7 +3,7 @@ import { asAuthError } from '../../../../auth/types'
 import { ToneIcon } from '../../../../components/console/StatusPill'
 import { Button } from '../../../../components/ui/Button'
 import { Modal } from '../../../../components/ui/Dialog'
-import { SelectField, TextAreaField, TextField } from '../../../../components/ui/Field'
+import { Checkbox, SelectField, TextAreaField, TextField } from '../../../../components/ui/Field'
 import { useConsole } from '../../../../console/ConsoleProvider'
 import type { Appointment, AppointmentPatch } from '../../../../console/types'
 import { useOrg } from '../../../../console/useOrg'
@@ -30,7 +30,8 @@ interface Props {
  * that doctor to pick from, and warnings (not blocks) for what would be
  * wrong: an overlap, outside opening hours, a closed day, the doctor away or
  * late, a time that has passed. Only the API's own refusal stops a save.
- * Saving confirms the booking, as it always has.
+ * A reason is asked for (it goes in the history); the booking becomes
+ * rescheduled, or confirmed when the patient has already agreed to it.
  */
 export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onClose, onSave }: Props) {
   const client = useConsole()
@@ -39,6 +40,8 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
   const [time, setTime] = useState('')
   const [doctor, setDoctor] = useState('')
   const [text, setText] = useState('')
+  const [why, setWhy] = useState('')
+  const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Days beyond what the page loaded, read as the dialog needs them, so a suggestion or warning is never based on a blank.
@@ -50,6 +53,8 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
     setTime(appointment.time)
     setDoctor(appointment.doctor)
     setText(appointment.note ?? '')
+    setWhy('')
+    setAgreed(false)
     setError(null)
     setExtra({ covered: [], rows: [] })
     // Keyed on the booking, not the object: a refresh of the list hands over a new copy, and must not wipe what is being typed.
@@ -85,11 +90,14 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
   async function save(e: FormEvent) {
     e.preventDefault()
     if (!appointment) return
+    const moved = date !== appointment.date || time !== appointment.time || doctor !== appointment.doctor
+    if (!moved) return setError('Choose a new date, time or doctor.')
+    if (why.trim().length < 3) return setError('Say why it’s being moved. It goes in the history.')
     setBusy(true)
     setError(null)
     try {
       const department = doctors.find((d) => d.doctor === doctor)?.department || undefined
-      await onSave({ date, time, department, doctor, note: text.trim(), status: 'confirmed' })
+      await onSave({ date, time, department, doctor, note: text.trim(), changeReason: why.trim(), ...(agreed ? { status: 'confirmed' as const } : {}) })
     } catch (err) {
       setError(asAuthError(err).message)
     } finally {
@@ -98,7 +106,7 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
   }
 
   return (
-    <Modal open={!!appointment} title={`Change ${appointment ? (ctx.who(appointment) === 'A patient' ? 'the' : `${ctx.who(appointment)}'s`) : ''} appointment`} onClose={() => !busy && onClose()}>
+    <Modal open={!!appointment} title={`Reschedule ${appointment ? (ctx.who(appointment) === 'A patient' ? 'the' : `${ctx.who(appointment)}'s`) : ''} appointment`} onClose={() => !busy && onClose()}>
       <form className="op-form ap-change" onSubmit={save} noValidate>
         <div className="step__grid">
           <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -138,8 +146,10 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
         )}
         {warnings.length > 0 && <p className="ap-hint">You can still save: these are warnings.</p>}
 
+        <TextAreaField label="Why it’s moved" hint="Kept in the appointment’s history." rows={2} maxLength={300} value={why} onChange={(e) => setWhy(e.target.value)} />
         <TextAreaField label="Note" hint="Optional, for your team." rows={2} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
-        <p className="field__hint">Saving confirms it. Let the patient know about the change: AICA doesn't call them.</p>
+        <Checkbox label="The patient has agreed to the new time" hint="Saves it as confirmed. Otherwise it’s rescheduled, waiting for confirmation." checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <p className="field__hint">Let the patient know about the change: AICA doesn't call them.</p>
         {error && (
           <p className="field__error" role="alert">
             {error}
@@ -147,7 +157,7 @@ export function ChangeDialog({ appointment, rows, loaded, ctx, today, known, onC
         )}
         <div className="dialog__actions">
           <Button type="submit" variant="plum" size="sm" busy={busy} busyLabel="Saving…">
-            Save and confirm
+            {agreed ? 'Reschedule and confirm' : 'Reschedule'}
           </Button>
           <Button variant="line" size="sm" disabled={busy} onClick={onClose}>
             Keep as it was

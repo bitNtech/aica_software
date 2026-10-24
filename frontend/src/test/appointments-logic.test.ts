@@ -53,7 +53,7 @@ function appt(over: Partial<Appointment> = {}): Appointment {
     doctor: 'Dr. R. Ramachandran',
     date: MON,
     time: '11:00',
-    status: 'booked',
+    status: 'pending',
     bookedBy: 'agent',
     agentName: 'OPD appointments',
     callId: null,
@@ -163,8 +163,16 @@ describe('slot length and capacity', () => {
     expect(by['Dr. K. Arvind'].note?.kind).toBe('away')
   })
   it('counts statuses and the agents’ bookings', () => {
-    const c = countStatuses([appt({ status: 'needs_check' }), appt({ status: 'confirmed' }), appt({ status: 'cancelled', bookedBy: 'staff', agentName: null }), appt()])
-    expect(c).toEqual({ needsCheck: 1, confirmed: 1, cancelled: 1, byAgent: 3, total: 4 })
+    const c = countStatuses([
+      appt({ status: 'pending', checkReason: 'Unsure of the date.' }),
+      appt({ status: 'confirmed' }),
+      appt({ status: 'cancelled', bookedBy: 'staff', agentName: null }),
+      appt(),
+      appt({ status: 'completed', source: 'manual', bookedBy: 'staff' }),
+      appt({ status: 'no_show' }),
+      appt({ status: 'rescheduled' }),
+    ])
+    expect(c).toEqual({ needsCheck: 1, pending: 2, confirmed: 1, rescheduled: 1, completed: 1, noShow: 1, cancelled: 1, declined: 0, byAgent: 5, total: 7 })
   })
 })
 
@@ -197,10 +205,10 @@ describe('the day by doctor', () => {
 
 describe('problems', () => {
   it('flags a double booking on both bookings, not a booking back to back', () => {
-    const a = appt({ time: '12:00' })
-    const b = appt({ time: '12:15' })
-    const c = appt({ time: '12:30' })
-    const other = appt({ time: '12:00', doctor: 'Dr. S. Meenakshi' })
+    const a = appt({ time: '12:00', status: 'confirmed' })
+    const b = appt({ time: '12:15', status: 'confirmed' })
+    const c = appt({ time: '12:30', status: 'confirmed' })
+    const other = appt({ time: '12:00', doctor: 'Dr. S. Meenakshi', status: 'confirmed' })
     const m = findProblems([a, b, c, other], ctx())
     expect(kinds(m, a.id)).toEqual(['double_booked'])
     expect(kinds(m, b.id)).toEqual(['double_booked'])
@@ -208,6 +216,15 @@ describe('problems', () => {
     // 12:30 follows the 12:00 booking (30 minutes) but 12:15 overlaps it.
     expect(kinds(m, c.id)).toEqual(['double_booked'])
     expect(m.has(other.id)).toBe(false)
+  })
+  it('treats the agent’s requests for one time as a contest, not a clash, and flags a request for a time already given', () => {
+    const r1 = appt({ time: '10:00' })
+    const r2 = appt({ time: '10:00' })
+    const given = appt({ time: '11:00', status: 'confirmed' })
+    const late = appt({ time: '11:00' })
+    const m = findProblems([r1, r2, given, late], ctx())
+    for (const x of [r1, r2, given]) expect(m.get(x.id)?.map((p) => p.kind) ?? []).not.toContain('double_booked')
+    expect(kinds(m, late.id)).toEqual(['double_booked'])
   })
   it('flags outside hours and a closed day (a holiday or a closed weekday), only when the hours are known', () => {
     const early = appt({ time: '08:00' })
@@ -240,16 +257,20 @@ describe('problems', () => {
     // Moved is for information only.
     expect(findProblems([away], ctx({ changes: [change({ kind: 'moved', detail: 'Room 4' })] })).size).toBe(0)
   })
-  it('flags a past booking that was never confirmed', () => {
-    const past = appt({ time: '09:00', status: 'booked' })
+  it('flags a past booking that was never confirmed, or never marked, and leaves settled ones alone', () => {
+    const past = appt({ time: '09:00', status: 'pending' })
     const pastConfirmed = appt({ time: '09:30', status: 'confirmed' })
-    const yesterday = appt({ date: '2026-10-25', time: '09:00', status: 'needs_check' })
-    const later = appt({ time: '15:00', status: 'booked' })
-    const m = findProblems([past, pastConfirmed, yesterday, later], ctx({ settings: null }))
+    const yesterday = appt({ date: '2026-10-25', time: '09:00', status: 'pending' })
+    const later = appt({ time: '15:00', status: 'pending' })
+    const done = appt({ time: '09:00', doctor: 'Dr. Z', status: 'completed' })
+    const missed = appt({ time: '09:15', doctor: 'Dr. Y', status: 'no_show' })
+    const m = findProblems([past, pastConfirmed, yesterday, later, done, missed], ctx({ settings: null }))
     expect(kinds(m, past.id)).toEqual(['past_unconfirmed'])
     expect(kinds(m, yesterday.id)).toEqual(['past_unconfirmed'])
-    expect(m.has(pastConfirmed.id)).toBe(false)
+    expect(m.get(pastConfirmed.id)?.[0].text).toMatch(/mark it completed or a no-show/i)
     expect(m.has(later.id)).toBe(false)
+    expect(m.has(done.id)).toBe(false)
+    expect(m.has(missed.id)).toBe(false)
   })
   it('flags the same patient twice in a day, by phone (or by name when the phone is hidden), and not when nobody can tell', () => {
     const a = appt({ phone: '9800011111', time: '15:00', doctor: 'Dr. A' })
@@ -335,8 +356,8 @@ describe('filters', () => {
     expect(run({ doctor: 'dr k arvind' })).toEqual([a.id])
     expect(run({ department: 'ENT' })).toEqual([b.id])
     expect(run({ status: 'confirmed' })).toEqual([a.id])
-    expect(run({ by: 'agent' })).toEqual([b.id])
-    expect(run({ by: 'staff' })).toEqual([a.id])
+    expect(run({ by: 'ai_call' })).toEqual([b.id])
+    expect(run({ by: 'front_desk' })).toEqual([a.id])
     expect(run({ problemsOnly: true })).toEqual([b.id])
     expect(run({ doctor: 'Dr. K. Arvind', problemsOnly: true })).toEqual([])
   })
@@ -400,13 +421,13 @@ describe('the day sheet', () => {
   const b = appt({ patientName: '=cmd|calc', time: '09:00', doctor: 'Dr. A' })
   it('is in time order, with the phone only for those who may see it, and the patient as they may see them', () => {
     const full = daySheet([a, b], SEES).split('\n')
-    expect(full[0]).toBe('Date,Time,Doctor,Patient,Phone,Status,Notes')
-    expect(full[1]).toMatch(/^2026-10-26,09:00,Dr\. A,'=cmd\|calc,/)
-    expect(full[2]).toBe(`2026-10-26,10:00,Dr. B,Selvi M,'+91 98400 12345,Confirmed,"Bring ""old"" scans, please"`)
+    expect(full[0]).toBe('Appointment,Date,Time,Doctor,Department,Patient,Phone,Type,Reason for visit,Status,Booked through,Notes')
+    expect(full[1]).toMatch(new RegExp(`^${b.id},2026-10-26,09:00,Dr\\. A,Cardiology,'=cmd\\|calc,`))
+    expect(full[2]).toBe(`${a.id},2026-10-26,10:00,Dr. B,Cardiology,Selvi M,'+91 98400 12345,,,Confirmed,AI call,"Bring ""old"" scans, please"`)
     const limited = daySheet([a, b], { phone: false, name: false })
     expect(limited).not.toMatch(/98400/)
     expect(limited).not.toMatch(/Selvi/)
-    expect(limited.split('\n')[0]).toBe('Date,Time,Doctor,Patient,Status,Notes')
+    expect(limited.split('\n')[0]).toBe('Appointment,Date,Time,Doctor,Department,Patient,Type,Reason for visit,Status,Booked through,Notes')
     expect(limited.split('\n')[2]).toContain('A patient')
   })
   it('quotes cells and defuses formulas', () => {
@@ -417,17 +438,13 @@ describe('the day sheet', () => {
 })
 
 describe('undo', () => {
-  it('gives the patches that put a booking back, where the API allows it', () => {
-    const before = appt({ status: 'booked', time: '10:00', note: 'old' })
-    const moved = { ...before, status: 'confirmed' as const, time: '11:00', doctor: 'Dr. B', department: 'ENT', note: undefined }
-    expect(undoPatches(before, moved)).toEqual([{ status: 'booked', time: '10:00', doctor: before.doctor, department: 'Cardiology', note: 'old' }])
-    expect(undoPatches(before, { ...before, status: 'confirmed' })).toEqual([{ status: 'booked' }])
-    // A cancelled booking can only be booked again, and then confirmed if it was.
-    expect(undoPatches({ ...before, status: 'confirmed' }, { ...before, status: 'cancelled' })).toEqual([{ status: 'booked' }, { status: 'confirmed' }])
-    expect(undoPatches(before, { ...before, status: 'cancelled' })).toEqual([{ status: 'booked' }])
-    expect(undoPatches({ ...before, status: 'cancelled' }, { ...before, status: 'booked' })).toEqual([{ status: 'cancelled' }])
-    // The agent's reason for a check can't be written back.
-    expect(undoPatches({ ...before, status: 'needs_check' }, { ...before, status: 'confirmed' })).toBeNull()
+  it('gives one exact "undo" change that puts a booking back', () => {
+    const before = appt({ status: 'pending', time: '10:00', note: 'old' })
+    const moved = { ...before, status: 'rescheduled' as const, time: '11:00', doctor: 'Dr. B', department: 'ENT', note: undefined }
+    expect(undoPatches(before, moved)).toEqual([{ undo: true, status: 'pending', time: '10:00', doctor: before.doctor, department: 'Cardiology', note: 'old' }])
+    expect(undoPatches(before, { ...before, status: 'confirmed' })).toEqual([{ undo: true, status: 'pending' }])
+    expect(undoPatches({ ...before, status: 'confirmed' }, { ...before, status: 'cancelled' })).toEqual([{ undo: true, status: 'confirmed' }])
+    expect(undoPatches({ ...before, status: 'confirmed' }, { ...before, status: 'completed' })).toEqual([{ undo: true, status: 'confirmed' }])
     expect(undoPatches(before, before)).toBeNull()
   })
 })

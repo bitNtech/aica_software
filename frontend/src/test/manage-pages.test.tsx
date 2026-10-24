@@ -57,7 +57,7 @@ describe('Team', () => {
   })
 })
 
-describe('Organisation activity', () => {
+describe('Audit log (was Organisation activity)', () => {
   it('shows what changed, filters it, and hides billing from admins', async () => {
     const { user } = await open('admin@example.com', `${O}/activity`)
     expect(await screen.findByText(/signed in as karthik r for 30 minutes/i)).toBeInTheDocument()
@@ -73,7 +73,7 @@ describe('Organisation activity', () => {
     await user.click(await screen.findByRole('button', { name: /remove arun v/i }))
     await user.click(within(screen.getByRole('dialog', { name: /remove arun v/i })).getByRole('button', { name: /^remove$/i }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    await user.click(within(screen.getByRole('navigation', { name: /organisation/i })).getByRole('link', { name: /^activity$/i }))
+    await user.click(within(screen.getByRole('navigation', { name: /organisation/i })).getByRole('link', { name: /^audit log$/i }))
     expect(await screen.findByText(/removed arun v \(viewer\)/i)).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /^billing$/i })).toBeInTheDocument()
   })

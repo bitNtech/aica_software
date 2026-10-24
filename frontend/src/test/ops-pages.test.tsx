@@ -26,7 +26,7 @@ describe('Organisation detail', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /suspend/i })).toBeNull()
     await user.click(screen.getByRole('link', { name: /all usage/i }))
-    expect(await screen.findByRole('heading', { level: 1, name: /usage/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /analytics/i })).toBeInTheDocument()
   })
 })
 
@@ -57,13 +57,14 @@ describe('Template library', () => {
 })
 
 describe('Usage, status and platform', () => {
-  it('shows usage by organisation and switches period', async () => {
+  it('shows usage by organisation and switches period (/ops/usage now lands on Analytics)', async () => {
     const { user } = await open('ops@example.com', '/ops/usage')
-    const table = await screen.findByRole('table')
+    const usage = (await screen.findByRole('heading', { level: 2, name: /minutes and plan usage/i })).closest('section')!
+    const table = await within(usage).findByRole('table')
     expect(within(table).getByRole('link', { name: /arogya demo hospital/i })).toBeInTheDocument()
     expect(within(table).queryByText(/kaveri/i)).toBeNull()
-    await user.click(screen.getByRole('radio', { name: /last 7 days/i }))
-    expect(await screen.findByRole('heading', { name: /^last 7 days$/i })).toBeInTheDocument()
+    await user.click(within(usage).getByRole('radio', { name: /last 7 days/i }))
+    expect(await within(usage).findByRole('heading', { name: /^last 7 days$/i })).toBeInTheDocument()
   })
 
   it('shows each service’s health', async () => {

@@ -43,10 +43,10 @@ describe('myCallbacks', () => {
 
 describe('appointmentsToCheck', () => {
   it('keeps only the ones needing a check, earliest first', () => {
-    const appt = (id: string, time: string, status: Appointment['status']): Appointment => ({
-      id, patientName: id, phone: '', department: 'OPD', doctor: 'Dr A', date: '2023-11-14', time, status, bookedBy: 'agent', agentName: null, callId: null, createdAt: iso(-60),
+    const appt = (id: string, time: string, status: Appointment['status'], checkReason?: string): Appointment => ({
+      id, patientName: id, phone: '', department: 'OPD', doctor: 'Dr A', date: '2023-11-14', time, status, checkReason, bookedBy: 'agent', agentName: null, callId: null, createdAt: iso(-60),
     })
-    expect(appointmentsToCheck([appt('b', '15:00', 'needs_check'), appt('x', '09:00', 'confirmed'), appt('a', '09:30', 'needs_check')]).map((a) => a.id)).toEqual(['a', 'b'])
+    expect(appointmentsToCheck([appt('b', '15:00', 'pending', 'Unsure of the date.'), appt('x', '09:00', 'confirmed', 'Cleared once confirmed.'), appt('y', '09:10', 'pending'), appt('a', '09:30', 'pending', 'Name unclear.')]).map((a) => a.id)).toEqual(['a', 'b'])
   })
 })
 

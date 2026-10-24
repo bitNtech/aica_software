@@ -1,8 +1,8 @@
 import { useCallback, useMemo, type ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
-import { asAuthError, type User } from '../../auth/types'
-import { canOpen, platformAccess, type PageKey } from '../../console/access'
+import { asAuthError, type PlatformRole, type User } from '../../auth/types'
+import { canOpen, isMaster, platformAccess, type PageKey } from '../../console/access'
 import { OrgScopeContext, useOrg, type OrgScope } from '../../console/useOrg'
 import { useAsync } from '../../lib/useAsync'
 import { Alert } from '../ui/Alert'
@@ -55,18 +55,11 @@ export function OpsOrgShell() {
             <Link to={base} className="ops-org__name">
               {org.state === 'ready' ? org.data.name : 'Organisation'}
             </Link>
-            <NavLink to={`${base}/agents`} className="ops-org__link">
-              Agents
-            </NavLink>
-            <NavLink to={`${base}/integrations`} className="ops-org__link">
-              Tools and integrations
-            </NavLink>
-            <NavLink to={`${base}/uploads`} className="ops-org__link">
-              Call uploads
-            </NavLink>
-            <NavLink to={`${base}/requests`} className="ops-org__link">
-              Requests
-            </NavLink>
+            {opsOrgPages(user.platformRole).map((p) => (
+              <NavLink key={p.path} to={`${base}/${p.path}`} className="ops-org__link">
+                {p.label}
+              </NavLink>
+            ))}
           </div>
         </nav>
         <main id="ops-main" className="console__main ops-org__main" tabIndex={-1}>
@@ -83,7 +76,7 @@ export function OpsOrgShell() {
                 <button type="button" className="btn-text" onClick={reload}>
                   Try again
                 </button>
-                <Link className="link" to="/ops">
+                <Link className="link" to="/ops/orgs">
                   Every organisation
                 </Link>
               </p>
@@ -100,10 +93,36 @@ export function OpsOrgShell() {
   )
 }
 
+/** The organisation's console pages bitNtech can open from Ops, in menu
+ * order. Pages with callers' personal details are the master admin's only. */
+const ORG_PAGES: { path: string; label: string; page: PageKey; masterOnly?: boolean }[] = [
+  { path: 'agents', label: 'Agents', page: 'agents' },
+  { path: 'calls', label: 'Calls', page: 'calls', masterOnly: true },
+  { path: 'live', label: 'Live calls', page: 'live', masterOnly: true },
+  { path: 'callbacks', label: 'Callbacks', page: 'callbacks', masterOnly: true },
+  { path: 'appointments', label: 'Appointments', page: 'appointments', masterOnly: true },
+  { path: 'knowledge', label: 'Knowledge', page: 'knowledge' },
+  { path: 'integrations', label: 'Tools and integrations', page: 'integrations' },
+  { path: 'numbers', label: 'Phone numbers', page: 'numbers' },
+  { path: 'uploads', label: 'Call uploads', page: 'uploads' },
+  { path: 'team', label: 'Team', page: 'team' },
+  { path: 'audit', label: 'Audit log', page: 'activity' },
+  { path: 'settings', label: 'Settings', page: 'settings' },
+  { path: 'billing', label: 'Billing', page: 'billing', masterOnly: true },
+  { path: 'usage', label: 'Usage and limits', page: 'usage', masterOnly: true },
+  { path: 'requests', label: 'Requests', page: 'requests' },
+]
+
+/** The pages `role` may open for an organisation. Requests is bitNtech's reply view, open to staff. */
+export function opsOrgPages(role: PlatformRole) {
+  const access = platformAccess(role)
+  return ORG_PAGES.filter((p) => (p.masterOnly ? role === 'master_admin' : p.page === 'requests' || canOpen(access, p.page)))
+}
+
 /** One page inside the Ops organisation frame: bitNtech's access must allow
  * it (the builder is the master admin's). If not, back to the organisation. */
-export function OpsOrgPage({ page, children }: { page: PageKey; children: ReactNode }) {
+export function OpsOrgPage({ page, masterOnly, children }: { page: PageKey; masterOnly?: boolean; children: ReactNode }) {
   const { access, org } = useOrg()
-  if (!canOpen(access, page)) return <Navigate to={`/ops/orgs/${org.orgSlug}`} replace />
+  if (!canOpen(access, page) || (masterOnly && !isMaster(access))) return <Navigate to={`/ops/orgs/${org.orgSlug}`} replace />
   return children
 }

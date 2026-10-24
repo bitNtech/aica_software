@@ -46,7 +46,7 @@ describe('Home', () => {
     await open('viewer@example.com', O)
     // The "Needs a person" cards and the Reports section load independently;
     // wait for the one each assertion actually needs, not an unrelated one.
-    expect(await screen.findByRole('link', { name: /appointments to check/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /appointment requests to review/i })).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: /^reports$/i })).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: /waiting for a person/i })).toBeInTheDocument()
   })

@@ -2,8 +2,8 @@ import { useMemo, useState, type CSSProperties, type KeyboardEvent } from 'react
 import { ToneIcon } from '../../../../components/console/StatusPill'
 import type { Appointment } from '../../../../console/types'
 import { useMediaQuery } from '../../../../lib/useMediaQuery'
-import { byStart, dayMonth, dayName, doctorShort, gridWindow, hourLabel, hueFor, isActive, longDay, mondayOf, neighbour, dateList, time12, toMin, weekdayName, hoursFor, type NavItem, type NavKey } from './model'
-import { Agenda, AgentMark, Avatar, describe, ProblemFlag, STATUS_TONE, type Shared } from './parts'
+import { byStartRank, pileOf, dayMonth, needsCheck, dayName, doctorShort, gridWindow, hourLabel, hueFor, isActive, longDay, mondayOf, neighbour, dateList, time12, toMin, weekdayName, hoursFor, type NavItem, type NavKey } from './model'
+import { Agenda, AgentMark, pileStyle, RequestsMark, Avatar, describe, ProblemFlag, toneOf, type Shared } from './parts'
 
 const NARROW = '(max-width: 719px)'
 const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'])
@@ -23,7 +23,7 @@ export function WeekView({ shared, anchor, appts, all }: { shared: Shared; ancho
   const days = useMemo(() => dateList(mondayOf(anchor), 7), [anchor])
 
   const model = useMemo(() => {
-    const byDay = new Map(days.map((d) => [d, appts.filter((a) => a.date === d).sort(byStart)]))
+    const byDay = new Map(days.map((d) => [d, appts.filter((a) => a.date === d).sort(byStartRank)]))
     const allDay = new Map(days.map((d) => [d, all.filter((a) => a.date === d)]))
     const wins = days.map((d) => gridWindow(d, settings, allDay.get(d)!, slot))
     // Rows run over the earliest start to the latest end of the week's days.
@@ -36,14 +36,14 @@ export function WeekView({ shared, anchor, appts, all }: { shared: Shared; ancho
 
   if (all.length === 0) return <p className="empty-note">No appointments this week.</p>
 
-  const items: NavItem[] = days.flatMap((d, i) => model.byDay.get(d)!.map((a) => ({ id: a.id, col: i, start: toMin(a.time) })))
+  const items: NavItem[] = days.flatMap((d, i) => model.byDay.get(d)!.map((a) => ({ id: a.id, col: i, start: toMin(a.time) + (pileOf(a)?.index ?? 0) / 100 })))
   const first = [...items].sort((a, b) => a.col - b.col || a.start - b.start)[0]?.id ?? null
   const stop = tabId && items.some((i) => i.id === tabId) ? tabId : (shared.selectedId && items.some((i) => i.id === shared.selectedId) ? shared.selectedId : first)
 
   const dayHead = (d: string) => {
     const mine = model.allDay.get(d)!
     const active = mine.filter(isActive).length
-    const check = mine.filter((a) => a.status === 'needs_check').length
+    const check = mine.filter(needsCheck).length
     const h = hoursFor(d, settings)
     return { active, check, closed: !h.open && h.known ? h.reason : null }
   }
@@ -131,13 +131,14 @@ export function WeekView({ shared, anchor, appts, all }: { shared: Shared; ancho
                         const who = sees.name ? a.patientName : 'A patient'
                         const problems = shared.problems.get(a.id)
                         const hue = hueFor(a.doctor, known)
+                        const pile = pileStyle(a)
                         return (
                           <button
                             key={a.id}
                             type="button"
                             data-appt={a.id}
-                            className={`ap-chip ap-chip--${a.status}${shared.selectedId === a.id ? ' is-selected' : ''}${problems?.length ? ' has-problem' : ''}`}
-                            style={{ '--ap-h': hue } as CSSProperties}
+                            className={`ap-chip ap-chip--${a.status}${needsCheck(a) ? ' is-check' : ''}${shared.selectedId === a.id ? ' is-selected' : ''}${problems?.length ? ' has-problem' : ''}${pile?.className ?? ''}`}
+                            style={{ '--ap-h': hue, ...(pile ? { '--pile-i': pile.index, zIndex: 3 + pile.size - pile.index } : {}) } as CSSProperties}
                             tabIndex={a.id === stop ? 0 : -1}
                             aria-haspopup="dialog"
                             aria-label={describe(a, who, problems)}
@@ -147,10 +148,11 @@ export function WeekView({ shared, anchor, appts, all }: { shared: Shared; ancho
                             <span className="ap-chip__top" aria-hidden="true">
                               <Avatar doctor={a.doctor} hue={hue} />
                               <span className="ap-chip__time num">{time12(a.time)}</span>
-                              <span className={`ap-chip__status ap-chip__status--${STATUS_TONE[a.status]}`}>
-                                <ToneIcon tone={STATUS_TONE[a.status]} size={12} />
+                              <span className={`ap-chip__status ap-chip__status--${toneOf(a)}`}>
+                                <ToneIcon tone={toneOf(a)} size={12} />
                               </span>
                               <AgentMark appt={a} compact />
+                              <RequestsMark appt={a} />
                             </span>
                             <span className="ap-chip__who" aria-hidden="true">
                               {who}

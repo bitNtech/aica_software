@@ -20,7 +20,7 @@ afterEach(() => {
 })
 
 const row = (o: Partial<Appointment> & Pick<Appointment, 'id' | 'patientName' | 'phone' | 'doctor' | 'department' | 'date' | 'time'>): Appointment => ({
-  status: 'booked',
+  status: 'pending',
   bookedBy: 'agent',
   agentName: 'OPD appointments',
   callId: null,
@@ -32,7 +32,7 @@ const MEENA = { doctor: 'Dr. S. Meenakshi', department: 'General medicine' }
 const ARVIND = { doctor: 'Dr. K. Arvind', department: 'Orthopaedics' }
 
 const ROWS: Appointment[] = [
-  row({ id: 'r1', patientName: 'Lakshmi Narayanan', phone: '+91 98400 12345', ...RAMA, date: TODAY, time: '11:00', status: 'needs_check', checkReason: 'The caller wasn’t sure of the date.', callId: 'call_1', note: 'Wants a morning slot.' }),
+  row({ id: 'r1', patientName: 'Lakshmi Narayanan', phone: '+91 98400 12345', ...RAMA, date: TODAY, time: '11:00', status: 'pending', checkReason: 'The caller wasn’t sure of the date.', callId: 'call_1', note: 'Wants a morning slot.' }),
   row({ id: 'r2', patientName: 'Divya Prakash', phone: '+91 98400 22222', ...RAMA, date: TODAY, time: '11:00', bookedBy: 'staff', agentName: null }),
   row({ id: 'r3', patientName: 'Mohammed Irfan', phone: '+91 98400 33333', ...RAMA, date: TODAY, time: '09:30', status: 'cancelled' }),
   row({ id: 'm1', patientName: 'Selvi Murugan', phone: '+91 98400 44444', ...MEENA, date: TODAY, time: '14:00', status: 'confirmed' }),
@@ -68,7 +68,7 @@ function makeClient(over: Partial<ConsoleClient> = {}, rows: Appointment[] = ROW
     const a = store.find((x) => x.id === id)!
     Object.assign(a, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)))
     if (a.note === '') delete a.note
-    if (patch.status && patch.status !== 'needs_check') delete a.checkReason
+    if (patch.status && patch.status !== 'pending' && patch.status !== 'rescheduled') delete a.checkReason
     return { ...a }
   })
   const client: ConsoleClient = {
@@ -260,7 +260,7 @@ describe('Appointments: the booking in the drawer', () => {
     await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'r2', { status: 'confirmed' }))
     expect(await screen.findByText(/divya prakash.s appointment is confirmed/i)).toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /^undo$/i }))
-    await waitFor(() => expect(fx.update).toHaveBeenLastCalledWith('arogya-demo', 'r2', { status: 'booked' }))
+    await waitFor(() => expect(fx.update).toHaveBeenLastCalledWith('arogya-demo', 'r2', { undo: true, status: 'pending' }))
     expect(await screen.findByText(/^undone\.$/i)).toBeInTheDocument()
   })
 
@@ -276,22 +276,28 @@ describe('Appointments: the booking in the drawer', () => {
     await user.click(within(dialog).getByRole('button', { name: /^keep it$/i }))
     expect(fx.update).not.toHaveBeenCalled()
     await user.click(within(drawer()).getByRole('button', { name: /^cancel$/i }))
-    await user.click(within(await screen.findByRole('dialog', { name: /cancel selvi/i })).getByRole('button', { name: /^cancel appointment$/i }))
-    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'm1', { status: 'cancelled' }))
+    const again = within(await screen.findByRole('dialog', { name: /cancel selvi/i }))
+    // A reason is needed: it goes in the history.
+    await user.click(again.getByRole('button', { name: /^cancel appointment$/i }))
+    expect(await again.findByText(/say why it.s being cancelled/i)).toBeInTheDocument()
+    expect(fx.update).not.toHaveBeenCalled()
+    await user.type(again.getByLabelText(/why it.s cancelled/i), 'The patient is travelling.')
+    await user.click(again.getByRole('button', { name: /^cancel appointment$/i }))
+    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'm1', { status: 'cancelled', changeReason: 'The patient is travelling.' }))
     expect(await screen.findByText(/selvi murugan.s appointment is cancelled/i)).toBeInTheDocument()
-    // It was confirmed, so Undo books it again and confirms it.
+    // It was confirmed, so Undo puts it back as confirmed, in one change.
     await user.click(await screen.findByRole('button', { name: /^undo$/i }))
-    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'm1', { status: 'confirmed' }))
-    expect(fx.update.mock.calls.filter((c) => c[1] === 'm1').map((c) => c[2])).toEqual([{ status: 'cancelled' }, { status: 'booked' }, { status: 'confirmed' }])
+    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'm1', { undo: true, status: 'confirmed' }))
+    expect(fx.update.mock.calls.filter((c) => c[1] === 'm1').map((c) => c[2])).toEqual([{ status: 'cancelled', changeReason: 'The patient is travelling.' }, { undo: true, status: 'confirmed' }])
   })
 
-  it('shows a cancelled booking without Confirm, Change or Cancel, but with a way to book it again', async () => {
+  it('shows a cancelled booking without Confirm, Reschedule or Cancel, but with a way to book it again', async () => {
     const { user } = await open()
     await dayGrid()
     await user.click(block(/Mohammed Irfan/))
     const d = within(drawer())
     expect(d.queryByRole('button', { name: /^confirm$/i })).not.toBeInTheDocument()
-    expect(d.queryByRole('button', { name: /^change$/i })).not.toBeInTheDocument()
+    expect(d.queryByRole('button', { name: /^reschedule$/i })).not.toBeInTheDocument()
     expect(d.queryByRole('button', { name: /^cancel$/i })).not.toBeInTheDocument()
     expect(d.getByRole('button', { name: /book it again/i })).toBeInTheDocument()
   })
@@ -303,7 +309,9 @@ describe('Appointments: the booking in the drawer', () => {
     await dayGrid()
     await user.click(block(/Divya Prakash/))
     await user.click(within(drawer()).getByRole('button', { name: /^cancel$/i }))
-    await user.click(within(await screen.findByRole('dialog', { name: /cancel divya/i })).getByRole('button', { name: /^cancel appointment$/i }))
+    const dialog = within(await screen.findByRole('dialog', { name: /cancel divya/i }))
+    await user.type(dialog.getByLabelText(/why it.s cancelled/i), 'Booked twice.')
+    await user.click(dialog.getByRole('button', { name: /^cancel appointment$/i }))
     expect(await screen.findByText(/doesn.t exist any more/i)).toBeInTheDocument()
   })
 })
@@ -313,8 +321,8 @@ describe('Appointments: change', () => {
     const view = await open('admin@example.com', fx)
     await dayGrid()
     await view.user.click(block(patient))
-    await view.user.click(within(drawer()).getByRole('button', { name: /^change$/i }))
-    const dialog = await screen.findByRole('dialog', { name: /change lakshmi narayanan.s appointment/i })
+    await view.user.click(within(drawer()).getByRole('button', { name: /^reschedule$/i }))
+    const dialog = await screen.findByRole('dialog', { name: /reschedule lakshmi narayanan.s appointment/i })
     return { ...view, dialog: within(dialog), fx }
   }
 
@@ -336,9 +344,20 @@ describe('Appointments: change', () => {
     fireEvent.change(dialog.getByLabelText('Time'), { target: { value: '11:00' } })
     expect(dialog.getByRole('status', { name: /things to check/i })).toBeInTheDocument()
     expect(dialog.getByText(/you can still save/i)).toBeInTheDocument()
-    await user.click(dialog.getByRole('button', { name: /save and confirm/i }))
-    await waitFor(() => expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'r1', expect.objectContaining({ date: TODAY, time: '11:00', doctor: 'Dr. R. Ramachandran', department: 'Cardiology', status: 'confirmed' })))
-    expect(await screen.findByText(/lakshmi narayanan.s appointment is now today at 11:00 am/i)).toBeInTheDocument()
+    // 11:00 is where it already is: nothing to move.
+    await user.click(dialog.getByRole('button', { name: /^reschedule$/i }))
+    expect(await dialog.findByRole('alert')).toHaveTextContent(/choose a new date, time or doctor/i)
+    // Moving it needs a reason; the patient agreeing confirms it.
+    await user.click(slots[0])
+    await user.click(dialog.getByRole('button', { name: /^reschedule$/i }))
+    expect(await dialog.findByRole('alert')).toHaveTextContent(/say why it.s being moved/i)
+    await user.type(dialog.getByLabelText(/why it.s moved/i), 'The doctor’s clinic moved.')
+    await user.click(dialog.getByRole('checkbox', { name: /the patient has agreed/i }))
+    await user.click(dialog.getByRole('button', { name: /reschedule and confirm/i }))
+    await waitFor(() =>
+      expect(fx.update).toHaveBeenCalledWith('arogya-demo', 'r1', expect.objectContaining({ date: TODAY, time: '11:30', doctor: 'Dr. R. Ramachandran', department: 'Cardiology', status: 'confirmed', changeReason: 'The doctor’s clinic moved.' })),
+    )
+    expect(await screen.findByText(/lakshmi narayanan.s appointment is now today at 11:30 am, confirmed/i)).toBeInTheDocument()
   })
 
   it('warns about a time that has passed, a closed day and a doctor who is away', async () => {
@@ -360,7 +379,9 @@ describe('Appointments: change', () => {
     const fx = makeClient()
     fx.client.updateAppointment = vi.fn(async () => Promise.reject(new AuthError('invalid_input', 'Choose a real date.')))
     const { dialog, user } = await openChange(/Lakshmi Narayanan/, fx)
-    await user.click(dialog.getByRole('button', { name: /save and confirm/i }))
+    fireEvent.change(dialog.getByLabelText('Time'), { target: { value: '15:00' } })
+    await user.type(dialog.getByLabelText(/why it.s moved/i), 'Asked for later.')
+    await user.click(dialog.getByRole('button', { name: /^reschedule$/i }))
     expect(await dialog.findByRole('alert')).toHaveTextContent('Choose a real date.')
   })
 })
@@ -401,10 +422,10 @@ describe('Appointments: week and list', () => {
   it('lists the bookings in a table you can sort, with the phone for managers, and opens one from its row', async () => {
     const { user } = await open()
     await dayGrid()
-    await user.click(screen.getByRole('button', { name: 'List' }))
+    await user.click(screen.getByRole('button', { name: 'All' }))
     const table = await screen.findByRole('table', { name: /^appointments$/i })
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent?.trim())
-    expect(headers).toEqual(['Date', 'Time', 'Patient', 'Phone', 'Doctor', 'Department', 'Status', 'Booked by', 'Problems', 'Note'])
+    expect(headers).toEqual(['Date', 'Time', 'Patient', 'Phone', 'Doctor', 'Department', 'Status', 'Booked through', 'Problems', 'Note'])
     const names = () => within(table).getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[2].textContent)
     // Date then time by default: today 09:30 first.
     expect(names()[0]).toBe('Mohammed Irfan')
@@ -424,14 +445,14 @@ describe('Appointments: week and list', () => {
   it('remembers the view for the person', async () => {
     const { user } = await open()
     await dayGrid()
-    await user.click(screen.getByRole('button', { name: 'List' }))
+    await user.click(screen.getByRole('button', { name: 'All' }))
     await screen.findByRole('table', { name: /^appointments$/i })
     expect(Object.entries(localStorage).filter(([k]) => k.startsWith('aica.appointments.view.')).map(([, v]) => v)).toEqual(['list'])
     cleanup()
     // The same person in the same browser: still signed in, and back on the list.
     renderApp(`${O}/appointments`, { consoleClient: makeClient().client })
     expect(await screen.findByRole('table', { name: /^appointments$/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true')
   })
 })
 
@@ -489,9 +510,9 @@ describe('Appointments: needs a check, summary and filters', () => {
     expect(within(column(/Dr\. R\. Ramachandran/)).queryByRole('button', { name: /mohammed irfan/i })).not.toBeInTheDocument()
     expect(within(column(/Dr\. R\. Ramachandran/)).getAllByRole('button')).toHaveLength(2)
     await user.click(screen.getByRole('button', { name: /clear all/i }))
-    await user.selectOptions(screen.getByLabelText('Booked by'), 'staff')
+    await user.selectOptions(screen.getByLabelText('Booked through'), 'front_desk')
     expect(within(column(/Dr\. R\. Ramachandran/)).getAllByRole('button')).toHaveLength(1)
-    await user.selectOptions(screen.getByLabelText('Booked by'), '')
+    await user.selectOptions(screen.getByLabelText('Booked through'), '')
     await user.selectOptions(screen.getByLabelText('Status'), 'cancelled')
     expect(within(column(/Dr\. R\. Ramachandran/)).getAllByRole('button')).toHaveLength(1)
   })
@@ -513,8 +534,8 @@ describe('Appointments: export', () => {
       r.readAsText(blob!)
     })
     const lines = text.split('\n')
-    expect(lines[0]).toBe('Date,Time,Doctor,Patient,Phone,Status,Notes')
-    expect(lines[1]).toContain('09:30,Dr. R. Ramachandran,Mohammed Irfan')
+    expect(lines[0]).toBe('Appointment,Date,Time,Doctor,Department,Patient,Phone,Type,Reason for visit,Status,Booked through,Notes')
+    expect(lines[1]).toContain('09:30,Dr. R. Ramachandran,Cardiology,Mohammed Irfan')
     expect(lines.length).toBe(7)
     expect(text).toContain("'+91 98400 12345")
     click.mockRestore()
@@ -558,13 +579,13 @@ describe('Appointments: who sees what', () => {
     await user.click(block(/11:00 am, A patient, Dr\. R\. Ramachandran.*Needs a check/i))
     const d = within(drawer())
     expect(d.getByRole('heading', { level: 2, name: 'A patient' })).toBeInTheDocument()
-    for (const name of [/^confirm$/i, /^change$/i, /^cancel$/i, /^call /i, /book it again/i]) expect(d.queryByRole('button', { name })).not.toBeInTheDocument()
+    for (const name of [/^confirm$/i, /^reschedule$/i, /^cancel$/i, /^call /i, /book it again/i, /^mark /i]) expect(d.queryByRole('button', { name })).not.toBeInTheDocument()
     expect(drawer().querySelector('a[href^="tel:"]')).toBeNull()
     expect(d.queryByText(/98400/)).not.toBeInTheDocument()
     expect(d.getByText(/can.t see callers. details/i)).toBeInTheDocument()
     // The list has no phone column for them either.
     await user.keyboard('{Escape}')
-    await user.click(screen.getByRole('button', { name: 'List' }))
+    await user.click(screen.getByRole('button', { name: 'All' }))
     const table = await screen.findByRole('table', { name: /^appointments$/i })
     expect(within(table).queryByRole('columnheader', { name: /phone/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /csv/i })).not.toBeInTheDocument()
@@ -615,7 +636,7 @@ describe('Appointments: with the demo’s own data', () => {
     const view = renderApp(`${O}/appointments`, { consoleClient: createDemoConsoleClient({ latency: 0, persist: false }) })
     await signIn(view.user, email)
     await screen.findByRole('heading', { level: 2, name: /monday 26 october/i })
-    for (const name of ['Week', 'List', 'Day by doctor']) {
+    for (const name of ['Week', 'Month', 'Today’s appointments', 'All', 'Requests to review', 'Cancelled and rescheduled', 'Day by doctor']) {
       await view.user.click(screen.getByRole('button', { name }))
       await waitFor(() => expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true'))
     }

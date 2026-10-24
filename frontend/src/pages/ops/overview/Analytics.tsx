@@ -178,7 +178,7 @@ export function Analytics({ overview, error, reload, demo }: { overview: Platfor
         )}
       </Panel>
 
-      <Panel title="Usage by organisation" wide demo={demo} note={`${period}, busiest first`} action={<Link to="/ops/usage">Usage</Link>}>
+      <Panel title="Usage by organisation" wide demo={demo} note={`${period}, busiest first`} action={<Link to="/ops/analytics">Analytics</Link>}>
         {o.orgs.length === 0 ? (
           <p className="ov-empty">No active organisations yet.</p>
         ) : (

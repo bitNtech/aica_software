@@ -101,3 +101,50 @@
 .perm__group { display: grid; gap: 0.6rem; align-content: start; margin: 0; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
 .perm__legend { padding: 0 0.3rem; font: 600 var(--fs-md)/1.3 var(--display); color: var(--ink); }
 .perm__changed { font-weight: 500; color: var(--info-ink); }
+
+/* Owners */
+.own-list { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.own-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.own-card__main { display: grid; gap: 0.15rem; min-width: 0; overflow-wrap: anywhere; }
+.own-card__name { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 500; color: var(--ink); }
+.own-card__name .op-badge { margin: 0; }
+.own-card__why { max-width: 22rem; font-size: var(--fs-sm); color: var(--muted); }
+.own-powers { display: grid; gap: 0.3rem; margin: 0; padding-left: 1.2rem; color: var(--text); }
+.own-form { max-width: 34rem; }
+
+/* Usage and limits */
+.use-meters { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.75rem; margin: 0; }
+.use-meter { display: grid; align-content: start; gap: 0.3rem; padding: 0.8rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.use-meter > dd { margin: 0; }
+.use-meter__label { font-size: var(--fs-sm); color: var(--muted); }
+.use-meter__value { font: 600 var(--fs-xl)/1.2 var(--sans); color: var(--ink); }
+.use-meter__value .ops-muted { font-weight: 400; font-size: var(--fs-md); color: var(--muted); }
+.use-meter__bar { height: 6px; border-radius: var(--r-pill); background: var(--bg-2); overflow: hidden; }
+.use-meter__fill { display: block; height: 100%; border-radius: inherit; }
+.use-meter__fill--ok, .use-meter__fill--neutral { background: var(--ok); }
+.use-meter__fill--warn { background: var(--warn); }
+.use-meter__fill--danger { background: var(--danger); }
+.use-forecast { font-size: var(--fs-md); color: var(--text); }
+@media (forced-colors: active) { .use-meter__fill { background: CanvasText; } }
+
+/* Notifications */
+.ntf-rule { display: grid; gap: 0.6rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.ntf-rule:first-of-type { border-top: 0; padding-top: 0; }
+.ntf-rule__who { display: grid; gap: 0.6rem; padding-left: 3.25rem; }
+.ntf-roles { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0; padding: 0; border: 0; }
+.ntf-roles > legend { width: 100%; margin-bottom: 0.3rem; }
+.ntf-people summary { font-size: var(--fs-md); font-weight: 500; color: var(--ink); cursor: pointer; }
+.ntf-people__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.35rem 1rem; margin-top: 0.5rem; }
+.ntf-threshold { max-width: 14rem; }
+@media (max-width: 700px) { .ntf-rule__who { padding-left: 0; } }
+
+/* Profile */
+.prof { max-width: 46rem; margin: 0; padding: 0; }
+.prof-perms { display: grid; gap: 0.25rem; }
+.prof-perms__title { font: 500 var(--fs-md)/1.3 var(--sans); color: var(--ink); }
+.prof-perms ul { display: grid; gap: 0.15rem; margin: 0; padding-left: 1.2rem; font-size: var(--fs-md); color: var(--text); }
+
+/* Invoice numbers stay on one line; the table scrolls inside its box on a phone. */
+.bill-invoices th[scope='row'] { white-space: nowrap; overflow-wrap: normal; }
+.bill-invoices td { white-space: nowrap; }
+.prof-perms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.75rem 1.25rem; }

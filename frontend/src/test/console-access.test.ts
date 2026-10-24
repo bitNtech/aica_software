@@ -49,7 +49,12 @@ const PAGES: Record<(typeof PAGE_KEYS)[number], string> = {
   team: 'EE---E-',
   activity: 'RR---R-',
   settings: 'EE---E-',
-  billing: 'E------',
+  // Owners, and bitNtech's master admin (from Ops).
+  billing: 'E----E-',
+  owners: 'ER-----',
+  usage: 'E----E-',
+  notifications: 'EE-----',
+  profile: 'EEEEE--',
 }
 
 const TABS: Record<(typeof AGENT_TABS)[number], string> = {

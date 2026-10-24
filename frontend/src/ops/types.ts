@@ -34,6 +34,20 @@ export interface OpsDataClient {
   /** What's happening now: calls in progress, handoffs, failures, health. Polled. */
   getLiveOps(): Promise<LiveOps>
 
+  /** Agent publishes and platform releases, newest first. */
+  listDeployments(): Promise<Deployment[]>
+
+  /** Every incident, open ones first. */
+  listIncidents(): Promise<IncidentRecord[]>
+  /** Master admin: declares an incident. */
+  createIncident(input: NewIncident): Promise<IncidentRecord>
+  /** Master admin: posts an update, and moves it on (or resolves it). */
+  updateIncident(id: string, update: IncidentUpdateInput): Promise<IncidentRecord>
+
+  getSecurityPolicy(): Promise<SecurityPolicy>
+  /** Master admin only. */
+  updateSecurityPolicy(input: SecurityPolicyInput): Promise<SecurityPolicy>
+
   /** Who is asking (a real server knows from the session). */
   setViewer?(viewer: { id: string; name: string; platformRole: PlatformRole | null } | null): void
 }
@@ -377,3 +391,90 @@ export interface LiveOps {
   /** Worst first. */
   alerts: PlatformAlert[]
 }
+
+// ---------------------------------------------------------------- deployments
+
+export type DeploymentComponent = 'agent' | 'app' | PlatformServiceId
+
+export interface Deployment {
+  id: string
+  at: string
+  /** Who did it, by name. */
+  by: string
+  component: DeploymentComponent
+  /** "OPD appointments v12", "Voice model: Kavya 2". */
+  title: string
+  note: string
+  /** live: what's running now. superseded: a later one replaced it. */
+  status: 'live' | 'superseded' | 'rolled_back' | 'failed'
+  /** Agent publishes only. */
+  orgSlug?: string
+  orgName?: string
+  agentId?: string
+  version?: number
+}
+
+// ---------------------------------------------------------------- incidents
+
+export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
+export type IncidentSeverity = 'minor' | 'major' | 'critical'
+
+export interface IncidentUpdate {
+  at: string
+  by: string
+  status: IncidentStatus
+  text: string
+}
+
+export interface IncidentRecord {
+  id: string
+  title: string
+  service: PlatformServiceId | 'app'
+  severity: IncidentSeverity
+  status: IncidentStatus
+  startedAt: string
+  resolvedAt: string | null
+  /** Newest first. */
+  updates: IncidentUpdate[]
+  /** Raised by monitoring rather than a person. */
+  automatic: boolean
+}
+
+export interface NewIncident {
+  title: string
+  service: IncidentRecord['service']
+  severity: IncidentSeverity
+  text: string
+}
+
+export interface IncidentUpdateInput {
+  status: IncidentStatus
+  text: string
+}
+
+// ---------------------------------------------------------------- security
+
+export interface SecurityPolicy {
+  /** Characters, for every account. */
+  passwordMinLength: number
+  /** bitNtech staff must use two-step sign-in. */
+  staffTwoStep: boolean
+  /** Who in client organisations must use it. */
+  memberTwoStep: 'off' | 'owners' | 'everyone'
+  /** How long a sign-in lasts. */
+  staffSessionHours: number
+  memberSessionDays: number
+  /** Signed out after this long without using AICA. */
+  idleMinutes: number
+  /** Ops can be opened only from these address ranges (CIDR). Empty: anywhere. */
+  staffIpRanges: string[]
+  /** Acting as a client user lasts at most this long. */
+  actingMaxMinutes: number
+  /** Kept this long, then deleted. */
+  transcriptRetentionDays: number
+  recordingRetentionDays: number
+  updatedAt: string
+  updatedBy: string
+}
+
+export type SecurityPolicyInput = Omit<SecurityPolicy, 'updatedAt' | 'updatedBy'>

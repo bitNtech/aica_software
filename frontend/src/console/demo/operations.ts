@@ -1,6 +1,10 @@
 import type { Language } from '../../auth/types'
 import type {
   Appointment,
+  AppointmentChange,
+  AppointmentStatus,
+  AppointmentType,
+  BookingSource,
   Callback,
   CallOutcome,
   CallRecord,
@@ -41,7 +45,7 @@ export function rng(seed: number) {
 
 export const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7)
 
-function pick<T>(r: () => number, items: readonly T[], weights?: readonly number[]): T {
+export function pick<T>(r: () => number, items: readonly T[], weights?: readonly number[]): T {
   if (!weights) return items[Math.floor(r() * items.length)]
   const total = weights.reduce((a, b) => a + b, 0)
   let x = r() * total
@@ -78,13 +82,13 @@ export function seedMembers(orgSlug: string): Member[] {
 }
 
 /** Staff who pick up handed-over calls. */
-const DESK = [
+export const DESK = [
   { id: 'u_frontdesk', name: 'Meena S' },
   { id: 'u_frontdesk2', name: 'Suresh B' },
   { id: 'u_supervisor', name: 'Priya N' },
 ]
 
-const NAMES = ['Lakshmi Narayanan', 'Ramasamy K', 'Divya Prakash', 'Mohammed Irfan', 'Selvi Murugan', 'Anand Kumar', 'Fathima B', 'Gopal Krishnan', 'Priya Dharshini', 'Karthikeyan S', 'Meenakshi R', 'Joseph Antony', 'Revathi M', 'Senthil Kumar']
+export const NAMES = ['Lakshmi Narayanan', 'Ramasamy K', 'Divya Prakash', 'Mohammed Irfan', 'Selvi Murugan', 'Anand Kumar', 'Fathima B', 'Gopal Krishnan', 'Priya Dharshini', 'Karthikeyan S', 'Meenakshi R', 'Joseph Antony', 'Revathi M', 'Senthil Kumar']
 export const DEPARTMENTS: [string, string][] = [
   ['Cardiology', 'Dr. R. Ramachandran'],
   ['General medicine', 'Dr. S. Meenakshi'],
@@ -93,8 +97,8 @@ export const DEPARTMENTS: [string, string][] = [
   ['ENT', 'Dr. V. Senthil'],
 ]
 
-const phone = (r: () => number) => `9${Math.floor(r() * 9e8 + 1e8)}`.slice(0, 10)
-const formatPhone = (p: string) => `+91 ${p.slice(0, 5)} ${p.slice(5)}`
+export const phone = (r: () => number) => `9${Math.floor(r() * 9e8 + 1e8)}`.slice(0, 10)
+export const formatPhone = (p: string) => `+91 ${p.slice(0, 5)} ${p.slice(5)}`
 const maskPhone = (p: string) => `+91 ••••• ${p.slice(5)}`
 
 // ---------------------------------------------------------------- agents and what callers want
@@ -743,19 +747,61 @@ export function seedCallbacks(orgSlug: string): Callback[] {
 
 const dayFrom = (offset: number) => localDay(offset)
 
+const VISIT: Record<AppointmentType, string[]> = {
+  new_visit: ['Chest pain on climbing stairs', 'Fever for three days', 'Knee pain after a fall', 'Blurred vision', 'Child not eating well'],
+  follow_up: ['Review after starting BP tablets', 'Results of last week’s tests', 'Check the healing after surgery', 'Diabetes review'],
+  procedure: ['Dressing change', 'Joint injection', 'Endoscopy'],
+  test: ['Echo before the review', 'Thyroid blood test', 'X-ray of the knee', 'MRI preparation'],
+}
+const CANCEL_REASONS = ['The patient is travelling that week.', 'Feeling better; doesn’t need to come.', 'Booked twice by mistake.', 'The doctor is on leave that day.']
+const MOVE_REASONS = ['The patient asked for an evening slot.', 'The doctor’s clinic was moved.', 'Clashed with another test.', 'The patient couldn’t get leave from work.']
+
+/**
+ * Sample appointments, two weeks back to two weeks ahead: past days
+ * completed, missed or cancelled; today partly done; ahead pending,
+ * confirmed, moved or cancelled. Each has its history, as the API would keep it.
+ */
 export function seedAppointments(orgSlug: string): Appointment[] {
   if (orgSlug !== 'arogya-demo') return []
   const r = rng(hash(`${orgSlug}:appointments`))
   const times = ['09:00', '09:30', '10:00', '10:30', '11:15', '12:00', '15:00', '16:30', '17:15', '18:00']
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
   const out: Appointment[] = []
   let n = 0
-  for (let day = -2; day <= 6; day++) {
-    const count = day < 0 ? 2 : 3 + Math.floor(r() * 3)
+  for (let day = -14; day <= 13; day++) {
+    const count = day < 0 ? 2 + Math.floor(r() * 2) : 3 + Math.floor(r() * 3)
     for (let i = 0; i < count; i++) {
       const [department, doctor] = pick(r, DEPARTMENTS)
-      const byAgent = r() > 0.25
-      const check = byAgent && day >= 0 && r() > 0.8
+      const source: BookingSource = pick(r, ['ai_call', 'front_desk', 'manual'] as const, [7, 2, 1])
+      const type: AppointmentType = pick(r, ['new_visit', 'follow_up', 'procedure', 'test'] as const, [5, 4, 1, 2])
+      const time = pick(r, times)
+      const desk = pick(r, DESK).name
+      const created = Math.max(0.05, -day + 1 + r() * 3)
+      const past = day < 0 || (day === 0 && toMin(time) < nowMin - 30)
+      const x = r()
+      const status: AppointmentStatus = past
+        ? day < 0
+          ? x < 0.7 ? 'completed' : x < 0.82 ? 'no_show' : 'cancelled'
+          : x < 0.6 ? 'completed' : x < 0.75 ? 'no_show' : 'confirmed'
+        : x < 0.45 ? 'confirmed' : x < 0.8 ? 'pending' : x < 0.9 ? 'rescheduled' : 'cancelled'
+      const check = source === 'ai_call' && (status === 'pending' || status === 'rescheduled') && r() > 0.65
+      const by = source === 'ai_call' ? 'OPD appointments' : desk
       n++
+      const history: AppointmentChange[] = [{ at: ago(created), by, kind: 'created', text: source === 'ai_call' ? 'Booked on a call by the agent' : source === 'front_desk' ? 'Booked on a phone call by the front desk' : 'Entered by hand' }]
+      // Between the booking and the appointment (or now, for one still to come).
+      const lo = Math.max(0.02, -day)
+      const step = (kind: AppointmentChange['kind'], text: string, reason?: string) =>
+        history.unshift({ at: ago(lo + (created - lo) * (0.2 + r() * 0.6)), by: desk, kind, text, ...(reason ? { reason } : {}) })
+      let cancelReason: string | undefined
+      if (status === 'confirmed' || status === 'completed' || status === 'no_show') step('confirmed', 'Confirmed with the patient')
+      if (status === 'rescheduled') step('rescheduled', `Moved from ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][Math.floor(r() * 5)]}, ${pick(r, times)}`, pick(r, MOVE_REASONS))
+      if (status === 'cancelled') {
+        cancelReason = pick(r, CANCEL_REASONS)
+        step('cancelled', 'Cancelled', cancelReason)
+      }
+      if (status === 'completed') history.unshift({ at: ago(Math.max(0.01, -day)), by: desk, kind: 'completed', text: 'Marked completed' })
+      if (status === 'no_show') history.unshift({ at: ago(Math.max(0.01, -day)), by: desk, kind: 'no_show', text: 'Marked as a no-show' })
       out.push({
         id: `apt_${n}`,
         patientName: pick(r, NAMES),
@@ -763,13 +809,20 @@ export function seedAppointments(orgSlug: string): Appointment[] {
         department,
         doctor,
         date: dayFrom(day),
-        time: pick(r, times),
-        status: day < 0 ? 'confirmed' : check ? 'needs_check' : r() > 0.5 ? 'confirmed' : r() > 0.15 ? 'booked' : 'cancelled',
+        time,
+        status,
         checkReason: check ? pick(r, ['The caller wasn’t sure of the date.', 'The name was hard to hear; check the spelling.', 'Booked outside the doctor’s usual hours.']) : undefined,
-        bookedBy: byAgent ? 'agent' : 'staff',
-        agentName: byAgent ? 'OPD appointments' : null,
+        source,
+        bookedBy: source === 'ai_call' ? 'agent' : 'staff',
+        agentName: source === 'ai_call' ? 'OPD appointments' : null,
         callId: null,
-        createdAt: ago(Math.max(0.1, -day + 1 + r() * 3)),
+        type,
+        visitReason: pick(r, VISIT[type]),
+        ...(cancelReason ? { cancelReason } : {}),
+        createdAt: history[history.length - 1].at,
+        updatedAt: history[0].at,
+        updatedBy: history[0].by,
+        history,
       })
     }
   }

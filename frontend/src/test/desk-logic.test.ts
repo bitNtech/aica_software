@@ -71,7 +71,7 @@ const appt = (over: Partial<Appointment> = {}): Appointment => ({
   doctor: 'Dr. K. Arvind',
   date: '2026-10-25',
   time: '10:00',
-  status: 'booked',
+  status: 'pending',
   bookedBy: 'agent',
   agentName: null,
   callId: null,

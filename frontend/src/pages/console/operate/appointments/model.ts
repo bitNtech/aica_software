@@ -1,4 +1,6 @@
-import type { Appointment, AppointmentPatch, AppointmentStatus, DoctorChange, OrgSettings } from '../../../../console/types'
+import { isOpen, needsCheck } from '../../../../console/appointmentRecords'
+import { awaitsReview, nowKey, startsAt } from '../../../../console/appointmentRecords'
+import type { Appointment, AppointmentPatch, AppointmentStatus, AppointmentType, BookingSettings, BookingSource, DoctorChange, OrgSettings, PatientUpdate, PriorityLevel } from '../../../../console/types'
 
 /**
  * Appointments, worked out: dates and times, a doctor's day, how full it is,
@@ -9,7 +11,20 @@ import type { Appointment, AppointmentPatch, AppointmentStatus, DoctorChange, Or
  * live API doesn't send.
  */
 
-export const APPT_STATUS_LABEL: Record<AppointmentStatus, string> = { needs_check: 'Needs a check', booked: 'Booked', confirmed: 'Confirmed', cancelled: 'Cancelled' }
+export const APPT_STATUS_LABEL: Record<AppointmentStatus, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  rescheduled: 'Rescheduled',
+  completed: 'Completed',
+  no_show: 'No-show',
+  cancelled: 'Cancelled',
+  declined: 'Declined',
+}
+export const SOURCE_LABEL: Record<BookingSource, string> = { ai_call: 'AI call', front_desk: 'Front desk', manual: 'Entered by hand' }
+export const TYPE_LABEL: Record<AppointmentType, string> = { new_visit: 'New visit', follow_up: 'Follow-up', procedure: 'Procedure', test: 'Test or scan' }
+/** How it was booked, for records from before the source was kept. */
+export const sourceOf = (a: Appointment): BookingSource => a.source ?? (a.bookedBy === 'agent' ? 'ai_call' : 'front_desk')
+export { awaitsReview, isOpen, needsCheck }
 
 /** The entry for `key`, made if it isn't there yet. */
 function group<K, V>(map: Map<K, V>, key: K, make: () => V): V {
@@ -21,8 +36,8 @@ function group<K, V>(map: Map<K, V>, key: K, make: () => V): V {
   return v
 }
 
-/** Cancelled bookings are out of play: they take no time, cause no clash and need no check. */
-export const isActive = (a: Appointment) => a.status !== 'cancelled'
+/** Cancelled bookings and declined requests are out of play: they take no time, cause no clash and need no check. */
+export const isActive = (a: Appointment) => a.status !== 'cancelled' && a.status !== 'declined'
 
 /* ------------------------------------------------------------ dates and times */
 
@@ -291,18 +306,28 @@ export function doctorLoads(dates: string[], appts: Appointment[], known: Doctor
 
 export interface Counts {
   needsCheck: number
+  pending: number
   confirmed: number
+  rescheduled: number
+  completed: number
+  noShow: number
   cancelled: number
+  declined: number
   byAgent: number
   total: number
 }
 export function countStatuses(appts: Appointment[]): Counts {
-  const c: Counts = { needsCheck: 0, confirmed: 0, cancelled: 0, byAgent: 0, total: appts.length }
+  const c: Counts = { needsCheck: 0, pending: 0, confirmed: 0, rescheduled: 0, completed: 0, noShow: 0, cancelled: 0, declined: 0, byAgent: 0, total: appts.length }
   for (const a of appts) {
-    if (a.status === 'needs_check') c.needsCheck++
+    if (needsCheck(a)) c.needsCheck++
+    if (a.status === 'pending') c.pending++
     if (a.status === 'confirmed') c.confirmed++
+    if (a.status === 'rescheduled') c.rescheduled++
+    if (a.status === 'completed') c.completed++
+    if (a.status === 'no_show') c.noShow++
     if (a.status === 'cancelled') c.cancelled++
-    if (a.bookedBy === 'agent') c.byAgent++
+    if (a.status === 'declined') c.declined++
+    if (sourceOf(a) === 'ai_call') c.byAgent++
   }
   return c
 }
@@ -318,17 +343,23 @@ export interface Placed {
   lanes: number
 }
 
-/** Positions one doctor's bookings in a column: overlapping ones share it side by side. */
+/**
+ * Positions one doctor's bookings in a column: overlapping ones share it
+ * side by side, except the agent's requests for the same time, which take
+ * one place together as a pile (best-ranked in front).
+ */
 export function layoutColumn(appts: Appointment[], slot: number): Placed[] {
-  const items = appts
-    .map((appt) => ({ appt, start: toMin(appt.time), end: toMin(appt.time) + slot }))
-    .sort((a, b) => a.start - b.start || a.appt.id.localeCompare(b.appt.id))
+  const units = new Map<string, Appointment[]>()
+  for (const a of appts) group(units, pileOf(a) ? `pile|${a.time}` : a.id, () => []).push(a)
+  const items = [...units.values()]
+    .map((members) => ({ members: [...members].sort(byStartRank), start: toMin(members[0].time), end: toMin(members[0].time) + slot }))
+    .sort((a, b) => a.start - b.start || a.members[0].id.localeCompare(b.members[0].id))
   const out: Placed[] = []
   let cluster: { item: (typeof items)[number]; lane: number }[] = []
   let clusterEnd = -1
   const flush = () => {
     const lanes = cluster.reduce((m, c) => Math.max(m, c.lane + 1), 1)
-    for (const c of cluster) out.push({ ...c.item, lane: c.lane, lanes })
+    for (const c of cluster) for (const appt of c.item.members) out.push({ appt, start: c.item.start, end: c.item.end, lane: c.lane, lanes })
     cluster = []
   }
   for (const item of items) {
@@ -386,7 +417,7 @@ export const PROBLEM_SHORT: Record<ProblemKind, string> = {
   doctor_away: 'Doctor away',
   doctor_late: 'Doctor late',
   in_the_past: 'In the past',
-  past_unconfirmed: 'Never confirmed',
+  past_unconfirmed: 'Not marked',
   same_patient_twice: 'Twice in a day',
   unknown_doctor: 'Unknown doctor',
 }
@@ -454,14 +485,16 @@ export function proposalProblems(slot: Slot, others: Appointment[], ctx: Ctx): P
 
 /**
  * Everything wrong with the bookings, by appointment id (bookings with
- * nothing wrong are left out). Cancelled bookings are never a problem.
+ * nothing wrong are left out). Only pending, confirmed and rescheduled
+ * bookings are checked: completed, missed and cancelled ones are settled.
  * Checked: double booking, outside hours, closed day, doctor away or late
  * at that time, past and never confirmed, the same patient twice on a day,
  * and a doctor missing from the knowledge library (only when that list was
  * readable and has doctors in it).
  */
 export function findProblems(appts: Appointment[], ctx: Ctx): Map<string, Problem[]> {
-  const active = appts.filter(isActive)
+  // Only bookings still to be dealt with: a completed, missed or cancelled one has nothing left to fix.
+  const active = appts.filter(isOpen)
   const found = new Map<string, Problem[]>()
   const add = (id: string, p: Problem) => group(found, id, () => []).push(p)
 
@@ -472,10 +505,15 @@ export function findProblems(appts: Appointment[], ctx: Ctx): Map<string, Proble
   const libraryNames = ctx.library && ctx.library.length ? new Set(ctx.library.map((d) => norm(d.doctor))) : null
 
   for (const a of active) {
-    const mates = groups.get(`${norm(a.doctor)}|${a.date}`)!.filter((o) => o !== a)
+    // The agent's requests for a time aren't a clash with each other (they are ranked and decided), nor with a booking already given that time: the request is the one flagged.
+    const mates = groups.get(`${norm(a.doctor)}|${a.date}`)!.filter((o) => o !== a && !(isRequest(o) && (isRequest(a) || a.status !== 'pending')))
     for (const p of slotProblems(a, mates, ctx)) add(a.id, p)
-    if (a.status !== 'confirmed' && (a.date < t.date || (a.date === t.date && toMin(a.time) < t.minutes))) {
-      add(a.id, { kind: 'past_unconfirmed', tone: 'warn', text: `That time has passed and the booking was never confirmed (${APPT_STATUS_LABEL[a.status].toLowerCase()}).` })
+    if (isOpen(a) && (a.date < t.date || (a.date === t.date && toMin(a.time) < t.minutes))) {
+      add(a.id, {
+        kind: 'past_unconfirmed',
+        tone: 'warn',
+        text: a.status === 'confirmed' ? 'That time has passed: mark it completed or a no-show.' : `That time has passed and the booking was never confirmed (${APPT_STATUS_LABEL[a.status].toLowerCase()}).`,
+      })
     }
     if (libraryNames && !libraryNames.has(norm(a.doctor))) {
       add(a.id, { kind: 'unknown_doctor', tone: 'warn', text: `${a.doctor} isn't in the doctor list the agents answer from.` })
@@ -544,7 +582,7 @@ export interface Filters {
   doctor: string
   department: string
   status: AppointmentStatus | ''
-  by: '' | 'agent' | 'staff'
+  by: '' | BookingSource
   text: string
   problemsOnly: boolean
 }
@@ -576,7 +614,7 @@ export function applyFilters(appts: Appointment[], f: Filters, problems: Map<str
     if (f.doctor && norm(a.doctor) !== norm(f.doctor)) return false
     if (f.department && a.department !== f.department) return false
     if (f.status && a.status !== f.status) return false
-    if (f.by && a.bookedBy !== f.by) return false
+    if (f.by && sourceOf(a) !== f.by) return false
     if (f.problemsOnly && !problems.has(a.id)) return false
     if (text) {
       const hit =
@@ -592,7 +630,10 @@ export function applyFilters(appts: Appointment[], f: Filters, problems: Map<str
 
 /* ------------------------------------------------------------ views and ranges */
 
-export type View = 'day' | 'week' | 'list'
+/** Calendars (day by doctor, week, month) and lists (today, all, pending, changes). */
+export type View = 'today' | 'day' | 'week' | 'month' | 'list' | 'pending' | 'changes'
+/** `pending` is the requests to review (its key kept, so a remembered view still opens). */
+export const CALENDAR_VIEWS: View[] = ['day', 'week', 'month']
 export type ListScope = 'day' | 'week' | 'all'
 /** Days back and ahead of today that are always loaded: a week back, a month ahead. */
 export const DAYS_BACK = 7
@@ -602,8 +643,10 @@ export const baseWindow = (today: string) => ({ from: addDays(today, -DAYS_BACK)
 
 /** The days a view shows. The list's "all" is the whole loaded range. */
 export function viewDates(view: View, anchor: string, scope: ListScope, today: string): string[] {
+  if (view === 'today') return [today]
   if (view === 'day' || (view === 'list' && scope === 'day')) return [anchor]
   if (view === 'week' || (view === 'list' && scope === 'week')) return dateList(mondayOf(anchor), 7)
+  if (view === 'month') return monthGrid(anchor)
   const w = baseWindow(today)
   return dateList(w.from, daysBetween(w.from, w.to) + 1)
 }
@@ -618,11 +661,34 @@ export function loadWindow(today: string, dates: string[]): { from: string; to: 
   const first = dates[0] ?? today
   const last = dates[dates.length - 1] ?? today
   if (first >= base.from && last <= base.to) return base
-  return { from: addDays(first, -DAYS_BACK), to: addDays(first, DAYS_AHEAD) }
+  const to = addDays(first, DAYS_AHEAD)
+  return { from: addDays(first, -DAYS_BACK), to: last > to ? last : to }
 }
+
+/** The month around `date`, as whole weeks: Monday before the 1st to Sunday after the last day. */
+export function monthGrid(date: string): string[] {
+  const first = `${date.slice(0, 7)}-01`
+  const next = addMonths(first, 1)
+  const start = mondayOf(first)
+  const end = addDays(mondayOf(addDays(next, -1)), 6)
+  return dateList(start, daysBetween(start, end) + 1)
+}
+
+/** The same day `n` months on (the 1st of the month for day 1; clamped to the month's last day). */
+export function addMonths(date: string, n: number): string {
+  const d = parseDay(date)
+  const day = d.getDate()
+  const m = new Date(d.getFullYear(), d.getMonth() + n, 1)
+  const last = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate()
+  return dayString(new Date(m.getFullYear(), m.getMonth(), Math.min(day, last)))
+}
+
+export const monthName = (date: string) => parseDay(date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
 
 /** How far prev/next moves: a day for the day views, a week for the week views. */
 export const stepDays = (view: View, scope: ListScope) => (view === 'week' || (view === 'list' && scope !== 'day') ? 7 : 1)
+/** Views that show the whole loaded range rather than days picked with Previous and Next. */
+export const isRangeView = (view: View, scope: ListScope) => view === 'today' || view === 'pending' || view === 'changes' || (view === 'list' && scope === 'all')
 
 /* ------------------------------------------------------------ keyboard */
 
@@ -673,8 +739,10 @@ export function csvCell(v: string): string {
  * named as the person exporting may see them.
  */
 export function daySheet(appts: Appointment[], sees: Sees): string {
-  const head = ['Date', 'Time', 'Doctor', 'Patient', ...(sees.phone ? ['Phone'] : []), 'Status', 'Notes']
-  const rows = [...appts].sort(byStart).map((a) => [a.date, a.time, a.doctor, patientLabel(a, sees), ...(sees.phone ? [a.phone] : []), APPT_STATUS_LABEL[a.status], a.note ?? ''])
+  const head = ['Appointment', 'Date', 'Time', 'Doctor', 'Department', 'Patient', ...(sees.phone ? ['Phone'] : []), 'Type', 'Reason for visit', 'Status', 'Booked through', 'Notes']
+  const rows = [...appts]
+    .sort(byStart)
+    .map((a) => [a.id, a.date, a.time, a.doctor, a.department, patientLabel(a, sees), ...(sees.phone ? [a.phone] : []), a.type ? TYPE_LABEL[a.type] : '', a.visitReason ?? '', APPT_STATUS_LABEL[a.status], SOURCE_LABEL[sourceOf(a)], a.note ?? ''])
   return [head, ...rows].map((r) => r.map(csvCell).join(',')).join('\n')
 }
 
@@ -685,7 +753,7 @@ const VIEW_KEY = (userId: string) => `aica.appointments.view.${userId}`
 export function readView(userId: string): View | null {
   try {
     const v = localStorage.getItem(VIEW_KEY(userId))
-    return v === 'day' || v === 'week' || v === 'list' ? v : null
+    return (['today', 'day', 'week', 'month', 'list', 'pending', 'changes'] as string[]).includes(v ?? '') ? (v as View) : null
   } catch {
     return null
   }
@@ -708,24 +776,117 @@ export function mergeById(...lists: Appointment[][]): Appointment[] {
 /* ------------------------------------------------------------ undo */
 
 /**
- * The patches, in order, that put a booking back as it was before a change,
- * or null when the API can't (or can't faithfully) do it. A cancelled
- * booking can only be booked again, so Undo of a cancel is "booked", then
- * "confirmed" if it had been. The agent's reason for a check is cleared
- * once a booking is no longer "needs a check" and can't be written back, so
- * a change from that state has no Undo, and cancelling one restores it only
- * as booked.
+ * The change that puts a booking back exactly as it was (Undo), or null
+ * when nothing that can be put back differs. It is marked `undo`, so the
+ * usual order of statuses doesn't stop it, and the history says so.
  */
 export function undoPatches(before: Appointment, after: Appointment): AppointmentPatch[] | null {
-  if (before.status === 'cancelled') return after.status === 'booked' ? [{ status: 'cancelled' }] : null
-  if (after.status === 'cancelled') return [{ status: 'booked' }, ...(before.status === 'confirmed' ? [{ status: 'confirmed' as const }] : [])]
-  if (before.status === 'needs_check') return null
-  const patch: AppointmentPatch = {}
+  const patch: AppointmentPatch = { undo: true }
   if (before.status !== after.status) patch.status = before.status
   if (before.date !== after.date) patch.date = before.date
   if (before.time !== after.time) patch.time = before.time
   if (before.doctor !== after.doctor) patch.doctor = before.doctor
   if (before.department !== after.department) patch.department = before.department
   if ((before.note ?? '') !== (after.note ?? '')) patch.note = before.note ?? ''
-  return Object.keys(patch).length ? [patch] : null
+  return Object.keys(patch).length > 1 ? [patch] : null
+}
+
+/* ------------------------------------------------------------ requests and ranking */
+
+export const PRIORITY_LABEL: Record<PriorityLevel, string> = { urgent: 'Urgent', high: 'High', normal: 'Normal', routine: 'Routine' }
+export const PRIORITY_ORDER: Record<PriorityLevel, number> = { urgent: 0, high: 1, normal: 2, routine: 3 }
+
+/** Several requests for one doctor at one time, best-ranked first, and anything already given that time. */
+export interface RequestGroup {
+  key: string
+  date: string
+  time: string
+  doctor: string
+  department: string
+  requests: Appointment[]
+  /** A confirmed or offered booking already at that time, if any. */
+  taken: Appointment | null
+  /** The most pressing level among them (unranked counts as normal). */
+  level: PriorityLevel
+}
+
+/** A booking the agent made that waits for the hospital to decide: only these are ranked against each other. */
+export const isRequest = (a: Appointment) => a.status === 'pending' && sourceOf(a) === 'ai_call'
+
+const reqKey = (a: Appointment) => `${norm(a.doctor)}|${a.date}|${a.time}`
+const byRank = (a: Appointment, b: Appointment) => (a.rank?.position ?? 1) - (b.rank?.position ?? 1) || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+
+/**
+ * The requests waiting for a decision, grouped by doctor and time. Groups
+ * with something urgent come first, then by time. `all` is every booking
+ * loaded, to find a time already given to someone.
+ */
+export function requestGroups(requests: Appointment[], all: Appointment[], slot: number): RequestGroup[] {
+  const map = new Map<string, Appointment[]>()
+  for (const a of requests) if (a.status === 'pending') group(map, reqKey(a), () => []).push(a)
+  const out: RequestGroup[] = []
+  for (const [key, list] of map) {
+    const sorted = [...list].sort(byRank)
+    const first = sorted[0]
+    const taken = all.find((o) => o.status !== 'pending' && isOpen(o) && o.date === first.date && norm(o.doctor) === norm(first.doctor) && Math.abs(toMin(o.time) - toMin(first.time)) < slot) ?? null
+    const level = sorted.reduce<PriorityLevel>((m, a) => (a.rank && PRIORITY_ORDER[a.rank.level] < PRIORITY_ORDER[m] ? a.rank.level : m), 'normal')
+    out.push({ key, date: first.date, time: first.time, doctor: first.doctor, department: first.department, requests: sorted, taken, level })
+  }
+  return out.sort((a, b) => PRIORITY_ORDER[a.level] - PRIORITY_ORDER[b.level] || `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || a.doctor.localeCompare(b.doctor))
+}
+
+/** The other requests for the same doctor and time, best-ranked first. */
+export const rivalsOf = (a: Appointment, all: Appointment[]) => (isRequest(a) ? all.filter((o) => o.id !== a.id && isRequest(o) && reqKey(o) === reqKey(a)).sort(byRank) : [])
+
+/** What the evening's automatic confirmation would do with the requests now: as the server will, without finding the new times. */
+export function autoPreview(rows: Appointment[], s: BookingSettings, now: number): { confirm: number; others: number; left: number } {
+  const nk = nowKey(now)
+  const groups = requestGroups(rows.filter((a) => isRequest(a) && startsAt(a) > nk), rows, 1)
+  const out = { confirm: 0, others: 0, left: 0 }
+  for (const g of groups) {
+    const top = g.requests[0]
+    if ((s.autoSkipUrgent && top.rank?.level === 'urgent') || (s.autoSkipFlagged && top.checkReason)) out.left += g.requests.length
+    else {
+      out.confirm++
+      out.others += g.requests.length - 1
+    }
+  }
+  return out
+}
+
+/** Where a request sits in the pile of requests for its time (0 is the best-ranked), or null when it isn't in one. */
+export interface Pile {
+  index: number
+  size: number
+  level: PriorityLevel
+}
+export function pileOf(a: Appointment): Pile | null {
+  return isRequest(a) && a.rank && a.rank.of > 1 ? { index: a.rank.position - 1, size: a.rank.of, level: a.rank.level } : null
+}
+/** By start, and within the agent's requests for one time, by rank. */
+export const byStartRank = (a: Appointment, b: Appointment) =>
+  startKey(a).localeCompare(startKey(b)) || a.doctor.localeCompare(b.doctor) || (pileOf(a)?.index ?? -1) - (pileOf(b)?.index ?? -1) || a.id.localeCompare(b.id)
+
+/** Requests waiting for a decision, and flagged ones (the sidebar's and Home's count). */
+export const toReview = (rows: Appointment[]) => rows.filter(awaitsReview)
+
+export const UPDATE_CHANNEL_LABEL: Record<PatientUpdate['channel'], string> = { callback: 'Agent callback', whatsapp: 'WhatsApp message' }
+export const UPDATE_ABOUT_LABEL: Record<PatientUpdate['about'], string> = { confirmed: 'Confirmation', declined: 'Request declined', moved: 'New time offered' }
+export const UPDATE_STATE_LABEL: Record<PatientUpdate['state'], string> = {
+  queued: 'Queued',
+  in_progress: 'Calling now',
+  done: 'Answered',
+  no_answer: 'No answer',
+  sent: 'Sent',
+  delivered: 'Delivered',
+  read: 'Read',
+  failed: 'Failed',
+}
+/** How the patient is told, in words: "the agent calls back and a WhatsApp message goes out". */
+export function howTold(s: BookingSettings | null): string | null {
+  if (!s) return null
+  if (s.callback && s.whatsapp) return 'the agent calls the patient back and a WhatsApp message goes out'
+  if (s.callback) return 'the agent calls the patient back'
+  if (s.whatsapp) return 'a WhatsApp message goes to the patient'
+  return null
 }

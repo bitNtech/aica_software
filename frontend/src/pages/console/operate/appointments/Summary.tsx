@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { ToneIcon } from '../../../../components/console/StatusPill'
 import type { Appointment } from '../../../../console/types'
 import { useMediaQuery } from '../../../../lib/useMediaQuery'
-import { byStart, dayName, doctorShort, noteLabel, time12, type Counts, type DoctorLoad, type Problem } from './model'
+import { byStart, dayName, needsCheck, doctorShort, noteLabel, time12, type Counts, type DoctorLoad, type Problem } from './model'
 import { ApptStatus, ProblemFlag, type Shared } from './parts'
 
 /**
@@ -100,10 +100,10 @@ export function CheckPanel({ items, shared }: { items: Appointment[]; shared: Sh
                       {sees.name ? a.patientName : 'A patient'} <span className="ap-check__sub">{doctorShort(a.doctor)}</span>
                     </span>
                     <span className="ap-check__why">
-                      <ApptStatus status={a.status} />
+                      <ApptStatus appt={a} />
                       <ProblemFlag problems={p} />
                     </span>
-                    {a.status === 'needs_check' && a.checkReason && <span className="ap-check__reason">{a.checkReason}</span>}
+                    {needsCheck(a) && <span className="ap-check__reason">{a.checkReason}</span>}
                     {p[0] && <span className="ap-check__reason">{p[0].text}</span>}
                   </button>
                 </li>

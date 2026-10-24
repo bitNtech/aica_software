@@ -8,6 +8,7 @@ import { since } from '../operate/shared'
 import { StaleNote } from '../operate/LiveBits'
 import { isOverdue, waitingCallers } from './shift'
 import type { Slice, Today } from './useToday'
+import { awaitsReview } from '../../../console/appointmentRecords'
 
 /** Whether this person is shown anything about today at all. */
 export function expectsToday(access: Parameters<typeof can>[0]): boolean {
@@ -45,7 +46,7 @@ export function NeedsAPerson({
   const ownCallbacks = !access.perms.has('callbacks.assign')
   const openCallbacks = (today?.callbacks?.data ?? []).filter((c) => c.status === 'open' && (!ownCallbacks || c.assignedTo?.id === user.id || !c.assignedTo))
   const overdue = openCallbacks.filter((c) => isOverdue(c, now))
-  const toCheck = (today?.appointments?.data ?? []).filter((a) => a.status === 'needs_check')
+  const toCheck = (today?.appointments?.data ?? []).filter(awaitsReview)
   const liveCalls = today?.live?.data ?? []
   const upset = liveCalls.some((c) => c.flagged && !c.takenBy)
 
@@ -107,10 +108,10 @@ export function NeedsAPerson({
             slice={today.appointments}
             retry={reload}
             to={`${base}/appointments`}
-            label="Today's appointments to check"
+            label="Today's appointment requests to review"
             count={toCheck.length}
             urgent={false}
-            detail={`${(today.appointments.data ?? []).filter((a) => a.status !== 'cancelled').length} appointments today`}
+            detail={`${(today.appointments.data ?? []).filter((a) => a.status !== 'cancelled' && a.status !== 'declined').length} appointments today`}
           />
         )}
       </ul>

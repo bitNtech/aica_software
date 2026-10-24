@@ -13,8 +13,9 @@ describe('My account', () => {
     await user.type(name, 'Meena Sundaram')
     await user.click(screen.getByRole('button', { name: /save name/i }))
     expect(await screen.findByText('Name saved.')).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: /back to arogya demo hospital/i }))
+    // The account is inside the console now: the sidebar shows the new name.
     expect(await screen.findByRole('link', { name: /meena sundaram: your account/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: /your role in arogya demo hospital/i })).toBeInTheDocument()
   })
 
   it('shows only the emails for the person’s roles, and saves a change', async () => {

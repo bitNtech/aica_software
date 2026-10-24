@@ -11,10 +11,16 @@ import { useOrg } from '../../../../console/useOrg'
 import { timeAgo } from '../../../../lib/time'
 import { duration, OUTCOME_LABEL } from '../shared'
 import { ChangeDialog } from './ChangeDialog'
-import { addDays, byStart, dayName, doctorNote, longDay, mergeById, patientIdentity, shortDay, time12 } from './model'
-import { ApptStatus, NotePill, ProblemList, type Shared } from './parts'
+import { addDays, byStart, dayName, doctorNote, isOpen, longDay, mergeById, needsCheck, patientIdentity, shortDay, SOURCE_LABEL, sourceOf, time12, TYPE_LABEL } from './model'
+import { nowKey } from '../../../../console/appointmentRecords'
+import { TextAreaField } from '../../../../components/ui/Field'
+import { History } from './History'
+import { ApptStatus, NotePill, PriorityPill, ProblemList, type ActionKind, type Shared } from './parts'
+import { PatientUpdates } from './PatientUpdates'
+import { useRequestActions } from './RequestActions'
+import { rivalsOf } from './model'
 
-export type ActionKind = 'confirm' | 'change' | 'cancel' | 'rebook'
+export type { ActionKind }
 
 interface Props {
   appt: Appointment
@@ -45,13 +51,35 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
   const [error, setError] = useState<string | null>(null)
   const [changing, setChanging] = useState(false)
   const [cancelling, setCancelling] = useState(false)
-  const { sees, today, problems, changes } = shared
+  const [cancelReason, setCancelReason] = useState('')
+  const reasonField = useRef<HTMLTextAreaElement>(null)
+  const { sees, today, problems, changes, now } = shared
 
   const who = sees.name ? a.patientName : 'A patient'
   const mine = problems.get(a.id) ?? []
   const note = doctorNote(a.doctor, a.date, changes)
   const cancelled = a.status === 'cancelled'
+  const open = isOpen(a)
+  /** Its time has come: it can be marked completed or a no-show. */
+  const passed = `${a.date} ${a.time}` <= nowKey(now)
+  const source = sourceOf(a)
   const telHref = sees.phone ? `tel:${a.phone.replace(/[^\d+]/g, '')}` : null
+  const req = useRequestActions(shared)
+  const rivals = a.status === 'pending' ? rivalsOf(a, rows) : []
+
+  /** Confirm: a lone request at once, one with rivals through the dialog that settles them. */
+  async function confirm() {
+    if (a.status !== 'pending') return void run('confirm', { status: 'confirmed' })
+    setBusy('confirm')
+    setError(null)
+    try {
+      await req.confirm(a)
+    } catch (err) {
+      setError(asAuthError(err).message)
+    } finally {
+      setBusy(null)
+    }
+  }
 
   /** A button's action, with its own busy state and error, and focus kept in the detail afterwards. */
   async function run(kind: ActionKind, patch: AppointmentPatch): Promise<boolean> {
@@ -71,7 +99,7 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
 
   // While a dialog is open, Escape closes the dialog (not the drawer around it) and Tab stays inside it (the drawer's own trap would send focus to the page behind).
   const keepKeys = (e: KeyboardEvent) => {
-    if ((changing || cancelling) && (e.key === 'Escape' || e.key === 'Tab')) e.stopPropagation()
+    if ((changing || cancelling || req.open) && (e.key === 'Escape' || e.key === 'Tab')) e.stopPropagation()
   }
   // Arriving on another appointment from this one's list: focus its name, since the button pressed has gone.
   useEffect(() => {
@@ -94,41 +122,92 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
           <h2 className="ap-detail__name" id={`${uid}-name`} ref={heading} tabIndex={-1}>
             {who}
           </h2>
-          <ApptStatus status={a.status} />
+          <ApptStatus appt={a} />
         </div>
         <p className="ap-detail__when num">
           {longDay(a.date)}, {time12(a.time)}
         </p>
+        <p className="ap-detail__id">
+          Appointment <span className="num">{a.id}</span>
+        </p>
       </header>
 
-      {a.status === 'needs_check' && a.checkReason && (
+      {needsCheck(a) && (
         <p className="ap-callout ap-callout--warn">
           <strong>Needs a check.</strong> {a.checkReason}
         </p>
       )}
+      {a.status === 'declined' && a.declineReason && (
+        <p className="ap-callout">
+          <strong>Declined.</strong> {a.declineReason}
+        </p>
+      )}
+      {rivals.length > 0 && (
+        <p className="ap-callout ap-callout--info">
+          <strong>
+            {rivals.length + 1} requests for this time.
+          </strong>{' '}
+          {a.rank?.position === 1 ? 'This one is ranked first.' : `This one is ranked ${a.rank?.position ?? '?'} of ${rivals.length + 1}.`} Confirming it settles the others.
+        </p>
+      )}
+      {cancelled && a.cancelReason && (
+        <p className="ap-callout">
+          <strong>Cancelled.</strong> {a.cancelReason}
+        </p>
+      )}
       <ProblemList problems={mine} />
 
-      {canEdit && (
+      {(canEdit || (a.callId && canOpen(access, 'calls'))) && (
         <div className="ap-actions" role="group" aria-label="What to do with this appointment">
-          {!cancelled && a.status !== 'confirmed' && (
-            <Button variant="plum" size="sm" busy={busy === 'confirm'} busyLabel="Confirming…" disabled={!!busy} onClick={() => void run('confirm', { status: 'confirmed' })}>
+          {canEdit && (a.status === 'pending' || a.status === 'rescheduled') && (
+            <Button variant="plum" size="sm" busy={busy === 'confirm'} busyLabel="Confirming…" disabled={!!busy} onClick={() => void confirm()}>
               Confirm
             </Button>
           )}
-          {!cancelled && (
-            <Button variant="line" size="sm" disabled={!!busy} onClick={() => setChanging(true)}>
-              Change
+          {canEdit && a.status === 'pending' && (
+            <Button variant="line" size="sm" disabled={!!busy} onClick={() => req.decline(a)}>
+              Decline
             </Button>
           )}
-          {!cancelled && (
-            <Button variant="line" size="sm" className="ap-actions__cancel" disabled={!!busy} onClick={() => { setError(null); setCancelling(true) }}>
+          {canEdit && open && passed && (
+            <>
+              <Button variant="line" size="sm" busy={busy === 'complete'} busyLabel="Marking…" disabled={!!busy} onClick={() => void run('complete', { status: 'completed' })}>
+                Mark completed
+              </Button>
+              <Button variant="line" size="sm" busy={busy === 'no_show'} busyLabel="Marking…" disabled={!!busy} onClick={() => void run('no_show', { status: 'no_show' })}>
+                Mark no-show
+              </Button>
+            </>
+          )}
+          {canEdit && (open || a.status === 'no_show') && (
+            <Button variant="line" size="sm" disabled={!!busy} onClick={() => setChanging(true)}>
+              Reschedule
+            </Button>
+          )}
+          {canEdit && open && (
+            <Button
+              variant="line"
+              size="sm"
+              className="ap-actions__cancel"
+              disabled={!!busy}
+              onClick={() => {
+                setError(null)
+                setCancelReason('')
+                setCancelling(true)
+              }}
+            >
               Cancel
             </Button>
           )}
-          {cancelled && (
-            <Button variant="line" size="sm" busy={busy === 'rebook'} busyLabel="Booking again…" disabled={!!busy} onClick={() => void run('rebook', { status: 'booked' })}>
+          {canEdit && (cancelled || a.status === 'no_show') && (
+            <Button variant="line" size="sm" busy={busy === 'rebook'} busyLabel="Booking again…" disabled={!!busy} onClick={() => void run('rebook', { status: 'pending' })}>
               Book it again
             </Button>
+          )}
+          {a.callId && canOpen(access, 'calls') && (
+            <Link className="btn btn--line btn--sm" to={`${base}/calls/${a.callId}`}>
+              <span>View call</span>
+            </Link>
           )}
           {telHref && (
             <a className="btn btn--line btn--sm" href={telHref}>
@@ -162,9 +241,31 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
           <dd>{a.department}</dd>
         </div>
         <div>
-          <dt>Booked by</dt>
+          <dt>Type</dt>
+          <dd>{a.type ? TYPE_LABEL[a.type] : <span className="ap-muted">Not given</span>}</dd>
+        </div>
+        <div className="ap-facts__wide">
+          <dt>Reason for visit</dt>
+          <dd>{a.visitReason ?? <span className="ap-muted">Not given</span>}</dd>
+        </div>
+        <div>
+          <dt>Booked through</dt>
           <dd>
-            {a.bookedBy === 'agent' ? `Agent${a.agentName ? `: ${a.agentName}` : ''}` : 'Staff'} <span className="ap-facts__sub">{timeAgo(a.createdAt)}</span>
+            {SOURCE_LABEL[source]}
+            {source === 'ai_call' && a.agentName ? <span className="ap-facts__sub">{a.agentName}</span> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd>
+            {stamp(a.createdAt)} <span className="ap-facts__sub">{timeAgo(a.createdAt)}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Last updated</dt>
+          <dd>
+            {stamp(a.updatedAt ?? a.createdAt)}
+            {a.updatedBy && <span className="ap-facts__sub"> by {a.updatedBy}</span>}
           </dd>
         </div>
         {a.note && (
@@ -175,11 +276,15 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
         )}
       </dl>
 
+      {a.rank && section(a.status === 'pending' ? 'Priority' : 'How it was ranked', 'rank', <Priority a={a} rivals={rivals} shared={shared} onOpen={onOpenOther} />)}
+      {sourceOf(a) === 'ai_call' && section('Patient told', 'told', <PatientUpdates appt={a} shared={shared} />)}
       {section('The booking call', 'call', <BookingCall a={a} showLink={canOpen(access, 'calls')} base={base} />)}
+      {section('What happened', 'history', <History appt={a} />)}
       {section('This patient’s other appointments', 'others', <Others a={a} shared={shared} rows={rows} onOpen={onOpenOther} />)}
 
       {/* Inside the drawer, so the page's inert layer doesn't swallow them. */}
       <div onKeyDown={keepKeys}>
+        {req.dialogs}
         <ChangeDialog
           appointment={changing ? a : null}
           rows={rows}
@@ -203,15 +308,55 @@ export function Detail({ appt: a, shared, rows, loaded, canEdit, onAct, onOpenOt
           busy={busy === 'cancel'}
           danger
           error={cancelling ? error : null}
-          onConfirm={() => void run('cancel', { status: 'cancelled' }).then((ok) => ok && setCancelling(false))}
+          initialFocus={reasonField}
+          onConfirm={() => {
+            if (cancelReason.trim().length < 3) {
+              setError('Say why it’s being cancelled. It goes in the history.')
+              reasonField.current?.focus()
+              return
+            }
+            void run('cancel', { status: 'cancelled', changeReason: cancelReason.trim() }).then((ok) => ok && setCancelling(false))
+          }}
           onCancel={() => setCancelling(false)}
         >
           <p>
             {dayName(a.date, today)} at {time12(a.time)} with {a.doctor}. Let the patient know: AICA doesn't call them about it.
           </p>
+          <TextAreaField ref={reasonField} label="Why it’s cancelled" rows={2} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} hint="Kept in the appointment’s history." />
         </ConfirmDialog>
       </div>
     </article>
+  )
+}
+
+/** Where it was ranked among requests for the same time, the LLM's reasons, and the others. */
+function Priority({ a, rivals, shared, onOpen }: { a: Appointment; rivals: Appointment[]; shared: Shared; onOpen(x: Appointment): void }) {
+  const r = a.rank!
+  return (
+    <div className="ap-rank">
+      <p className="ap-rank__head">
+        <span className="ap-rank__pos num">
+          {r.position} of {r.of}
+        </span>
+        <PriorityPill level={r.level} />
+        {r.position === 1 && a.status === 'pending' && <span className="ap-reqs">Recommended</span>}
+      </p>
+      <p>{r.reasons}</p>
+      <p className="ap-muted">Ranked by the LLM from what the agent gathered on each call, {timeAgo(r.rankedAt)}.</p>
+      {rivals.length > 0 && (
+        <ul className="ap-others">
+          {rivals.map((o) => (
+            <li key={o.id}>
+              <button type="button" className="ap-others__row" onClick={() => onOpen(o)}>
+                <span className="num">{o.rank ? `${o.rank.position} of ${o.rank.of}` : '–'}</span>
+                <span>{shared.sees.name ? o.patientName : 'A patient'}{o.visitReason ? `: ${o.visitReason}` : ''}</span>
+                {o.rank && <PriorityPill level={o.rank.level} />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -236,12 +381,14 @@ function BookingCall({ a, showLink, base }: { a: Appointment; showLink: boolean;
   }, [client, org.orgSlug, a.callId])
 
   if (!a.callId) {
-    return a.bookedBy === 'agent' ? (
+    return sourceOf(a) === 'ai_call' ? (
       <p className="ap-muted">
         Booked by {a.agentName ?? 'an agent'} on a call, {timeAgo(a.createdAt)}. No call is linked to this booking, so there is no summary to show.
       </p>
     ) : (
-      <p className="ap-muted">Booked by staff, {timeAgo(a.createdAt)}: not on a call.</p>
+      <p className="ap-muted">
+        {sourceOf(a) === 'front_desk' ? 'Booked by the front desk on a phone call' : 'Entered by hand'}, {timeAgo(a.createdAt)}: no recorded call.
+      </p>
     )
   }
   if (!rec || rec.state === 'loading') return <span aria-busy="true"><p className="sr-only" role="status">Loading the call…</p><Skeleton lines={3} /></span>
@@ -314,10 +461,16 @@ function Others({ a, shared, rows, onOpen }: { a: Appointment; shared: Shared; r
             <span>
               {o.doctor}, {o.department}
             </span>
-            <ApptStatus status={o.status} />
+            <ApptStatus appt={o} />
           </button>
         </li>
       ))}
     </ul>
   )
+}
+
+/** "Thu 23 Oct, 4:12 pm": a moment in full. */
+function stamp(iso: string): string {
+  const d = new Date(iso)
+  return `${d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}, ${d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`
 }

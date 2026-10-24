@@ -1,6 +1,13 @@
 # Project Handoff
 
 ## Status
+- Latest (2026-10-25, `main`, **uncommitted**): calendars now pile up the agent's requests for one time instead of merging them into one block (see "Appointment requests" → "Calendar piles"). Approved "proceed". Verified: `tsc -b` clean, vitest 846/846, `npm run build` ok, screenshots reviewed (Day and Week at 1440, the list view at 390).
+- Latest (2026-10-24, `main`, **uncommitted**): appointment **requests** flow (see "Appointment requests" below). Approved "proceed" on the revised plan. Frontend and demo only. Verified: `tsc -b` clean, vitest 846/846 (62 files), `npm run build` ok, screenshots reviewed (1440 and 390).
+- Next recommended action: agree the pipeline contract in `docs/backend-workflow.md` §5 "Appointment requests" (request event, LLM ranking, outbound callback, WhatsApp provider and templates), then plan the backend.
+- Latest (2026-10-24, `main`, **uncommitted**): Appointments page reworked (see "Appointments rework" below). Approved "no backend, otherwise go with the best". Verified: `tsc -b` clean, vitest 835/835, `npm run build` ok, screenshots reviewed (1440 and 390).
+- Latest (2026-10-24, `main`, **uncommitted**): seven organisation console pages (see "Organisation console pages" below). Approved "proceed" on the recommended defaults: owners act on their own (typing the organisation's name instead of a password check, because there's no re-authentication API); email-only alerts; Activity renamed Audit log; UI only. Verified: `tsc -b` clean, vitest 823/823, `npm run build` ok, screenshots reviewed.
+- Latest (2026-10-24, `main`, **uncommitted**): the master admin's Ops app now covers every organisation (19 pages; see "Ops management pages" below). Approved "proceed" with these answers: personal data is the master admin's only; Deployments covers both agent versions and platform releases; Security covers both policies and access review; old addresses redirect; Billing has both provider payment methods and invoices; built directly, without subagents. Verified: `tsc -b` clean, vitest 813/813, `npm run build` ok, headless screenshots reviewed.
+- Next recommended action: try the pages in a real browser, then plan the backend: one cross-organisation endpoint per Ops page, plus incidents, deployments, security policies and billing APIs.
 - Latest (2026-10-24, `main`, **uncommitted**): the Ops overview (`/ops`) is rebuilt as a platform dashboard for master admin and staff. It's UI only; the backend comes later. See "Ops overview" below. Verified: `tsc -b` clean, vitest 796/796, `npm run build` ok, headless screenshots reviewed (1440 light and dark, 390).
 - Next recommended action: look at `/ops` in a real browser, then agree definitions and plan the backend for `getOverview`/`getLiveOps` (contract in `frontend/src/ops/types.ts`).
 - Previously (2026-10-24, `main`, **uncommitted**): the Operate pages are rebuilt around the people who use them (Phases 0–4 of the rebuild plan, each approved). See "Operate rebuild" below. Verified: `tsc -b` clean, vitest 786/786, `vite build` ok, backend pytest all passing, headless screenshots reviewed (1440 light/dark, 390).
@@ -37,6 +44,113 @@
 
 
 
+
+## Appointment requests (2026-10-24, approved "proceed"; frontend and demo only)
+- **Flow:** the agent books on a call → the request appears in Appointments (in-page alert and toast for new ones; sidebar and Home count "to review") → the LLM ranks requests that share a doctor and time → staff confirm or decline → the agent calls back and/or WhatsApp tells the patient. Settings allow automatic confirmation at a chosen time each day.
+- **Types** (`console/types.ts`): the `declined` status, `AppointmentRank`, `PatientUpdate`, `BookingSettings`, `AutoConfirmResult`; `rank`, `updates`, `declineReason` and `confirmedBy` on `Appointment`; the `declined`/`notified` history kinds. There are four optional `ConsoleClient` methods (`get/updateBookingSettings`, `runAutoConfirm`, `retryPatientUpdate`). The http client rejects all four with "needs the AICA server to be updated first", and `toApiPatch` refuses `declined`.
+- **Demo** (`console/demo/bookingRequests.ts`, new):
+  - ranking: a keyword stand-in for the LLM, `refreshRanks`;
+  - `queueUpdates`, `advanceUpdates`, `withdrawQueued`;
+  - `runAuto`, `nextFreeTime`;
+  - seeded shared times and declined requests, plus updates on settled agent bookings (one failed WhatsApp).
+
+  `demoClient.ts` adds decline, queues updates on confirm, move and decline (agent bookings only), and makes Undo withdraw queued updates. It also adds a new request every 4 minutes, six at most.
+- **UI** (`pages/console/operate/appointments/`):
+  - `RequestsView.tsx`: groups, rank, Recommended, auto banner, Run now;
+  - `ConfirmRequestDialog.tsx`, `DeclineDialog.tsx`, `RequestActions.tsx` (`useRequestActions`);
+  - `PatientUpdates.tsx`, `BookingSettings.tsx`, `useNewRequests.ts`;
+  - Detail: Priority, Patient told, Decline;
+  - Day and Week show one block for a shared time ("3 requests").
+
+  In `model.ts`:
+  - only the agent's pending requests are contests (`isRequest`): they don't flag each other as double-booked, and a request for a time already given is flagged;
+  - also `requestGroups`, `rivalsOf`, `collapseRequests`, `autoPreview`.
+- **Elsewhere:** `useAttention` and Home count `awaitsReview`. Ops appointments adds Requests waiting, Times with several requests, Declined, and the rank line.
+- **Mistake made and fixed:** I first wrote the new demo module over the existing tracked `console/demo/requests.ts` (bitNtech change requests). It was restored with `git checkout -- frontend/src/console/demo/requests.ts`; that file had no uncommitted changes. The new code lives in `bookingRequests.ts`.
+- **Calendar piles (2026-10-25):**
+  - Day and Week no longer merge requests into one block. The agent's requests for one time overlap as a pile: each card is offset 14px by rank, with the best-ranked in front. Each shows its rank number in the level's colour, in its bottom-right corner, and the top card says "Decide · N".
+  - A pile takes a single lane in `layoutColumn`, so only bookings that truly clash sit side by side.
+  - Hover or focus brings a card forward. The pulse is off under reduced motion, and there is an outline in forced colours.
+  - The arrow keys go down a pile in rank order.
+  - The phone agenda lists the pile in rank order, indented, with the same marks.
+  - The screen-reader label says "ranked N of M requests for this time, waiting for a decision".
+  - `pileOf` and `byStartRank` are in model.ts. `collapseRequests` was removed.
+- **Limitations:**
+  - There is no backend, LLM, outbound call or WhatsApp. The demo ranks by keywords, and updates move through their states on a timer.
+  - The automatic run happens only via Run now; there's no scheduler.
+  - Booking settings, ranking and updates show "not on the server yet" in live mode.
+
+## Appointments rework (2026-10-24, approved; frontend only)
+
+- **Model** (`console/types.ts`):
+  - Statuses are `pending | confirmed | rescheduled | completed | no_show | cancelled`. "Needs a check" is now the agent's `checkReason` flag on a pending or rescheduled booking (`needsCheck()` in `console/appointmentRecords.ts`).
+  - New fields: `source` (`ai_call | front_desk | manual`; `bookedBy` is kept in step), `type`, `visitReason`, `cancelReason`, `updatedAt`/`updatedBy` and `history[]`.
+  - `AppointmentPatch` gains `changeReason` and `undo`. New `createAppointment`.
+- **Live API compatibility:** `fromRecord` reads the API's `booked`/`needs_check` as pending. `toApiPatch` writes only status (pending/rescheduled → `booked`), date, time, doctor, department and note.
+  - In live mode, Mark completed, Mark no-show and Add appointment say the server needs updating.
+  - Reasons, type and history aren't stored by the API yet. **Backend follow-up:** the new statuses and fields, history, `POST …/appointments`, and a status migration.
+- **Page:**
+  - Calendars: Day by doctor, Week, Month (new). Lists: Today's appointments (new: upcoming, completed, missed or unmarked), All, Pending confirmation (new), Cancelled and rescheduled (new).
+  - Filters now say "Booked through".
+  - The detail shows the ID, type, reason, source, created and updated times, and the history timeline (`History.tsx`).
+  - Actions: Add appointment (`CreateDialog.tsx`), Confirm, Reschedule (reason required; confirmed if the patient agreed, else rescheduled), Cancel (reason required), Mark completed and Mark no-show (after the time), Book it again, View call. Undo is one exact `undo` patch.
+- **Problems:** only open bookings are checked. A past confirmed booking is "Not marked".
+- **Demo:**
+  - The seed now covers two weeks either side, with every status, source, type and reason, and its history.
+  - The demo client enforces the order of statuses, required reasons and "after the time".
+  - Demo data saved earlier is converted when read.
+- **Other readers updated:** Home shift and Needs a person, sidebar attention, and Ops appointments (the KPIs now include Needs a check).
+- **Tests:** `test/appointments-flow.test.tsx` (new); appointments page and logic, http client, home-shift and attention tests updated.
+- **Pipeline:** agent bookings still can't reach the API until the §5 contract is agreed. The page already shows them automatically once they're stored.
+
+## Organisation console pages (2026-10-24, approved "proceed"; UI only)
+
+- `/o/:slug/analytics`: the report dashboard as its own page (Home keeps it); `/reports` redirects. Page key `reports`, shown in the Operate menu.
+- `/o/:slug/owners` (`owners`): owners edit, admins read. Make someone an owner after typing the organisation's name; change another owner to admin.
+  - It uses the existing Team API, so it works live. The rules stay the API's: nobody changes their own role, and there's always one owner. So stepping down means asking another owner.
+- `/o/:slug/usage` (`usage`): owners and the master admin from Ops.
+  - Minutes, live agents and lines against the plan; calls each day this period; a month-end forecast with the cost of extra minutes; the alert level.
+  - It's built from `getBilling` (no backend yet), agents, numbers, the report and alert settings.
+- `/o/:slug/notifications` (`notifications`): owners and admins. Per alert: on or off, roles, named people, thresholds, and quiet hours (emergencies always go). Email only.
+  - New `getAlertSettings`/`updateAlertSettings` on `ConsoleClient`, in demo only. In live mode they fall back to the demo store, labelled "Demo data". **Backend needed.**
+- `/o/:slug/audit` (the `activity` page key, renamed "Audit log"): `/activity` redirects, and so does `/ops/orgs/:slug/activity`.
+  - Adds a period filter that loads older pages until the period is covered (30 days by default), and a CSV download of up to 2000 entries.
+- `/o/:slug/profile` (`profile`): the account sections plus your role and permissions here.
+  - `/account` redirects people in one active organisation here, and bitNtech staff to `/ops/profile`. The sidebar name links here.
+- Billing: the invoice table no longer squeezes on a phone, and the "owners only" wording is right for both owners and the master admin.
+- Docs: `docs/pages-and-access.md` §3.3 and the Analytics row are updated; `console-access` test table updated.
+- Tests: `test/console-manage.test.tsx` (new); `account.test.tsx` and `manage-pages.test.tsx` updated for the move and rename.
+- **Follow-ups:**
+  - backend for alert settings and billing;
+  - a re-authentication API if a password check is wanted for owner changes;
+  - SMS or WhatsApp alerts need a provider.
+
+## Ops management pages (2026-10-24, approved "proceed"; UI first)
+
+- **Sidebar:** grouped into Organisations, Calls, Platform and Master admin. On a phone it's one row that scrolls sideways. The name link goes to `/ops/profile`.
+- **Organisation pages:**
+  - `/ops/orgs`: search, a status filter, sort, and calls, agents and attention flags per organisation.
+  - `/ops/orgs/:slug` has "Manage" links to every page below.
+  - The Ops organisation frame now also includes the console's calls, call detail, live, callbacks, appointments, knowledge, numbers, team, activity, settings and billing pages, as well as agents, integrations, uploads and requests. One list (`opsOrgPages` in `OpsOrgShell.tsx`) drives both the menu and the links.
+  - Calls, live, callbacks, appointments and billing are the master admin's only (`OpsOrgPage masterOnly`).
+  - Agent test and versions are the existing workspace tabs (`/agents/:agentId/test`, `/versions`).
+- **Across organisations:** `/ops/calls`, `/ops/calls/live`, `/ops/handoffs`, `/ops/appointments`, `/ops/integrations`, `/ops/billing` and the access review on `/ops/security`.
+  - They read each organisation through the existing console endpoints (`pages/ops/acrossOrgs.tsx`). One failing organisation is reported without hiding the others.
+  - This asks once per organisation, which is fine for a few dozen. **Backend follow-up:** add endpoints that answer for every organisation in one request.
+  - Staff see calls without callers' names or numbers ("Hidden") and can't open calls.
+  - `/ops/calls/:callId?org=slug` redirects into the organisation frame.
+- **New, demo-only:** `listDeployments`, `listIncidents`/`createIncident`/`updateIncident` and `get`/`updateSecurityPolicy` on `OpsDataClient`. The types in `ops/types.ts` are the proposed contract. Incidents and policy changes only last until the tab is closed.
+- **Moved:** `/ops/usage` now redirects to `/ops/analytics` (overview analytics with a CSV download, plus the old usage report). `/ops/changes` redirects to `/ops/support` (same page, renamed). `/account` sends bitNtech staff to `/ops/profile`.
+- **Access change:** the master admin can now open and change an organisation's billing.
+  - `console/access.ts` billing rule; the demo client's `getBilling`/`changePlan`/`updateBillingDetails`; `console-access` test table updated.
+  - **The backend has no billing endpoints yet.**
+- **Tests:** `test/ops-manage.test.tsx` (new). `ops-pages.test.tsx` is updated for the analytics move.
+- **Not verified:** a real browser by a person, a screen reader, any live backend for the new pages.
+- **Known issues and follow-ups:**
+  - The console billing page's invoice table squeezes on a phone. This also affects the console itself.
+  - That page says "Only owners see this page", which is wrong when the master admin opens it from Ops.
+  - Callbacks for staff follow the demo's "own or unassigned" rule.
+  - Consider paging `/ops/calls`, which is capped at 200 per organisation and shows 500.
 
 ## Ops overview (2026-10-24, approved "proceed"; UI only)
 

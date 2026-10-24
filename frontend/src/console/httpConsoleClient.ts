@@ -1,6 +1,7 @@
 import { request } from '../auth/httpClient'
 import { AuthError, type AuthErrorCode } from '../auth/types'
 import { apiBase, apiCredentials, apiUrl } from '../lib/api'
+import { fromRecord, toApiPatch } from './appointmentRecords'
 import { createDemoConsoleClient } from './demoClient'
 import type {
   ActivityPage,
@@ -156,8 +157,15 @@ export function createHttpConsoleClient(
       updateCallback: (o, id, patch) => post<Callback>(org(o, `/callbacks/${enc(id)}`), patch),
     },
     appointments: {
-      listAppointments: (o, from, to) => get<Appointment[]>(org(o, `/appointments${qs({ from, to })}`)),
-      updateAppointment: (o, id, patch) => post<Appointment>(org(o, `/appointments/${enc(id)}`), patch),
+      // The API still stores the earlier statuses: read them as the page's, and write only what it knows.
+      listAppointments: async (o, from, to) => (await get<Appointment[]>(org(o, `/appointments${qs({ from, to })}`))).map(fromRecord),
+      updateAppointment: async (o, id, patch) => fromRecord(await post<Appointment>(org(o, `/appointments/${enc(id)}`), toApiPatch(patch))),
+      createAppointment: () => Promise.reject(new AuthError('invalid_input', 'Adding an appointment by hand needs the AICA server to be updated first.')),
+      // Ranking, patient updates and automatic confirmation aren't on the server yet.
+      getBookingSettings: () => Promise.reject(new AuthError('invalid_input', 'Booking settings need the AICA server to be updated first.')),
+      updateBookingSettings: () => Promise.reject(new AuthError('invalid_input', 'Booking settings need the AICA server to be updated first.')),
+      runAutoConfirm: () => Promise.reject(new AuthError('invalid_input', 'Automatic confirmation needs the AICA server to be updated first.')),
+      retryPatientUpdate: () => Promise.reject(new AuthError('invalid_input', 'Sending updates to patients needs the AICA server to be updated first.')),
     },
     reports: {
       getReport: (o, q) => get<Report>(org(o, `/reports${qs({ days: q.days, agentId: q.agentId })}`)),

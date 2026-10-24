@@ -17,7 +17,7 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 const appointment = (over: Partial<Appointment> = {}): Appointment => ({
-  id: 'apt_x', patientName: 'Gita Subramanian', phone: '+91 98400 00000', department: 'Cardiology', doctor: 'Dr Menon', date: localDay(0), time: '10:30', status: 'needs_check',
+  id: 'apt_x', patientName: 'Gita Subramanian', phone: '+91 98400 00000', department: 'Cardiology', doctor: 'Dr Menon', date: localDay(0), time: '10:30', status: 'pending',
   checkReason: 'The caller wasn’t sure of the date.', bookedBy: 'agent', agentName: 'OPD appointments', callId: null, createdAt: new Date().toISOString(), ...over,
 })
 
@@ -189,7 +189,7 @@ describe('Home: viewer', () => {
   it('sees the report, the appointments card and who is waiting, but no shift', async () => {
     await open('viewer@example.com')
     expect(await screen.findByRole('heading', { name: /^at a glance$/i })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: /appointments to check/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /appointment requests to review/i })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /your shift/i })).not.toBeInTheDocument()
     // Viewers watch Live calls, so they see who is waiting there; they take nothing.
     expect(await screen.findByRole('link', { name: /waiting for a person/i })).toHaveAttribute('href', `${O}/live`)

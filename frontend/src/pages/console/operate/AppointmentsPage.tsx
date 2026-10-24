@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { asAuthError } from '../../../auth/types'
 import { can, canOpen, pageAccess } from '../../../console/access'
 import { useConsole } from '../../../console/ConsoleProvider'
-import type { Appointment, AppointmentPatch, Desk, OrgSettings } from '../../../console/types'
+import type { Appointment, AppointmentPatch, BookingSettings, BookingSource, Desk, NewAppointment, OrgSettings } from '../../../console/types'
 import { useOrg } from '../../../console/useOrg'
 import { ConsolePage } from '../../../components/console/ConsolePage'
 import { useShortcuts } from '../../../components/console/KeyboardHelp'
@@ -23,14 +23,29 @@ import { useLiveData } from './shared'
 import { Detail, type ActionKind } from './appointments/Detail'
 import { DayView } from './appointments/DayView'
 import { ListView } from './appointments/ListView'
+import { ChangesView } from './appointments/ChangesView'
+import { CreateDialog } from './appointments/CreateDialog'
+import { MonthView } from './appointments/MonthView'
+import { TodayView } from './appointments/TodayView'
 import { CheckPanel, Summary } from './appointments/Summary'
 import { WeekView } from './appointments/WeekView'
+import { RequestsView } from './appointments/RequestsView'
+import { BookingSettingsDialog } from './appointments/BookingSettings'
+import { useNewRequests } from './appointments/useNewRequests'
 import {
   addDays,
+  addMonths,
   APPT_STATUS_LABEL,
+  CALENDAR_VIEWS,
+  isRangeView,
+  monthName,
+  needsCheck,
+  SOURCE_LABEL,
   applyFilters,
   byStart,
   countStatuses,
+  howTold,
+  sourceOf,
   dayMonth,
   daySheet,
   dayName,
@@ -57,14 +72,23 @@ import {
   type Sees,
   type View,
 } from './appointments/model'
-import type { Shared } from './appointments/parts'
+import type { RivalChoice, Shared } from './appointments/parts'
 import './Operate.css'
 import './appointments/Appointments.css'
 
 /** How often the bookings are read again (it pauses while the tab is hidden). */
 const POLL_MS = 20_000
 
-const VIEW_LABEL: Record<View, string> = { day: 'Day by doctor', week: 'Week', list: 'List' }
+const VIEW_LABEL: Record<View, string> = {
+  day: 'Day by doctor',
+  week: 'Week',
+  month: 'Month',
+  today: 'Today’s appointments',
+  list: 'All',
+  pending: 'Requests to review',
+  changes: 'Cancelled and rescheduled',
+}
+const LIST_VIEWS: View[] = ['today', 'list', 'pending', 'changes']
 const SCOPE_LABEL: Record<ListScope, string> = { day: 'This day', week: 'This week', all: 'A week back to a month ahead' }
 
 interface Feed {
@@ -155,7 +179,33 @@ export default function AppointmentsPage() {
   const filtering = isFiltering(filters)
   const dayAll = useMemo(() => rows.filter((a) => a.date === anchor), [rows, anchor])
   const dayShown = useMemo(() => matching.filter((a) => a.date === anchor), [matching, anchor])
-  const needCheck = useMemo(() => rows.filter((a) => isActive(a) && (a.status === 'needs_check' || problems.has(a.id))), [rows, problems])
+  const needCheck = useMemo(() => rows.filter((a) => isActive(a) && (needsCheck(a) || problems.has(a.id))), [rows, problems])
+  const todayShown = useMemo(() => matching.filter((a) => a.date === today), [matching, today])
+  const pendingShown = useMemo(() => spanShown.filter((a) => a.status === 'pending'), [spanShown])
+
+  // ---- how requests are confirmed and patients told
+  const [booking, setBooking] = useState<BookingSettings | null>(null)
+  const [bookingError, setBookingError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  useEffect(() => {
+    let live = true
+    setBooking(null)
+    setBookingError(null)
+    if (!client.getBookingSettings) return setBookingError('Booking settings need the AICA server to be updated first.')
+    client.getBookingSettings(org.orgSlug).then(
+      (b) => live && setBooking(b),
+      (err) => live && setBookingError(asAuthError(err).message),
+    )
+    return () => {
+      live = false
+    }
+  }, [client, org.orgSlug])
+  async function saveBooking(next: BookingSettings) {
+    if (!client.updateBookingSettings) throw new Error('Booking settings need the AICA server to be updated first.')
+    setBooking(await client.updateBookingSettings(org.orgSlug, next))
+    setSettingsOpen(false)
+    toast.show({ message: next.confirm === 'auto' ? `Saved. Requests are confirmed automatically at ${time12(next.autoAt)}.` : 'Saved. Requests wait for staff to confirm them.', tone: 'ok' })
+  }
 
   // ---- the one open
   const [openId, setOpenId] = useState<string | null>(null)
@@ -170,18 +220,28 @@ export default function AppointmentsPage() {
     setOpenId(a.id)
   }
 
-  const shared: Shared = { today, now, known, ctx, settings, changes, problems, sees, slot, selectedId: openId, onOpen: open }
+  const shared: Shared = { today, now, known, ctx, settings, changes, problems, sees, slot, selectedId: openId, onOpen: open, rows, booking, canEdit, onAct: act, onResolve: resolve, onReplace: replace }
+
+  // ---- the staff hear of each new request while the page is open
+  useNewRequests(ready ? rows : null, (fresh) => {
+    const a = fresh[0]
+    const more = fresh.length > 1 ? ` and ${fresh.length - 1} more` : ''
+    const text = `New request from the agent: ${patientLabel(a, sees)}, ${a.doctor}, ${dayName(a.date, today).toLowerCase()} at ${time12(a.time)}${more}.`
+    say(text)
+    toast.show({ message: text, tone: 'info', action: { label: 'Open', onClick: () => open(a) } })
+  })
 
   // ---- changes made here show at once; a fresh read follows
-  const replace = (updated: Appointment) =>
+  function replace(updated: Appointment) {
     feed.setData((d) => (d ? { ...d, rows: [...(d.rows.some((x) => x.id === updated.id) ? d.rows.map((x) => (x.id === updated.id ? updated : x)) : [...d.rows, updated])].sort(byStart) } : d))
+  }
 
   async function undo(before: Appointment, after: Appointment, patches: AppointmentPatch[]) {
     try {
       let last = after
       for (const p of patches) last = await client.updateAppointment(org.orgSlug, after.id, p)
       replace(last)
-      toast.show({ message: before.status === 'needs_check' ? 'Undone. It is booked, but no longer flagged for a check.' : 'Undone.', tone: 'ok' })
+      toast.show({ message: needsCheck(before) ? 'Undone. It is back as it was, but no longer flagged for a check.' : 'Undone.', tone: 'ok' })
     } catch (err) {
       toast.show({ message: `Couldn't undo: ${asAuthError(err).message}`, tone: 'danger' })
     } finally {
@@ -193,36 +253,94 @@ export default function AppointmentsPage() {
     const after = await client.updateAppointment(org.orgSlug, before.id, patch)
     replace(after)
     const name = patientLabel(after, sees) === 'A patient' ? 'That' : `${patientLabel(after, sees)}'s`
+    const told = sourceOf(after) === 'ai_call' && howTold(booking) && (kind === 'confirm' || kind === 'decline' || kind === 'change') ? ' The patient is being told.' : ''
     const message =
-      kind === 'confirm'
+      (kind === 'decline'
+        ? `${name} request is declined.`
+        : kind === 'confirm'
         ? `${name} appointment is confirmed.`
         : kind === 'cancel'
           ? `${name} appointment is cancelled.`
           : kind === 'rebook'
-            ? `${name} appointment is booked again.`
-            : `${name} appointment is now ${dayName(after.date, today).toLowerCase()} at ${time12(after.time)}.`
+            ? `${name} appointment is booked again, waiting for confirmation.`
+            : kind === 'complete'
+              ? `${name} appointment is marked completed.`
+              : kind === 'no_show'
+                ? `${name} appointment is marked as a no-show.`
+                : `${name} appointment is now ${dayName(after.date, today).toLowerCase()} at ${time12(after.time)}${after.status === 'confirmed' ? ', confirmed' : ', waiting for confirmation'}.`) + told
     const back = undoPatches(before, after)
     toast.show({ message, tone: 'ok', action: back ? { label: 'Undo', onClick: () => void undo(before, after, back) } : undefined })
     feed.reload()
   }
 
+  /** Confirms the chosen request, then offers the others another time or declines them. Undo puts all of them back. */
+  async function resolve(winner: Appointment, others: RivalChoice[]) {
+    const done: [Appointment, Appointment][] = []
+    try {
+      done.push([winner, await client.updateAppointment(org.orgSlug, winner.id, { status: 'confirmed' })])
+      for (const c of others) {
+        const patch: AppointmentPatch = c.action === 'offer' ? { date: c.date, time: c.time, changeReason: 'The requested time went to a patient who needed it more.' } : { status: 'declined', changeReason: c.reason }
+        done.push([c.appt, await client.updateAppointment(org.orgSlug, c.appt.id, patch)])
+      }
+    } finally {
+      for (const [, after] of done) replace(after)
+      feed.reload()
+    }
+    const offered = others.filter((c) => c.action === 'offer').length
+    const declined = others.length - offered
+    const name = patientLabel(winner, sees) === 'A patient' ? 'The' : `${patientLabel(winner, sees)}'s`
+    const rest = [offered ? `${offered} offered another time` : '', declined ? `${declined} declined` : ''].filter(Boolean).join(', ')
+    const backs = done.map(([before, after]) => [before, after, undoPatches(before, after)] as const)
+    toast.show({
+      message: `${name} request is confirmed${rest ? `; ${rest}` : ''}.${howTold(booking) ? ' The patients are being told.' : ''}`,
+      tone: 'ok',
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          void (async () => {
+            for (const [before, after, back] of backs) if (back) await undo(before, after, back)
+          })(),
+      },
+    })
+  }
+
+  async function runAuto() {
+    if (!client.runAutoConfirm) throw new Error('Automatic confirmation needs the AICA server to be updated first.')
+    const r = await client.runAutoConfirm(org.orgSlug)
+    feed.reload()
+    const parts = [`${r.confirmed} confirmed`, r.offered ? `${r.offered} offered another time` : '', r.declined ? `${r.declined} declined` : '', r.left ? `${r.left} left for a person` : ''].filter(Boolean)
+    toast.show({ message: `Automatic confirmation done: ${parts.join(', ')}.`, tone: 'ok' })
+  }
+
+  // ---- adding one by hand
+  const [creating, setCreating] = useState(false)
+  async function create(input: NewAppointment) {
+    const made = await client.createAppointment(org.orgSlug, input)
+    replace(made)
+    setCreating(false)
+    toast.show({ message: `${patientLabel(made, sees) === 'A patient' ? 'The' : `${patientLabel(made, sees)}'s`} appointment is added for ${dayName(made.date, today).toLowerCase()} at ${time12(made.time)}.`, tone: 'ok' })
+    open(made)
+    feed.reload()
+  }
+
   // ---- moving about
   const step = stepDays(view, scope)
-  const go = (n: number) => setAnchor((d) => addDays(d, n))
+  const go = (n: number) => setAnchor((d) => (view === 'month' ? addMonths(d, n) : addDays(d, n * step)))
   const search = useRef<HTMLInputElement>(null)
   useShortcuts({
     '/': { description: 'Search the appointments', run: () => search.current?.focus() },
     t: { description: 'Go to today', run: () => setAnchor(localDay(0)) },
-    '[': { description: 'Previous day or week', run: () => go(-step) },
-    ']': { description: 'Next day or week', run: () => go(step) },
+    '[': { description: 'Previous day, week or month', run: () => go(-1) },
+    ']': { description: 'Next day, week or month', run: () => go(1) },
     d: { description: 'Show the day by doctor', run: () => setView('day') },
     w: { description: 'Show the week', run: () => setView('week') },
+    m: { description: 'Show the month', run: () => setView('month') },
     l: { description: 'Show the list', run: () => setView('list') },
   })
 
   // ---- the day sheet
   function exportCsv() {
-    const list = view === 'day' ? dayShown : spanShown
+    const list = view === 'day' ? dayShown : view === 'today' ? todayShown : view === 'pending' ? pendingShown : spanShown
     const blob = new Blob([daySheet(list, sees)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -243,14 +361,20 @@ export default function AppointmentsPage() {
     ...(filters.doctor ? [{ id: 'doctor', label: `Doctor: ${filters.doctor}`, onRemove: () => setFilters((f) => ({ ...f, doctor: '' })) }] : []),
     ...(filters.department ? [{ id: 'department', label: `Department: ${filters.department}`, onRemove: () => setFilters((f) => ({ ...f, department: '' })) }] : []),
     ...(filters.status ? [{ id: 'status', label: `Status: ${APPT_STATUS_LABEL[filters.status]}`, onRemove: () => setFilters((f) => ({ ...f, status: '' as const })) }] : []),
-    ...(filters.by ? [{ id: 'by', label: filters.by === 'agent' ? 'Booked by the agents' : 'Booked by staff', onRemove: () => setFilters((f) => ({ ...f, by: '' as const })) }] : []),
+    ...(filters.by ? [{ id: 'by', label: `Booked through: ${SOURCE_LABEL[filters.by]}`, onRemove: () => setFilters((f) => ({ ...f, by: '' as const })) }] : []),
     ...(filters.problemsOnly ? [{ id: 'problems', label: 'Only with a problem', onRemove: () => setFilters((f) => ({ ...f, problemsOnly: false })) }] : []),
   ]
   const filterSaid = useSettled(`${spanShown.length} of ${spanAll.length} appointments shown`, filtering && ready)
 
-  const title = view === 'day' || (view === 'list' && scope === 'day') ? `${longDay(anchor)}${anchor === today ? ' (today)' : ''}` : `${dayMonth(dates[0])} to ${dayMonth(dates[dates.length - 1])}`
-  const summaryLabel = view === 'day' || (view === 'list' && scope === 'day') ? `How full ${anchor === today ? 'today' : longDay(anchor)} is` : view === 'week' || scope === 'week' ? `How full the week of ${dayMonth(dates[0])} is` : 'How full the days loaded are'
-  const stepWord = step === 7 ? 'week' : 'day'
+  const title =
+    view === 'month'
+      ? monthName(anchor)
+      : view === 'day' || (view === 'list' && scope === 'day')
+        ? `${longDay(anchor)}${anchor === today ? ' (today)' : ''}`
+        : `${dayMonth(dates[0])} to ${dayMonth(dates[dates.length - 1])}`
+  const ranged = isRangeView(view, scope)
+  const summaryLabel = view === 'month' ? `How full ${monthName(anchor)} is` : view === 'today' ? 'How full today is' : view === 'pending' || view === 'changes' ? 'How full the days loaded are' : view === 'day' || (view === 'list' && scope === 'day') ? `How full ${anchor === today ? 'today' : longDay(anchor)} is` : view === 'week' || scope === 'week' ? `How full the week of ${dayMonth(dates[0])} is` : 'How full the days loaded are'
+  const stepWord = view === 'month' ? 'month' : step === 7 ? 'week' : 'day'
   const loading = !ready && !feed.error
   const failed = !ready && !!feed.error
 
@@ -273,13 +397,27 @@ export default function AppointmentsPage() {
       docTitle="Appointments"
       status={<UpdatedAgo at={feed.checkedAt} />}
       actions={
-        canExport && ready ? (
-          <Button variant="line" size="sm" onClick={exportCsv}>
-            {view === 'day' ? 'Day sheet (CSV)' : 'Download list (CSV)'}
+        <>
+          {canEdit && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              Add appointment
+            </Button>
+          )}
+          <Button variant="line" size="sm" onClick={() => setSettingsOpen(true)}>
+            Booking settings
           </Button>
-        ) : null
+          {canExport && ready && (
+            <Button variant="line" size="sm" onClick={exportCsv}>
+              {view === 'day' ? 'Day sheet (CSV)' : 'Download list (CSV)'}
+            </Button>
+          )}
+        </>
       }
-      lede={<p>Bookings made on calls. Check the ones flagged, and confirm or correct them. {canEdit ? '' : 'You can look; the front desk and above make changes.'}</p>}
+      lede={
+        <p>
+          The agent books on calls and its requests arrive here by themselves, ranked when several patients ask for the same time. Confirm or decline them{booking?.confirm === 'auto' ? ` (or leave them for the automatic confirmation at ${time12(booking.autoAt)})` : ''}, and the patient is told. Record each visit afterwards. {canEdit ? '' : 'You can look; the front desk and above make changes.'}
+        </p>
+      }
     >
       <p className="sr-only" role="status">
         {said}
@@ -301,9 +439,12 @@ export default function AppointmentsPage() {
 
       {!failed && (
         <>
-          <div className="ap-nav" role="group" aria-label="Choose the day">
+          {ranged ? (
+            <h2 className="ap-nav__title ap-nav__title--solo">{view === 'today' ? `Today, ${longDay(today)}` : `${VIEW_LABEL[view]}: ${dayMonth(dates[0])} to ${dayMonth(dates[dates.length - 1])}`}</h2>
+          ) : (
+          <div className="ap-nav" role="group" aria-label={view === 'month' ? 'Choose the month' : 'Choose the day'}>
             <div className="ap-nav__steps">
-              <Button variant="line" size="sm" aria-label={`Previous ${stepWord}`} disabled={view === 'list' && scope === 'all'} onClick={() => go(-step)}>
+              <Button variant="line" size="sm" aria-label={`Previous ${stepWord}`} onClick={() => go(-1)}>
                 ‹ Previous
               </Button>
               <Button variant="line" size="sm" aria-pressed={anchor === today} onClick={() => setAnchor(today)}>
@@ -312,13 +453,14 @@ export default function AppointmentsPage() {
               <Button variant="line" size="sm" aria-pressed={anchor === addDays(today, 1)} onClick={() => setAnchor(addDays(today, 1))}>
                 Tomorrow
               </Button>
-              <Button variant="line" size="sm" aria-label={`Next ${stepWord}`} disabled={view === 'list' && scope === 'all'} onClick={() => go(step)}>
+              <Button variant="line" size="sm" aria-label={`Next ${stepWord}`} onClick={() => go(1)}>
                 Next ›
               </Button>
             </div>
             <TextField label="Jump to a date" type="date" value={anchor} onChange={(e) => e.target.value && setAnchor(e.target.value)} />
             <h2 className="ap-nav__title">{title}</h2>
           </div>
+          )}
 
           <Toolbar
             label="Filter the appointments"
@@ -337,27 +479,32 @@ export default function AppointmentsPage() {
                   onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value as Filters['status'] }))}
                 />
                 <SelectField
-                  label="Booked by"
+                  label="Booked through"
                   value={filters.by}
-                  options={[
-                    { value: '', label: 'Anyone' },
-                    { value: 'agent', label: 'The agents' },
-                    { value: 'staff', label: 'Staff' },
-                  ]}
+                  options={[{ value: '', label: 'Any way' }, ...(Object.keys(SOURCE_LABEL) as BookingSource[]).map((s) => ({ value: s, label: SOURCE_LABEL[s] }))]}
                   onChange={(e) => setFilters((f) => ({ ...f, by: e.target.value as Filters['by'] }))}
                 />
                 {view === 'list' && <SelectField label="Show" value={scope} options={(Object.keys(SCOPE_LABEL) as ListScope[]).map((s) => ({ value: s, label: SCOPE_LABEL[s] }))} onChange={(e) => setScope(e.target.value as ListScope)} />}
                 <Checkbox label="Only with a problem" checked={filters.problemsOnly} onChange={(e) => setFilters((f) => ({ ...f, problemsOnly: e.target.checked }))} />
               </>
             }
-            summary={ready ? `${spanShown.length} of ${spanAll.length} shown` : undefined}
+            summary={ready ? (view === 'today' ? `${todayShown.length} today` : view === 'pending' ? `${pendingShown.length} waiting for a decision` : `${spanShown.length} of ${spanAll.length} shown`) : undefined}
             views={
-              <div className="ap-views" role="group" aria-label="View">
-                {(Object.keys(VIEW_LABEL) as View[]).map((v) => (
-                  <button key={v} type="button" className="ap-views__btn" aria-pressed={view === v} onClick={() => setView(v)}>
-                    {VIEW_LABEL[v]}
-                  </button>
-                ))}
+              <div className="ap-viewsets">
+                <div className="ap-views" role="group" aria-label="Calendar">
+                  {CALENDAR_VIEWS.map((v) => (
+                    <button key={v} type="button" className="ap-views__btn" aria-pressed={view === v} onClick={() => setView(v)}>
+                      {VIEW_LABEL[v]}
+                    </button>
+                  ))}
+                </div>
+                <div className="ap-views" role="group" aria-label="Lists">
+                  {LIST_VIEWS.map((v) => (
+                    <button key={v} type="button" className="ap-views__btn" aria-pressed={view === v} onClick={() => setView(v)}>
+                      {VIEW_LABEL[v]}
+                    </button>
+                  ))}
+                </div>
               </div>
             }
             chips={chips}
@@ -379,6 +526,22 @@ export default function AppointmentsPage() {
                 <DayView shared={shared} date={anchor} appts={dayShown} all={dayAll} filters={filters} filtering={filtering} onClearFilters={() => setFilters(NO_FILTERS)} />
               ) : view === 'week' ? (
                 <WeekView shared={shared} anchor={anchor} appts={spanShown} all={spanAll} />
+              ) : view === 'month' ? (
+                <MonthView
+                  shared={shared}
+                  anchor={anchor}
+                  appts={spanShown}
+                  onPickDay={(d) => {
+                    setAnchor(d)
+                    setView('day')
+                  }}
+                />
+              ) : view === 'today' ? (
+                <TodayView shared={shared} appts={todayShown} />
+              ) : view === 'pending' ? (
+                <RequestsView shared={shared} appts={pendingShown} empty={filtering ? emptyList : 'No requests waiting. New ones from the agent appear here by themselves.'} onSettings={() => setSettingsOpen(true)} onRunAuto={canEdit ? runAuto : undefined} />
+              ) : view === 'changes' ? (
+                <ChangesView shared={shared} appts={spanShown} empty={filtering ? emptyList : 'Nothing cancelled or rescheduled in these days.'} />
               ) : (
                 <ListView shared={shared} appts={spanShown} empty={emptyList} loading={false} />
               )}
@@ -387,6 +550,10 @@ export default function AppointmentsPage() {
           </div>
         </>
       )}
+
+      <CreateDialog open={creating} rows={rows} ctx={ctx} today={today} known={known} startDate={view === 'day' ? anchor : today} onClose={() => setCreating(false)} onCreate={create} />
+
+      <BookingSettingsDialog open={settingsOpen} settings={booking} error={bookingError} canChange={maySettings} orgName={org.orgName} onClose={() => setSettingsOpen(false)} onSave={saveBooking} />
 
       <Drawer open={!!opened} onClose={() => setOpenId(null)} label="Appointment">
         {opened && <Detail key={opened.id} appt={opened} shared={shared} rows={rows} loaded={{ from: win.from, to: win.to }} canEdit={canEdit} onAct={act} onOpenOther={open} />}

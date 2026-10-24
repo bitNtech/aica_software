@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useParams } from 'react-router'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { OrgPage, RedirectIfSignedIn, RequireAuth, RequireOrg, RequireStaff } from './auth/guards'
@@ -25,6 +25,11 @@ import TeamPage from './pages/console/manage/TeamPage'
 import ActivityPage from './pages/console/manage/ActivityPage'
 import OrgSettingsPage from './pages/console/manage/OrgSettingsPage'
 import BillingPage from './pages/console/manage/BillingPage'
+import AnalyticsPage from './pages/console/manage/AnalyticsPage'
+import OwnersPage from './pages/console/manage/OwnersPage'
+import UsagePage from './pages/console/manage/UsagePage'
+import NotificationsPage from './pages/console/manage/NotificationsPage'
+import ProfilePage from './pages/console/manage/ProfilePage'
 import CallbacksPage from './pages/console/operate/CallbacksPage'
 import LiveCallsPage from './pages/console/operate/LiveCallsPage'
 import BotDeskPage from './pages/console/operate/BotDeskPage'
@@ -40,9 +45,20 @@ import OpsPeoplePage from './pages/ops/OpsPeoplePage'
 import OpsRequestsPage from './pages/ops/OpsRequestsPage'
 import OpsOrgDetailPage from './pages/ops/OpsOrgDetailPage'
 import OpsTemplatesPage from './pages/ops/OpsTemplatesPage'
-import OpsUsagePage from './pages/ops/OpsUsagePage'
 import OpsPlatformPage from './pages/ops/OpsPlatformPage'
 import OpsStatusPage from './pages/ops/OpsStatusPage'
+import OpsOrgsPage from './pages/ops/OpsOrgsPage'
+import OpsCallsPage, { OpsCallRedirect } from './pages/ops/OpsCallsPage'
+import OpsLiveCallsPage from './pages/ops/OpsLiveCallsPage'
+import OpsHandoffsPage from './pages/ops/OpsHandoffsPage'
+import OpsAppointmentsPage from './pages/ops/OpsAppointmentsPage'
+import OpsAnalyticsPage from './pages/ops/OpsAnalyticsPage'
+import OpsIntegrationsPage from './pages/ops/OpsIntegrationsPage'
+import OpsDeploymentsPage from './pages/ops/OpsDeploymentsPage'
+import OpsIncidentsPage from './pages/ops/OpsIncidentsPage'
+import OpsSecurityPage from './pages/ops/OpsSecurityPage'
+import OpsBillingPage from './pages/ops/OpsBillingPage'
+import OpsProfilePage from './pages/ops/OpsProfilePage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SignupPage from './pages/SignupPage'
 import { ForbiddenPage, NotFoundPage } from './pages/SystemPage'
@@ -56,7 +72,17 @@ const guest = (page: ReactNode) => <RedirectIfSignedIn>{page}</RedirectIfSignedI
 const member = (page: ReactNode) => <RequireAuth>{page}</RequireAuth>
 const staff = (page: ReactNode) => <RequireStaff>{page}</RequireStaff>
 const org = (page: PageKey, element: ReactNode) => <OrgPage page={page}>{element}</OrgPage>
-const opsOrg = (page: PageKey, element: ReactNode) => <OpsOrgPage page={page}>{element}</OpsOrgPage>
+const opsOrg = (page: PageKey, element: ReactNode, masterOnly?: boolean) => (
+  <OpsOrgPage page={page} masterOnly={masterOnly}>
+    {element}
+  </OpsOrgPage>
+)
+
+/** An old address inside the Ops organisation frame, sent to its new name. */
+function OpsOrgRedirect({ to }: { to: string }) {
+  const { slug = '' } = useParams()
+  return <Navigate to={`/ops/orgs/${slug}/${to}`} replace />
+}
 
 export default function App() {
   return (
@@ -113,11 +139,17 @@ export default function App() {
         <Route path="appointments" element={org('appointments', <AppointmentsPage />)} />
         <Route path="calls" element={org('calls', <CallHistoryPage />)} />
         <Route path="calls/:callId" element={org('calls', <CallDetailPage />)} />
-        <Route path="reports" element={<Navigate to="../" replace />} />
+        <Route path="analytics" element={org('reports', <AnalyticsPage />)} />
+        <Route path="reports" element={<Navigate to="../analytics" replace />} />
         <Route path="team" element={org('team', <TeamPage />)} />
-        <Route path="activity" element={org('activity', <ActivityPage />)} />
+        <Route path="owners" element={org('owners', <OwnersPage />)} />
+        <Route path="audit" element={org('activity', <ActivityPage />)} />
+        <Route path="activity" element={<Navigate to="../audit" replace />} />
         <Route path="settings" element={org('settings', <OrgSettingsPage />)} />
+        <Route path="notifications" element={org('notifications', <NotificationsPage />)} />
         <Route path="billing" element={org('billing', <BillingPage />)} />
+        <Route path="usage" element={org('usage', <UsagePage />)} />
+        <Route path="profile" element={org('profile', <ProfilePage />)} />
         {UiKitPage && (
           <Route
             path="dev/ui"
@@ -137,19 +169,46 @@ export default function App() {
       <Route path="/ops/people" element={staff(<OpsPeoplePage />)} />
       <Route path="/ops/audit" element={staff(<OpsAuditPage />)} />
       <Route path="/ops/orgs/:slug" element={staff(<OpsOrgDetailPage />)} />
-      <Route path="/ops/changes" element={staff(<OpsChangesPage />)} />
-      {/* One organisation's agents, worked on by bitNtech: the console's agent pages in an Ops frame. */}
+      <Route path="/ops/orgs" element={staff(<OpsOrgsPage />)} />
+      <Route path="/ops/support" element={staff(<OpsChangesPage />)} />
+      <Route path="/ops/changes" element={<Navigate to="/ops/support" replace />} />
+      {/* One organisation, worked on by bitNtech: the console's own pages in an Ops frame. */}
       <Route element={staff(<OpsOrgShell />)}>
         <Route path="/ops/orgs/:slug/agents" element={opsOrg('agents', <AgentsPage />)} />
         <Route path="/ops/orgs/:slug/agents/new" element={opsOrg('agentBuilder', <NewAgentPage />)} />
         <Route path="/ops/orgs/:slug/agents/drafts/:draftId/:step?" element={opsOrg('agentBuilder', <BuilderRoute />)} />
         <Route path="/ops/orgs/:slug/agents/:agentId/:tab?" element={opsOrg('agentWorkspace', <AgentWorkspaceRoute />)} />
+        <Route path="/ops/orgs/:slug/calls" element={opsOrg('calls', <CallHistoryPage />, true)} />
+        <Route path="/ops/orgs/:slug/calls/:callId" element={opsOrg('calls', <CallDetailPage />, true)} />
+        <Route path="/ops/orgs/:slug/live" element={opsOrg('live', <LiveCallsPage />, true)} />
+        <Route path="/ops/orgs/:slug/callbacks" element={opsOrg('callbacks', <CallbacksPage />, true)} />
+        <Route path="/ops/orgs/:slug/appointments" element={opsOrg('appointments', <AppointmentsPage />, true)} />
+        <Route path="/ops/orgs/:slug/knowledge" element={opsOrg('knowledge', <KnowledgePage />)} />
         <Route path="/ops/orgs/:slug/integrations" element={opsOrg('integrations', <ToolsPage />)} />
+        <Route path="/ops/orgs/:slug/numbers" element={opsOrg('numbers', <NumbersPage />)} />
         <Route path="/ops/orgs/:slug/uploads" element={opsOrg('uploads', <UploadsPage />)} />
+        <Route path="/ops/orgs/:slug/team" element={opsOrg('team', <TeamPage />)} />
+        <Route path="/ops/orgs/:slug/audit" element={opsOrg('activity', <ActivityPage />)} />
+        <Route path="/ops/orgs/:slug/activity" element={<OpsOrgRedirect to="audit" />} />
+        <Route path="/ops/orgs/:slug/usage" element={opsOrg('usage', <UsagePage />, true)} />
+        <Route path="/ops/orgs/:slug/settings" element={opsOrg('settings', <OrgSettingsPage />)} />
+        <Route path="/ops/orgs/:slug/billing" element={opsOrg('billing', <BillingPage />, true)} />
         <Route path="/ops/orgs/:slug/requests" element={<RequestsPage />} />
       </Route>
+      <Route path="/ops/calls" element={staff(<OpsCallsPage />)} />
+      <Route path="/ops/calls/live" element={staff(<OpsLiveCallsPage />)} />
+      <Route path="/ops/calls/:callId" element={staff(<OpsCallRedirect />)} />
+      <Route path="/ops/handoffs" element={staff(<OpsHandoffsPage />)} />
+      <Route path="/ops/appointments" element={staff(<OpsAppointmentsPage />)} />
+      <Route path="/ops/analytics" element={staff(<OpsAnalyticsPage />)} />
+      <Route path="/ops/usage" element={<Navigate to="/ops/analytics" replace />} />
+      <Route path="/ops/integrations" element={staff(<OpsIntegrationsPage />)} />
+      <Route path="/ops/deployments" element={staff(<OpsDeploymentsPage />)} />
+      <Route path="/ops/incidents" element={staff(<OpsIncidentsPage />)} />
+      <Route path="/ops/security" element={staff(<OpsSecurityPage />)} />
+      <Route path="/ops/billing" element={staff(<OpsBillingPage />)} />
+      <Route path="/ops/profile" element={staff(<OpsProfilePage />)} />
       <Route path="/ops/templates" element={staff(<OpsTemplatesPage />)} />
-      <Route path="/ops/usage" element={staff(<OpsUsagePage />)} />
       <Route path="/ops/platform" element={staff(<OpsPlatformPage />)} />
       <Route path="/ops/status" element={staff(<OpsStatusPage />)} />
 

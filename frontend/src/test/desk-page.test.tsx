@@ -33,7 +33,7 @@ const appt = (id: string, doctor: string, date: string, time: string, over: Part
   doctor,
   date,
   time,
-  status: 'booked',
+  status: 'pending',
   bookedBy: 'agent',
   agentName: 'OPD appointments',
   callId: null,

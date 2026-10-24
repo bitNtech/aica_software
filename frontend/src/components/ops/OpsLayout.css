@@ -93,6 +93,13 @@
   margin-left: auto;
 }
 
+.ops__nav-group {
+  margin: 0.7rem 0.6rem 0.15rem;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .ops__nav-sep {
   height: 1px;
   margin: 0.4rem 0.15rem;
@@ -201,15 +208,18 @@
 
   .ops__brand { padding: 0.6rem 1rem; }
 
+  /* One row that scrolls sideways: there are too many links to wrap. */
   .ops__nav {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     flex: none;
     order: 3;
     width: 100%;
     gap: 0.1rem;
     padding: 0.25rem 0.75rem 0.4rem;
+    overflow-x: auto;
   }
+  .ops__nav-group { display: none; }
 
   .ops__link { min-height: 32px; }
   .ops__nav-sep { width: 1px; height: 20px; margin: auto 0.15rem; }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { ROLE_LABEL } from '../../auth/roles'
-import { navFor, type PageKey } from '../../console/access'
+import { canOpen, navFor, type PageKey } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
 import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../console/flowPatternConfig'
 import { AttentionProvider, useAttention } from '../../console/useAttention'
@@ -201,7 +201,7 @@ function Frame() {
 
         <div className="console__me">
           <span className="console__me-text">
-            <Link to="/account" className="console__me-name">
+            <Link to={canOpen(access, 'profile') ? `${base}/profile` : '/account'} className="console__me-name">
               {user.name}
               <span className="sr-only">: your account</span>
             </Link>
@@ -266,6 +266,10 @@ function NavIcon({ page }: { page: PageKey }) {
     activity: <path d="M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM10 6.5V10l2.4 1.6" />,
     settings: <path d="M10 12.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zM10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4" />,
     billing: <path d="M3 5.5h14v9H3zM3 8.5h14M6 12h3" />,
+    owners: <path d="M4 15.5h12M4.5 13l-1-7 3.5 3L10 4.5 13 9l3.5-3-1 7z" />,
+    usage: <path d="M3.5 13a6.5 6.5 0 0 1 13 0M10 13l3-4M3.5 15.5h13" />,
+    notifications: <path d="M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 1.5h-12zM8.5 17h3" />,
+    profile: <path d="M10 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 17a6 6 0 0 1 12 0" />,
   }
   return (
     <svg

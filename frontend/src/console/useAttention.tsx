@@ -4,6 +4,7 @@ import { localDay } from '../lib/time'
 import { can, canOpen, type Access, type PageKey } from './access'
 import { useConsole } from './ConsoleProvider'
 import { useOrg } from './useOrg'
+import { awaitsReview } from './appointmentRecords'
 
 /** How often the sidebar's counts are refreshed while the tab is in view. */
 export const ATTENTION_POLL_MS = 15_000
@@ -16,7 +17,7 @@ export interface AttentionCounts {
   waiting: number | null
   /** Open callbacks past their due time. */
   overdue: number | null
-  /** Appointments in the next 7 days that need a check. */
+  /** The agent's requests in the next 7 days waiting for a decision, and flagged bookings. */
   needsCheck: number | null
   /** Answers the agent got wrong, still open. */
   flags: number | null
@@ -74,7 +75,7 @@ export function useAttention(): AttentionApi | null {
 const WORDS: Record<Source, (n: number, emergency: boolean) => string> = {
   waiting: (n, emergency) => `${n} waiting${emergency ? ', including an emergency' : ''}`,
   overdue: (n) => `${n} overdue`,
-  needsCheck: (n) => `${n} to check`,
+  needsCheck: (n) => `${n} to review`,
   flags: (n) => `${n} flagged`,
 }
 
@@ -132,7 +133,7 @@ export function AttentionProvider({ children }: { children: ReactNode }) {
           set({ overdue: all.filter((c) => c.status === 'open' && Date.parse(c.dueBy) < now).length })
         }),
       needsCheck: () =>
-        client.listAppointments(slug, localDay(0), localDay(7)).then((all) => set({ needsCheck: all.filter((a) => a.status === 'needs_check').length })),
+        client.listAppointments(slug, localDay(0), localDay(7)).then((all) => set({ needsCheck: all.filter(awaitsReview).length })),
       flags: () => client.getDesk(slug).then((desk) => set({ flags: desk.flags.filter((f) => f.status === 'open').length })),
     }
 

@@ -11,6 +11,10 @@ import { VOICES } from '../console/demo/templates'
 import type { CallOutcome, Plan } from '../console/types'
 import type {
   AgentHealth,
+  Deployment,
+  IncidentRecord,
+  IncidentStatus,
+  SecurityPolicy,
   Health,
   Incident,
   LiveOps,
@@ -270,11 +274,89 @@ const rate = (part: number, all: number) => (all ? part / all : null)
 /** Builder drafts the console seeds for organisations with agents (demoClient's seedDrafts). */
 const DRAFT = { id: 'draft_billing', name: 'Billing and insurance', useCase: 'Billing and insurance', startedDaysAgo: 2, updatedHoursAgo: 12 }
 
+/** Two past incidents, so the history isn't empty. */
+function seedIncidents(): IncidentRecord[] {
+  const at = (d: number, h = 0) => new Date(Date.now() - d * DAY + h * 36e5).toISOString()
+  const u = (d: number, h: number, by: string, status: IncidentStatus, text: string) => ({ at: at(d, h), by, status, text })
+  return [
+    {
+      id: 'inc_lang_cut',
+      title: 'Language model replies cut off mid-sentence',
+      service: 'language',
+      severity: 'major',
+      status: 'resolved',
+      startedAt: at(6),
+      resolvedAt: at(6, 2),
+      automatic: false,
+      updates: [
+        u(6, 2, 'Vikram S', 'resolved', 'The provider rolled back. Replies are complete again; we watched for an hour.'),
+        u(6, 0.7, 'Vikram S', 'identified', 'A provider change shortened replies. They are rolling it back.'),
+        u(6, 0, 'Vikram S', 'investigating', 'Some agents stop mid-sentence. Callers hear silence, then the agent carries on.'),
+      ],
+    },
+    {
+      id: 'inc_tel_circle',
+      title: 'Calls from one mobile network not connecting',
+      service: 'telephony',
+      severity: 'critical',
+      status: 'resolved',
+      startedAt: at(12),
+      resolvedAt: at(12, 1.5),
+      automatic: false,
+      updates: [
+        u(12, 1.5, 'Divya K', 'resolved', 'The carrier fixed their routing. Calls connect normally.'),
+        u(12, 0, 'Divya K', 'investigating', 'Callers on one network hear an engaged tone. Other networks are fine.'),
+      ],
+    },
+  ]
+}
+
 export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}): OpsDataClient {
   const wait = makeWait(latency)
   let viewer: { id: string; name: string; platformRole: PlatformRole | null } | null = null
   /** Jobs retried in this tab: id → when. */
   const retried: Record<string, number> = {}
+  /** Incidents declared or updated in this tab, and the two seeded past ones. */
+  const incidents: IncidentRecord[] = seedIncidents()
+  let security: SecurityPolicy = {
+    passwordMinLength: 10,
+    staffTwoStep: true,
+    memberTwoStep: 'owners',
+    staffSessionHours: 12,
+    memberSessionDays: 14,
+    idleMinutes: 60,
+    staffIpRanges: [],
+    actingMaxMinutes: 30,
+    transcriptRetentionDays: 180,
+    recordingRetentionDays: 90,
+    updatedAt: ago(20),
+    updatedBy: 'Vikram S',
+  }
+
+  /** Monitoring's own incident while the voice service is slow, unless someone has taken it over. */
+  const autoIncident = (): IncidentRecord | null => {
+    const minute = Math.floor(Date.now() / 60_000)
+    if (!slowVoice(minute)) return null
+    const began = minute - ((minute % 180) - 100)
+    const id = `inc_voice_${began}`
+    if (incidents.some((i) => i.id === id)) return null
+    const at = new Date(began * 60_000).toISOString()
+    return {
+      id,
+      title: 'Voice replies are slow to start',
+      service: 'voice',
+      severity: 'minor',
+      status: 'investigating',
+      startedAt: at,
+      resolvedAt: null,
+      automatic: true,
+      updates: [{ at, by: 'Monitoring', status: 'investigating', text: 'The slowest 5% of voice replies are over twice their usual. Calls still connect; callers hear a longer pause.' }],
+    }
+  }
+  const allIncidents = () => {
+    const auto = autoIncident()
+    return [...(auto ? [auto] : []), ...incidents].sort((a, b) => Number(a.status === 'resolved') - Number(b.status === 'resolved') || b.startedAt.localeCompare(a.startedAt))
+  }
 
   const staff = () => {
     if (viewer && !viewer.platformRole) throw new AuthError('forbidden', 'Only bitNtech staff can see this.')
@@ -765,6 +847,108 @@ export function createDemoOpsClient({ latency = 500 }: { latency?: number } = {}
       alerts.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'critical' ? -1 : 1))
       const out: LiveOps = { checkedAt: new Date(now).toISOString(), calls: live, handoffs, failures, services, incidents, alerts }
       return copy(out)
+    },
+
+    async listDeployments() {
+      await wait()
+      staff()
+      const out: Deployment[] = []
+      for (const [slug, o] of Object.entries(ORGS)) {
+        if (o.status !== 'active' && o.status !== 'suspended') continue
+        const calls = seedCalls(slug)
+        for (const a of seedAgents(slug)) {
+          const versions = seedDetail(slug, a, calls)?.versions ?? []
+          const latest = Math.max(...versions.map((v) => v.version))
+          for (const v of versions)
+            out.push({
+              id: `dep_${slug}_${a.id}_${v.version}`,
+              at: v.publishedAt,
+              by: v.publishedBy,
+              component: 'agent',
+              title: `${a.name} v${v.version}`,
+              note: v.note,
+              status: v.version === latest && a.status === 'live' ? 'live' : 'superseded',
+              orgSlug: slug,
+              orgName: o.name,
+              agentId: a.id,
+              version: v.version,
+            })
+        }
+      }
+      const p = platform()
+      out.push(
+        { id: 'dep_app_3', at: ago(3), by: 'Vikram S', component: 'app', title: 'AICA web app, October release 3', note: 'Live calls and callbacks rebuilt; faster call history.', status: 'live' },
+        { id: 'dep_app_2', at: ago(10), by: 'Vikram S', component: 'app', title: 'AICA web app, October release 2', note: 'Reports and agent versions.', status: 'superseded' },
+        { id: 'dep_models', at: p.updatedAt, by: p.updatedBy || 'Vikram S', component: 'language', title: 'Platform settings: models, voices and plans', note: 'The defaults new agents start with.', status: 'live' },
+      )
+      return copy(out.sort((a, b) => b.at.localeCompare(a.at)))
+    },
+
+    async listIncidents() {
+      await wait()
+      staff()
+      return copy(allIncidents())
+    },
+
+    async createIncident(input) {
+      await wait()
+      master('declare incidents')
+      const title = input.title.trim()
+      const text = input.text.trim()
+      if (title.length < 5 || title.length > 100) throw new AuthError('invalid_input', 'Give the incident a title of 5 to 100 characters.')
+      if (text.length < 10) throw new AuthError('invalid_input', 'Say what’s happening in at least a sentence.')
+      const now = new Date().toISOString()
+      const inc: IncidentRecord = { id: `inc_${Date.now().toString(36)}`, title, service: input.service, severity: input.severity, status: 'investigating', startedAt: now, resolvedAt: null, automatic: false, updates: [{ at: now, by: by(), status: 'investigating', text }] }
+      incidents.unshift(inc)
+      return copy(inc)
+    },
+
+    async updateIncident(id, update) {
+      await wait()
+      master('update incidents')
+      let inc = incidents.find((i) => i.id === id)
+      if (!inc) {
+        // Taking over monitoring's incident keeps it.
+        const auto = autoIncident()
+        if (!auto || auto.id !== id) throw notFound('incident')
+        inc = { ...auto, automatic: true }
+        incidents.unshift(inc)
+      }
+      if (inc.status === 'resolved') throw new AuthError('invalid_input', 'This incident is resolved. Declare a new one if it’s back.')
+      const text = update.text.trim()
+      if (text.length < 5) throw new AuthError('invalid_input', 'Write what changed, in a sentence.')
+      const now = new Date().toISOString()
+      inc.status = update.status
+      inc.updates.unshift({ at: now, by: by(), status: update.status, text })
+      if (update.status === 'resolved') inc.resolvedAt = now
+      return copy(inc)
+    },
+
+    async getSecurityPolicy() {
+      await wait()
+      staff()
+      return copy(security)
+    },
+
+    async updateSecurityPolicy(input) {
+      await wait()
+      master('change security policies')
+      const whole = (n: number, lo: number, hi: number, what: string) => {
+        if (!Number.isInteger(n) || n < lo || n > hi) throw new AuthError('invalid_input', `${what}: a whole number from ${lo} to ${hi}.`)
+      }
+      whole(input.passwordMinLength, 8, 64, 'Shortest password')
+      whole(input.staffSessionHours, 1, 72, 'bitNtech sign-in length')
+      whole(input.memberSessionDays, 1, 90, 'Client sign-in length')
+      whole(input.idleMinutes, 5, 480, 'Idle sign-out')
+      whole(input.actingMaxMinutes, 5, 120, 'Acting as a user')
+      whole(input.transcriptRetentionDays, 30, 3650, 'Keep transcripts')
+      whole(input.recordingRetentionDays, 7, 3650, 'Keep recordings')
+      const ranges = input.staffIpRanges.map((r) => r.trim()).filter(Boolean)
+      const cidr = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}\/([0-9]|[12]\d|3[0-2])$/
+      const bad = ranges.find((r) => !cidr.test(r))
+      if (bad) throw new AuthError('invalid_input', `“${bad}” isn’t an address range. Write it like 203.0.113.0/24.`)
+      security = { ...input, staffIpRanges: ranges, updatedAt: new Date().toISOString(), updatedBy: by() }
+      return copy(security)
     },
   }
 }

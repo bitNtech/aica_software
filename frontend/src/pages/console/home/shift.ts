@@ -1,4 +1,5 @@
 import type { Appointment, Callback, Desk, DoctorChange, Handoff, Notice } from '../../../console/types'
+import { needsCheck } from '../../../console/appointmentRecords'
 
 /**
  * What a person who takes calls needs from today's data, picked and ordered.
@@ -23,7 +24,7 @@ export const isOverdue = (c: Pick<Callback, 'dueBy'>, now: number) => Date.parse
 
 /** Appointments waiting for someone to check them, earliest first. */
 export function appointmentsToCheck(appointments: Appointment[]): Appointment[] {
-  return appointments.filter((a) => a.status === 'needs_check').sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+  return appointments.filter(needsCheck).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
 }
 
 /** Notices the agents are telling callers right now. */

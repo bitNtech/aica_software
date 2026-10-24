@@ -18,8 +18,17 @@ const shortDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateStri
 const longDay = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
 const num = (n: number) => n.toLocaleString('en-IN')
 
-/** /ops/usage: calls, minutes and processing per organisation. Staff and master admin. */
+/** /ops/usage (now part of /ops/analytics): calls, minutes and processing per organisation. */
 export default function OpsUsagePage() {
+  return (
+    <OpsLayout kicker="Usage" docTitle="Usage" title="Usage" demoData lede={<p>Calls, call minutes and recordings processed, for each organisation. Times are days in India.</p>}>
+      <UsageReportView />
+    </OpsLayout>
+  )
+}
+
+/** Calls, minutes and processing per organisation, with its own period. Staff and master admin. */
+export function UsageReportView() {
   const ops = useOpsData()
   const id = useId()
   const [days, setDays] = useState<UsageDays>(30)
@@ -56,7 +65,7 @@ export default function OpsUsagePage() {
     : []
 
   return (
-    <OpsLayout kicker="Usage" docTitle="Usage" title="Usage" demoData lede={<p>Calls, call minutes and recordings processed, for each organisation. Times are days in India.</p>}>
+    <>
       <div className="list-tools">
         <SegFilter<`${UsageDays}`> legend="Period" value={`${days}`} onChange={(v) => setDays(Number(v) as UsageDays)} options={([7, 30, 90] as UsageDays[]).map((d) => ({ value: `${d}`, label: DAYS_LABEL[d] }))} />
       </div>
@@ -157,6 +166,6 @@ export default function OpsUsagePage() {
           </section>
         </div>
       )}
-    </OpsLayout>
+    </>
   )
 }

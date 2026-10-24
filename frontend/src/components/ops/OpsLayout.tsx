@@ -70,6 +70,11 @@ export function OpsBar({ pendingCount }: { pendingCount?: number }) {
         <NavLink to="/ops" end className="ops__link">
           Overview
         </NavLink>
+
+        <p className="ops__nav-group">Organisations</p>
+        <NavLink to="/ops/orgs" className="ops__link">
+          Organisations
+        </NavLink>
         <NavLink to="/ops/requests" className="ops__link">
           Sign-up requests
           {pendingCount ? (
@@ -79,23 +84,55 @@ export function OpsBar({ pendingCount }: { pendingCount?: number }) {
             </span>
           ) : null}
         </NavLink>
-        <NavLink to="/ops/changes" className="ops__link">
-          Change requests
+        <NavLink to="/ops/support" className="ops__link">
+          Support requests
         </NavLink>
-        <NavLink to="/ops/usage" className="ops__link">
-          Usage
+
+        <p className="ops__nav-group">Calls</p>
+        <NavLink to="/ops/calls" end className="ops__link">
+          Call history
+        </NavLink>
+        <NavLink to="/ops/calls/live" className="ops__link">
+          Live calls
+        </NavLink>
+        <NavLink to="/ops/handoffs" className="ops__link">
+          Handoffs and callbacks
+        </NavLink>
+        <NavLink to="/ops/appointments" className="ops__link">
+          Appointments
+        </NavLink>
+        <NavLink to="/ops/analytics" className="ops__link">
+          Analytics
+        </NavLink>
+
+        <p className="ops__nav-group">Platform</p>
+        <NavLink to="/ops/templates" className="ops__link">
+          Templates
+        </NavLink>
+        <NavLink to="/ops/integrations" className="ops__link">
+          Integrations
+        </NavLink>
+        <NavLink to="/ops/deployments" className="ops__link">
+          Deployments
+        </NavLink>
+        <NavLink to="/ops/incidents" className="ops__link">
+          Incidents
         </NavLink>
         <NavLink to="/ops/status" className="ops__link">
           Service status
         </NavLink>
-        <NavLink to="/ops/templates" className="ops__link">
-          Templates
-        </NavLink>
+
         {user.platformRole === 'master_admin' && (
           <>
-            <div className="ops__nav-sep" aria-hidden="true" />
+            <p className="ops__nav-group">Master admin</p>
+            <NavLink to="/ops/billing" className="ops__link">
+              Billing
+            </NavLink>
+            <NavLink to="/ops/security" className="ops__link">
+              Security
+            </NavLink>
             <NavLink to="/ops/platform" className="ops__link">
-              Platform
+              Platform settings
             </NavLink>
             <NavLink to="/ops/people" className="ops__link">
               People
@@ -109,7 +146,7 @@ export function OpsBar({ pendingCount }: { pendingCount?: number }) {
 
       <div className="ops__me">
         {client.isDemo && <span className="demo-chip">Demo</span>}
-        <Link to="/account" className="ops__name">
+        <Link to="/ops/profile" className="ops__name">
           {user.name}
           <span className="sr-only">: your account</span>
         </Link>

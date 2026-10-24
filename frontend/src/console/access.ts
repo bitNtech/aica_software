@@ -36,6 +36,10 @@ export type PageKey =
   | 'activity'
   | 'settings'
   | 'billing'
+  | 'owners'
+  | 'usage'
+  | 'notifications'
+  | 'profile'
 
 export type PermissionGroup = 'agents' | 'desk' | 'calls' | 'manage'
 
@@ -164,8 +168,17 @@ const PAGE_RULE: Record<PageKey, (a: Access) => AccessLevel | null> = {
   team: (a) => (has(a, 'team.manage') ? 'edit' : null),
   activity: (a) => (has(a, 'activity.view') ? 'read' : null),
   settings: (a) => (has(a, 'settings.manage') ? 'edit' : null),
-  // Billing stays with owners; it isn't a permission anyone can be given.
-  billing: (a) => (a.role === 'owner' && !a.platform ? 'edit' : null),
+  // Billing stays with owners (it isn't a permission anyone can be given),
+  // and bitNtech's master admin, who manages every organisation's billing.
+  billing: (a) => (a.role === 'owner' && (!a.platform || a.platform === 'master_admin') ? 'edit' : null),
+  // Owners add and change owners; admins see who they are.
+  owners: (a) => (a.platform ? null : a.role === 'owner' ? 'edit' : has(a, 'team.manage') ? 'read' : null),
+  // Use against the plan: billing's people.
+  usage: (a) => (a.role === 'owner' && (!a.platform || a.platform === 'master_admin') ? 'edit' : null),
+  // Who gets the organisation's alerts.
+  notifications: (a) => (a.platform ? null : has(a, 'settings.manage') ? 'edit' : null),
+  // Everyone's own account; bitNtech's is in Ops.
+  profile: (a) => (a.platform ? null : 'edit'),
 }
 
 export const PAGE_KEYS = Object.keys(PAGE_RULE) as PageKey[]
@@ -187,9 +200,13 @@ export const PAGE_LABEL: Record<PageKey, string> = {
   calls: 'Call history',
   reports: 'Reports',
   team: 'Team',
-  activity: 'Organisation activity',
+  activity: 'the audit log',
   settings: 'Organisation settings',
   billing: 'Billing and plan',
+  owners: 'Owners',
+  usage: 'Usage and limits',
+  notifications: 'Notifications',
+  profile: 'Your profile',
 }
 
 /** The agent workspace's tabs differ by who's looking (docs/pages-and-access.md,
@@ -316,6 +333,7 @@ export const NAV: NavSection[] = [
       { page: 'callbacks', label: 'Callbacks', path: 'callbacks', description: 'Missed calls and people to call back.' },
       { page: 'appointments', label: 'Appointments', path: 'appointments', description: 'Bookings made on calls, to check.' },
       { page: 'calls', label: 'Call history', path: 'calls', description: 'Every call, with its transcript and what happened.' },
+      { page: 'reports', label: 'Analytics and reports', path: 'analytics', description: 'How calls went over a period: outcomes, topics, hours and agents.' },
     ],
   },
   {
@@ -333,9 +351,12 @@ export const NAV: NavSection[] = [
     heading: 'Manage',
     items: [
       { page: 'team', label: 'Team', path: 'team', description: 'Who can sign in, their roles and what they can do.' },
-      { page: 'activity', label: 'Activity', path: 'activity', description: 'What changed, and who changed it.' },
+      { page: 'owners', label: 'Owners', path: 'owners', description: 'Who owns the organisation, and handing ownership over.' },
+      { page: 'activity', label: 'Audit log', path: 'audit', description: 'What changed, and who changed it.' },
       { page: 'settings', label: 'Settings', path: 'settings', description: 'Name, languages and business hours.' },
-      { page: 'billing', label: 'Billing and plan', path: 'billing', description: 'Plan, usage, invoices and payment.' },
+      { page: 'notifications', label: 'Notifications', path: 'notifications', description: 'Who gets which alerts, and quiet hours.' },
+      { page: 'billing', label: 'Billing and plan', path: 'billing', description: 'Plan, invoices and payment.' },
+      { page: 'usage', label: 'Usage and limits', path: 'usage', description: 'Minutes, agents and lines against your plan.' },
     ],
   },
 ]

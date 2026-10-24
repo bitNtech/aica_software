@@ -30,7 +30,7 @@ describe('Sidebar counts', () => {
     expect(document.title).toMatch(/· Arogya .* · AICA$/)
   })
 
-  it('counts appointments to check for a viewer, who also sees who is waiting but not callbacks', async () => {
+  it('counts appointment requests to review for a viewer, who also sees who is waiting but not callbacks', async () => {
     const client = createDemoConsoleClient({ latency: 0 })
     const handoffs = vi.spyOn(client, 'listHandoffs')
     const callbacks = vi.spyOn(client, 'listCallbacks')
@@ -40,8 +40,8 @@ describe('Sidebar counts', () => {
 
     await (await nav()).findByRole('link', { name: /appointments/i })
     await waitFor(() => expect(appointments).toHaveBeenCalled())
-    const check = (await client.listAppointments('arogya-demo', localDay(0), localDay(7))).filter((a) => a.status === 'needs_check').length
-    if (check > 0) expect(await (await nav()).findByRole('link', { name: new RegExp(`^appointments ${check} to check$`, 'i') })).toBeInTheDocument()
+    const check = (await client.listAppointments('arogya-demo', localDay(0), localDay(7))).filter((a) => a.status === 'pending' || (!!a.checkReason && a.status === 'rescheduled')).length
+    if (check > 0) expect(await (await nav()).findByRole('link', { name: new RegExp(`^appointments ${check} to review$`, 'i') })).toBeInTheDocument()
     else expect((await nav()).getByRole('link', { name: /^appointments$/i })).toBeInTheDocument()
 
     // A viewer watches Live calls, so it reads who is waiting; Callbacks and the desk aren't theirs.

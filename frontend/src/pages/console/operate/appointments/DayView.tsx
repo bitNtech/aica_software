@@ -3,12 +3,14 @@ import { ToneIcon } from '../../../../components/console/StatusPill'
 import { Checkbox } from '../../../../components/ui/Field'
 import type { Appointment } from '../../../../console/types'
 import { useMediaQuery } from '../../../../lib/useMediaQuery'
-import { clockOf, doctorColumns, fromMin, gridWindow, hourLabel, isActive, longDay, neighbour, norm, time12, weekdayName, type DoctorColumn, type Filters, type NavItem, type NavKey } from './model'
-import { Agenda, AgentMark, ApptStatus, Avatar, describe, NotePill, ProblemFlag, type Shared } from './parts'
+import { clockOf, needsCheck, pileOf, doctorColumns, fromMin, gridWindow, hourLabel, isActive, longDay, neighbour, norm, time12, weekdayName, type DoctorColumn, type Filters, type NavItem, type NavKey } from './model'
+import { Agenda, AgentMark, pileStyle, RequestsMark, ApptStatus, Avatar, describe, NotePill, ProblemFlag, type Shared } from './parts'
 
 /** Pixels per minute: an hour is 96px, enough for a 15-minute booking to be read. */
 const PPM = 1.6
 const NARROW = '(max-width: 719px)'
+/** How far each card in a pile of requests sits from the one in front (px). */
+const PILE_STEP = 14
 const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'])
 
 interface Props {
@@ -127,7 +129,7 @@ export function DayView({ shared, date, appts, all, filters, filtering, onClearF
   const t = clockOf(now)
   const showNow = date === today && t.minutes >= win.gridFrom && t.minutes <= win.gridTo
 
-  const items: NavItem[] = cols.flatMap((c, i) => c.placed.map((p) => ({ id: p.appt.id, col: i, start: p.start })))
+  const items: NavItem[] = cols.flatMap((c, i) => c.placed.map((p) => ({ id: p.appt.id, col: i, start: p.start + (pileOf(p.appt)?.index ?? 0) / 100 })))
   const first = [...items].sort((a, b) => a.col - b.col || a.start - b.start)[0]?.id ?? null
   const stop = tabId && items.some((i) => i.id === tabId) ? tabId : (shared.selectedId && items.some((i) => i.id === shared.selectedId) ? shared.selectedId : first)
 
@@ -185,17 +187,27 @@ export function DayView({ shared, date, appts, all, filters, filtering, onClearF
                 const a = p.appt
                 const who = shared.sees.name ? a.patientName : 'A patient'
                 const problems = shared.problems.get(a.id)
+                // The agent's requests for one time overlap, each a step down and across by its rank, the best-ranked in front.
+                const pile = pileStyle(a)
+                const step = pile ? pile.index * PILE_STEP : 0
+                const shrink = pile ? (pile.size - 1) * PILE_STEP : 0
                 return (
                   <li
                     key={a.id}
-                    className="ap-slot"
-                    style={{ top: top(p.start), height: Math.max(34, (p.end - p.start) * PPM), left: `${(p.lane / p.lanes) * 100}%`, width: `${100 / p.lanes}%` }}
+                    className={`ap-slot${pile ? ' is-piled' : ''}`}
+                    style={{
+                      top: top(p.start) + step,
+                      height: Math.max(pile ? 52 : 34, (p.end - p.start) * PPM),
+                      left: pile ? `calc(${(p.lane / p.lanes) * 100}% + ${step}px)` : `${(p.lane / p.lanes) * 100}%`,
+                      width: pile ? `calc(${100 / p.lanes}% - ${shrink}px)` : `${100 / p.lanes}%`,
+                      ...(pile ? { zIndex: 3 + pile.size - pile.index } : {}),
+                    }}
                   >
                     <button
                       type="button"
                       data-appt={a.id}
                       data-col={ci}
-                      className={`ap-block ap-block--${a.status}${problems?.length ? ' has-problem' : ''}${p.lanes > 1 ? ' is-shared' : ''}${shared.selectedId === a.id ? ' is-selected' : ''}`}
+                      className={`ap-block ap-block--${a.status}${needsCheck(a) ? ' is-check' : ''}${problems?.length ? ' has-problem' : ''}${p.lanes > 1 ? ' is-shared' : ''}${pile?.className ?? ''}${shared.selectedId === a.id ? ' is-selected' : ''}`}
                       style={{ '--ap-h': c.hue } as CSSProperties}
                       tabIndex={a.id === stop ? 0 : -1}
                       aria-haspopup="dialog"
@@ -208,7 +220,8 @@ export function DayView({ shared, date, appts, all, filters, filtering, onClearF
                         <span className="ap-block__who">{who}</span>
                       </span>
                       <span className="ap-block__tags" aria-hidden="true">
-                        <ApptStatus status={a.status} />
+                        <RequestsMark appt={a} />
+                        <ApptStatus appt={a} />
                         <AgentMark appt={a} compact />
                         <ProblemFlag problems={problems} />
                       </span>
