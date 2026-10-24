@@ -29,6 +29,25 @@ export interface OpsDataClient {
 
   getServiceStatus(): Promise<ServiceStatus>
 
+  /** The overview's figures across every organisation, for a period. */
+  getOverview(days: OverviewDays): Promise<PlatformOverview>
+  /** What's happening now: calls in progress, handoffs, failures, health. Polled. */
+  getLiveOps(): Promise<LiveOps>
+
+  /** Agent publishes and platform releases, newest first. */
+  listDeployments(): Promise<Deployment[]>
+
+  /** Every incident, open ones first. */
+  listIncidents(): Promise<IncidentRecord[]>
+  /** Master admin: declares an incident. */
+  createIncident(input: NewIncident): Promise<IncidentRecord>
+  /** Master admin: posts an update, and moves it on (or resolves it). */
+  updateIncident(id: string, update: IncidentUpdateInput): Promise<IncidentRecord>
+
+  getSecurityPolicy(): Promise<SecurityPolicy>
+  /** Master admin only. */
+  updateSecurityPolicy(input: SecurityPolicyInput): Promise<SecurityPolicy>
+
   /** Who is asking (a real server knows from the session). */
   setViewer?(viewer: { id: string; name: string; platformRole: PlatformRole | null } | null): void
 }
@@ -193,3 +212,269 @@ export interface ServiceStatus {
   queue: QueueHealth
   failures: ServiceFailure[]
 }
+
+// ---------------------------------------------------------------- overview
+
+/** Today (by hour), or the last 7 or 30 days (by day). Days are in India. */
+export type OverviewDays = 1 | 7 | 30
+
+/**
+ * How calls ended. `failed` is a technical failure (a service error, the
+ * line dropping on our side); `dropped` is the caller hanging up before
+ * anything was settled. A call succeeds when it is neither.
+ */
+export type OverviewOutcome = 'resolved' | 'booked' | 'callback' | 'handed_over' | 'emergency' | 'dropped' | 'failed'
+
+export interface OverviewBucket {
+  /** Short, under a column: "10 am", "6 Oct". */
+  label: string
+  /** In full, for the readout: "10 to 11 am", "Monday 6 October". */
+  name: string
+}
+
+/** One organisation's calls in the period. Active and suspended ones only. */
+export interface OverviewOrgUsage {
+  slug: string
+  name: string
+  status: OrgStatus
+  calls: number
+  minutes: number
+  /** 0 to 1. Null with no calls. */
+  successRate: number | null
+  /** Handed to a person (including emergencies), 0 to 1. Null with no calls. */
+  handoffRate: number | null
+}
+
+export type AgentHealth = 'ok' | 'degraded' | 'errors'
+
+export interface OverviewAgent {
+  orgSlug: string
+  orgName: string
+  id: string
+  name: string
+  status: AgentStatus
+  /** Its organisation is suspended, so it isn't answering whatever its status. */
+  orgSuspended: boolean
+  version: number | null
+  updatedAt: string
+  calls: number
+  successRate: number | null
+  handoffRate: number | null
+  /** Caller stops → agent starts, ms. Null with no calls. */
+  replyP50Ms: number | null
+  replyP95Ms: number | null
+  /** Calls that ended on a technical failure, 0 to 1. */
+  errorRate: number | null
+  /** `errors`: over 5% of calls failed. `degraded`: slowest replies over twice its usual. */
+  health: AgentHealth
+  /** What's wrong, in words, when health isn't ok. */
+  issue?: string
+}
+
+export type ActivityKind = 'agent_created' | 'agent_published' | 'admin'
+
+/** An event across the platform. Sign-ups come from the organisation list. */
+export interface OverviewActivity {
+  id: string
+  at: string
+  kind: ActivityKind
+  /** Who did it, e.g. "Vikram S" or "Lakshmi K (Arogya Demo Hospital)". */
+  who: string
+  /** What happened, in words, without callers' details. */
+  what: string
+  orgSlug?: string
+}
+
+export interface OrgAttention {
+  slug: string
+  name: string
+  tone: 'warn' | 'danger'
+  /** Why, in words: "Used 92% of its plan's minutes". */
+  reason: string
+}
+
+export interface PlatformOverview {
+  days: OverviewDays
+  generatedAt: string
+  buckets: OverviewBucket[]
+  /** Per bucket, oldest first. Succeeded + failed = all calls. */
+  succeeded: number[]
+  failed: number[]
+  /** Slowest 1 in 20 and typical replies per bucket, ms; null with no calls. */
+  replyP50ByBucket: (number | null)[]
+  replyP95ByBucket: (number | null)[]
+  totals: { calls: number; succeeded: number; minutes: number; replyP50Ms: number | null; replyP95Ms: number | null }
+  /** The same length of time just before (for today: yesterday to the same hour). */
+  previous: { calls: number; succeeded: number; replyP95Ms: number | null }
+  outcomes: Record<OverviewOutcome, number>
+  /** Calls so far today, by hour, and yesterday up to the same hour. Whatever the period. */
+  today: { calls: number; byHour: number[]; yesterdaySoFar: number }
+  orgs: OverviewOrgUsage[]
+  agents: OverviewAgent[]
+  attention: OrgAttention[]
+  /** Newest first. Admin actions are left out for anyone but the master admin. */
+  activity: OverviewActivity[]
+}
+
+export interface LiveOpsCall {
+  id: string
+  orgSlug: string
+  orgName: string
+  agentName: string
+  startedAt: string
+  /** What the caller wants, once the agent knows. */
+  intent: string | null
+  /** The caller sounds upset or stuck. */
+  flagged: boolean
+  takenBy: string | null
+}
+
+export interface LiveOpsHandoff {
+  id: string
+  orgSlug: string
+  orgName: string
+  agentName: string
+  /** Why the agent handed over, in words. */
+  reason: string
+  waitingSince: string
+  emergency: boolean
+}
+
+export interface LiveOpsFailure extends ServiceFailure {
+  orgSlug: string | null
+}
+
+export type PlatformServiceId = ServiceHealth['id'] | 'telephony'
+
+export interface PlatformService {
+  id: PlatformServiceId
+  name: string
+  health: Health
+  /** The last hour, 0 to 1. */
+  errorRate: number
+  /** The last 15 minutes, ms. */
+  p50: number
+  p95: number
+  /** p95 per minute, the last 30 minutes, oldest first. */
+  p95ByMinute: number[]
+  note?: string
+}
+
+export interface Incident {
+  id: string
+  title: string
+  service: PlatformServiceId
+  startedAt: string
+  status: 'investigating' | 'monitoring'
+  /** The latest update, in words. */
+  update: string
+}
+
+export interface PlatformAlert {
+  id: string
+  severity: 'critical' | 'warning'
+  title: string
+  detail: string
+  at: string
+  /** Where to go about it, inside the Ops app. */
+  href?: string
+}
+
+export interface LiveOps {
+  checkedAt: string
+  calls: LiveOpsCall[]
+  handoffs: LiveOpsHandoff[]
+  /** The last 2 hours, newest first. */
+  failures: LiveOpsFailure[]
+  services: PlatformService[]
+  incidents: Incident[]
+  /** Worst first. */
+  alerts: PlatformAlert[]
+}
+
+// ---------------------------------------------------------------- deployments
+
+export type DeploymentComponent = 'agent' | 'app' | PlatformServiceId
+
+export interface Deployment {
+  id: string
+  at: string
+  /** Who did it, by name. */
+  by: string
+  component: DeploymentComponent
+  /** "OPD appointments v12", "Voice model: Kavya 2". */
+  title: string
+  note: string
+  /** live: what's running now. superseded: a later one replaced it. */
+  status: 'live' | 'superseded' | 'rolled_back' | 'failed'
+  /** Agent publishes only. */
+  orgSlug?: string
+  orgName?: string
+  agentId?: string
+  version?: number
+}
+
+// ---------------------------------------------------------------- incidents
+
+export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
+export type IncidentSeverity = 'minor' | 'major' | 'critical'
+
+export interface IncidentUpdate {
+  at: string
+  by: string
+  status: IncidentStatus
+  text: string
+}
+
+export interface IncidentRecord {
+  id: string
+  title: string
+  service: PlatformServiceId | 'app'
+  severity: IncidentSeverity
+  status: IncidentStatus
+  startedAt: string
+  resolvedAt: string | null
+  /** Newest first. */
+  updates: IncidentUpdate[]
+  /** Raised by monitoring rather than a person. */
+  automatic: boolean
+}
+
+export interface NewIncident {
+  title: string
+  service: IncidentRecord['service']
+  severity: IncidentSeverity
+  text: string
+}
+
+export interface IncidentUpdateInput {
+  status: IncidentStatus
+  text: string
+}
+
+// ---------------------------------------------------------------- security
+
+export interface SecurityPolicy {
+  /** Characters, for every account. */
+  passwordMinLength: number
+  /** bitNtech staff must use two-step sign-in. */
+  staffTwoStep: boolean
+  /** Who in client organisations must use it. */
+  memberTwoStep: 'off' | 'owners' | 'everyone'
+  /** How long a sign-in lasts. */
+  staffSessionHours: number
+  memberSessionDays: number
+  /** Signed out after this long without using AICA. */
+  idleMinutes: number
+  /** Ops can be opened only from these address ranges (CIDR). Empty: anywhere. */
+  staffIpRanges: string[]
+  /** Acting as a client user lasts at most this long. */
+  actingMaxMinutes: number
+  /** Kept this long, then deleted. */
+  transcriptRetentionDays: number
+  recordingRetentionDays: number
+  updatedAt: string
+  updatedBy: string
+}
+
+export type SecurityPolicyInput = Omit<SecurityPolicy, 'updatedAt' | 'updatedBy'>

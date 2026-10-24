@@ -3,7 +3,7 @@
     .venv/bin/python -m app.scripts.rebuild_rollups --org <slug> [--days 400]
 
 Safe to re-run: each rollup is rewritten from the calls it covers. Use it if
-calls were written without app.reports.record_call, or after a fix to how
+calls were written without app.domain.rollups.record_call, or after a fix to how
 rollups count.
 """
 from __future__ import annotations
@@ -11,9 +11,9 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ..reports import rebuild
-from ..services import build_services
-from ..settings import get_settings
+from ..core.config import get_settings
+from ..core.services import build_services
+from ..domain.rollups import rebuild
 
 
 def main() -> int:

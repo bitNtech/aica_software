@@ -37,11 +37,18 @@
   --danger: #c8283a;
   --warn: #b26a00;
 
-  /* ---- type ---- */
-  --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
-  --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'DM Mono', ui-monospace, Consolas, monospace;
-  --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
+  /* ---- type: one family, one scale ---- */
+  --display: 'Rubik', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'Rubik', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --tamil: 'Noto Sans Tamil', 'Rubik', system-ui, sans-serif;
+  --fs-xs: 0.75rem;    /* 12: labels, chips, table heads */
+  --fs-sm: 0.8125rem;  /* 13: meta, hints */
+  --fs-md: 0.875rem;   /* 14: body, controls */
+  --fs-lg: 1rem;       /* 16: emphasis, card titles */
+  --fs-xl: 1.25rem;    /* 20: section titles */
+  --fs-2xl: 1.5rem;    /* 24: page titles */
+  --fs-3xl: 2rem;      /* 32: sign-in headings */
 
   /* ---- space, shape ---- */
   --s-1: 0.25rem;
@@ -51,10 +58,16 @@
   --s-5: 1.5rem;
   --s-6: 2rem;
   --s-7: 3rem;
-  --r-field: 14px;
-  --r-card: 20px;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-field: var(--r-md);
+  --r-card: var(--r-lg);
   --r-pill: 999px;
-  --field-h: 52px;
+  --field-h: 36px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.18);
 
   /* ---- motion: one curve for state changes, one for arrivals ---- */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -86,7 +99,19 @@
   --info-bg: #e8edff;
   --info-ink: var(--aica-deep);
 
+  /* Two surface levels for working screens: panels sit on --surface-1 (the
+     card colour); anything raised above them (a drawer, a toast, a menu)
+     is --surface-2 and carries --elev. */
+  --surface-1: var(--card);
+  --surface-2: #fffdf9;
+  --elev: 0 1px 2px rgb(34 9 52 / 0.08), 0 12px 32px rgb(34 9 52 / 0.16);
+
   color-scheme: light;
+}
+
+/* Touch screens keep 44px targets and 16px inputs (iOS zooms on smaller). */
+@media (pointer: coarse) {
+  :root { --field-h: 44px; }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -110,6 +135,8 @@
     --warn-bg: rgba(255, 176, 50, 0.12);
     --info-bg: rgba(91, 132, 255, 0.14);
     --info-ink: #9db6ff;
+    --surface-2: #262221;
+    --elev: 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 36px rgb(0 0 0 / 0.55);
     color-scheme: dark;
   }
 }

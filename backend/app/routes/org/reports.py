@@ -1,5 +1,5 @@
 """/api/orgs/{slug}/reports — the Reports section of Home (Phase 4), from
-the rollups in app/reports.py, and a CSV of the call list.
+the rollups in app/domain/rollups.py, and a CSV of the call list.
 
 - The report needs `reports.view`. It holds counts only: no caller details.
 - The call list CSV needs `reports.export`, and follows the call log's own
@@ -15,12 +15,12 @@ import io
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 
-from ...errors import ApiError, bad_input, forbidden
-from ...orgs import OrgContext, org_permission
-from ...ratelimit import limit_caller
-from ...redact import mask_phone
-from ...reports import build_report, ist, window
-from ...store import CallFilter, IndexMissing, now
+from ...access.orgs import OrgContext, org_permission
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import CallFilter, IndexMissing, now
+from ...domain.redact import mask_phone
+from ...domain.rollups import build_report, ist, window
 from .calls import DAYS, since_days
 
 router = APIRouter(prefix="/api/orgs/{slug}/reports", tags=["org"])

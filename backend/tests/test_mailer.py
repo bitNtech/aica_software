@@ -4,7 +4,7 @@ import json
 
 import httpx
 
-from app.mailer import Mailer
+from app.integrations.mailer import Mailer
 
 LEAD = {
     "name": "Dr. <script>alert(1)</script>",

@@ -108,7 +108,7 @@ describe('the bot desk', () => {
 
   it('sends a line to staff for a while, and gives it back', async () => {
     const { user } = await open('frontdesk@example.com', `${O}/desk`)
-    const card = (await screen.findByText('OPD appointments', { selector: 'strong' })).closest('li')!
+    const card = (await screen.findByRole('heading', { level: 3, name: 'OPD appointments' })).closest('li')!
     await user.click(within(card).getByRole('button', { name: /send to staff/i }))
     const dialog = screen.getByRole('dialog', { name: /send opd appointments to your team/i })
     await user.click(within(dialog).getByRole('radio', { name: /until the end of today/i }))
@@ -126,7 +126,7 @@ describe('the bot desk', () => {
     const n = screen.getByRole('dialog', { name: /post a notice/i })
     await user.type(within(n).getByLabelText(/what callers should know/i), 'The pharmacy counter has moved to the ground floor today.')
     await user.click(within(n).getByRole('button', { name: /post notice/i }))
-    expect(await within(screen.getByRole('list', { name: /^notices$/i })).findByText(/pharmacy counter has moved/i)).toBeInTheDocument()
+    expect(await within(screen.getByRole('list', { name: /notices showing now/i })).findByText(/pharmacy counter has moved/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /mark a doctor away or late/i }))
     const d = screen.getByRole('dialog', { name: /mark a doctor away or late/i })
@@ -152,7 +152,7 @@ describe('the bot desk', () => {
     await user.type(within(item).getByLabelText(/what you changed/i), 'Added pharmacy hours to the FAQ.')
     await user.click(within(item).getByRole('button', { name: /mark fixed/i }))
     expect(await screen.findByText('Nothing flagged.')).toBeInTheDocument()
-    expect(screen.getByText(/recently dealt with \(2\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^fixed 2$/i })).toBeInTheDocument()
   })
 })
 
@@ -201,8 +201,11 @@ describe('calls: guidance, analysis and quality', () => {
     await open('admin@example.com', `${O}/reports`)
     const quality = (await screen.findByRole('heading', { name: /^quality$/i })).closest('section')!
     expect(within(quality).getByText('Successful calls')).toBeInTheDocument()
-    expect(within(quality).getAllByText('Typical reply').length).toBe(2)
-    expect(within(quality).getByRole('table', { name: /each agent/i })).toBeInTheDocument()
+    // The by-agent table has its own Agents card now, beside Quality rather than inside it.
+    expect(within(quality).getAllByText('Typical reply').length).toBe(1)
+    const agents = screen.getByRole('heading', { name: /^agents$/i }).closest('section')!
+    expect(within(agents).getByRole('table', { name: /each agent/i })).toBeInTheDocument()
+    expect(within(agents).getByRole('columnheader', { name: /typical reply/i })).toBeInTheDocument()
   })
 
   it('lets the front desk guide the agent on a live call', async () => {

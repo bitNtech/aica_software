@@ -28,7 +28,6 @@ export type PageKey =
   | 'numbers'
   | 'desk'
   | 'live'
-  | 'handoffs'
   | 'callbacks'
   | 'appointments'
   | 'calls'
@@ -37,6 +36,10 @@ export type PageKey =
   | 'activity'
   | 'settings'
   | 'billing'
+  | 'owners'
+  | 'usage'
+  | 'notifications'
+  | 'profile'
 
 export type PermissionGroup = 'agents' | 'desk' | 'calls' | 'manage'
 
@@ -86,7 +89,7 @@ export const PERMISSIONS: Record<Permission, PermissionMeta> = {
   'library.secrets': { label: 'Replace system secrets', description: 'Set the keys your connected systems use. Values are never shown.', group: 'agents', defaults: MANAGERS, grantable: MANAGERS },
   'desk.bot': { label: 'Switch lines to staff', description: 'Send a line’s calls to people instead of the agent, and back.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'desk.notices': { label: 'Post notices', description: 'Today’s notices and doctor changes the agents tell callers about.', group: 'desk', defaults: STAFF, grantable: STAFF },
-  'calls.take': { label: 'Take calls', description: 'Live calls and the handoff queue: listen, guide the agent, take over.', group: 'desk', defaults: STAFF, grantable: STAFF },
+  'calls.take': { label: 'Take calls', description: 'Live calls and callers waiting for a person: guide the agent, hand over, take over.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'callbacks.assign': { label: 'Assign callbacks', description: 'See every callback and give them to anyone. Without it: their own.', group: 'desk', defaults: ['owner', 'admin', 'supervisor'], grantable: STAFF },
   'appointments.manage': { label: 'Manage appointments', description: 'Confirm, change and cancel bookings made on calls.', group: 'desk', defaults: STAFF, grantable: STAFF },
   'calls.viewAll': { label: 'See every call', description: 'The whole call history. Without it: only calls they handled.', group: 'calls', defaults: ['owner', 'admin', 'supervisor', 'viewer'], grantable: EVERYONE },
@@ -155,8 +158,8 @@ const PAGE_RULE: Record<PageKey, (a: Access) => AccessLevel | null> = {
   numbers: (a) => (has(a, 'library.numbers') ? 'edit' : has(a, 'agents.view') && a.role !== 'viewer' ? 'read' : null),
   // Operate
   desk: (a) => (a.platform ? null : has(a, 'desk.bot') || has(a, 'desk.notices') ? 'edit' : null),
-  live: (a) => (has(a, 'calls.take') ? 'edit' : null),
-  handoffs: (a) => (has(a, 'calls.take') ? 'edit' : null),
+  // Everyone who may see calls can watch the queue; taking and guiding need calls.take.
+  live: (a) => (has(a, 'calls.take') ? 'edit' : has(a, 'calls.viewAll') ? 'read' : null),
   callbacks: (a) => (has(a, 'callbacks.assign') ? 'edit' : has(a, 'calls.take') ? 'own' : null),
   appointments: (a) => (has(a, 'appointments.manage') ? 'edit' : has(a, 'calls.viewAll') ? 'read' : null),
   calls: (a) => (has(a, 'calls.viewAll') ? 'read' : has(a, 'calls.take') ? 'own' : null),
@@ -165,8 +168,17 @@ const PAGE_RULE: Record<PageKey, (a: Access) => AccessLevel | null> = {
   team: (a) => (has(a, 'team.manage') ? 'edit' : null),
   activity: (a) => (has(a, 'activity.view') ? 'read' : null),
   settings: (a) => (has(a, 'settings.manage') ? 'edit' : null),
-  // Billing stays with owners; it isn't a permission anyone can be given.
-  billing: (a) => (a.role === 'owner' && !a.platform ? 'edit' : null),
+  // Billing stays with owners (it isn't a permission anyone can be given),
+  // and bitNtech's master admin, who manages every organisation's billing.
+  billing: (a) => (a.role === 'owner' && (!a.platform || a.platform === 'master_admin') ? 'edit' : null),
+  // Owners add and change owners; admins see who they are.
+  owners: (a) => (a.platform ? null : a.role === 'owner' ? 'edit' : has(a, 'team.manage') ? 'read' : null),
+  // Use against the plan: billing's people.
+  usage: (a) => (a.role === 'owner' && (!a.platform || a.platform === 'master_admin') ? 'edit' : null),
+  // Who gets the organisation's alerts.
+  notifications: (a) => (a.platform ? null : has(a, 'settings.manage') ? 'edit' : null),
+  // Everyone's own account; bitNtech's is in Ops.
+  profile: (a) => (a.platform ? null : 'edit'),
 }
 
 export const PAGE_KEYS = Object.keys(PAGE_RULE) as PageKey[]
@@ -183,15 +195,18 @@ export const PAGE_LABEL: Record<PageKey, string> = {
   numbers: 'Phone numbers',
   desk: 'the Bot desk',
   live: 'Live calls',
-  handoffs: 'the Handoff queue',
   callbacks: 'Callbacks',
   appointments: 'Appointments',
   calls: 'Call history',
   reports: 'Reports',
   team: 'Team',
-  activity: 'Organisation activity',
+  activity: 'the audit log',
   settings: 'Organisation settings',
   billing: 'Billing and plan',
+  owners: 'Owners',
+  usage: 'Usage and limits',
+  notifications: 'Notifications',
+  profile: 'Your profile',
 }
 
 /** The agent workspace's tabs differ by who's looking (docs/pages-and-access.md,
@@ -248,6 +263,7 @@ export type ConsoleAction =
   | 'desk.notices'
   | 'desk.resolveFlags'
   | 'call.takeOver'
+  | 'call.seeWaiting'
   | 'call.playRecording'
   | 'call.notes'
   | 'call.personal'
@@ -274,6 +290,8 @@ const ACTION_RULE: Record<ConsoleAction, (a: Access) => boolean> = {
   // A flagged answer is fixed by changing the agent or its knowledge.
   'desk.resolveFlags': (a) => has(a, 'agents.configure') || has(a, 'library.knowledge'),
   'call.takeOver': (a) => has(a, 'calls.take'),
+  // Who is waiting for a person: anyone who can see calls (GET /handoffs).
+  'call.seeWaiting': (a) => has(a, 'calls.take') || has(a, 'calls.viewAll'),
   // Without the permission: only calls they handled; the page checks per call.
   'call.playRecording': (a) => has(a, 'calls.recordings') || has(a, 'calls.take'),
   'call.notes': (a) => a.role !== 'viewer' && (has(a, 'calls.take') || has(a, 'calls.viewAll')),
@@ -311,11 +329,11 @@ export const NAV: NavSection[] = [
     heading: 'Operate',
     items: [
       { page: 'desk', label: 'Bot desk', path: 'desk', description: 'Each line’s agent, today’s notices and doctor changes.' },
-      { page: 'live', label: 'Live calls', path: 'live', description: 'Calls the agents are on now.' },
-      { page: 'handoffs', label: 'Handoff queue', path: 'handoffs', description: 'Callers waiting for a person.' },
+      { page: 'live', label: 'Live calls', path: 'live', description: 'Calls the agents are on now, and callers waiting for a person.' },
       { page: 'callbacks', label: 'Callbacks', path: 'callbacks', description: 'Missed calls and people to call back.' },
       { page: 'appointments', label: 'Appointments', path: 'appointments', description: 'Bookings made on calls, to check.' },
       { page: 'calls', label: 'Call history', path: 'calls', description: 'Every call, with its transcript and what happened.' },
+      { page: 'reports', label: 'Analytics and reports', path: 'analytics', description: 'How calls went over a period: outcomes, topics, hours and agents.' },
     ],
   },
   {
@@ -333,9 +351,12 @@ export const NAV: NavSection[] = [
     heading: 'Manage',
     items: [
       { page: 'team', label: 'Team', path: 'team', description: 'Who can sign in, their roles and what they can do.' },
-      { page: 'activity', label: 'Activity', path: 'activity', description: 'What changed, and who changed it.' },
+      { page: 'owners', label: 'Owners', path: 'owners', description: 'Who owns the organisation, and handing ownership over.' },
+      { page: 'activity', label: 'Audit log', path: 'audit', description: 'What changed, and who changed it.' },
       { page: 'settings', label: 'Settings', path: 'settings', description: 'Name, languages and business hours.' },
-      { page: 'billing', label: 'Billing and plan', path: 'billing', description: 'Plan, usage, invoices and payment.' },
+      { page: 'notifications', label: 'Notifications', path: 'notifications', description: 'Who gets which alerts, and quiet hours.' },
+      { page: 'billing', label: 'Billing and plan', path: 'billing', description: 'Plan, invoices and payment.' },
+      { page: 'usage', label: 'Usage and limits', path: 'usage', description: 'Minutes, agents and lines against your plan.' },
     ],
   },
 ]

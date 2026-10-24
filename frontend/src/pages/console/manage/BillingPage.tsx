@@ -22,7 +22,7 @@ const STATUS_LABEL = { paid: 'Paid', due: 'Due', failed: 'Payment failed' } as c
 
 /** /o/:slug/billing: plan, usage, invoices, payment. Owners only. */
 export default function BillingPage() {
-  const { org } = useOrg()
+  const { org, access } = useOrg()
   const client = useConsole()
   const load = useCallback(() => client.getBilling(org.orgSlug), [client, org.orgSlug])
   const [billing, reload, setBilling] = useAsync(load)
@@ -33,7 +33,7 @@ export default function BillingPage() {
   }
 
   return (
-    <ConsolePage kicker="Manage" title="Billing and plan" docTitle="Billing and plan" lede={<p>Your plan, this month’s use, invoices and how you pay. Only owners see this page.</p>}>
+    <ConsolePage kicker="Manage" title="Billing and plan" docTitle="Billing and plan" lede={<p>Your plan, this month’s use, invoices and how you pay. {access.platform ? 'Owners see this page too; changes you make here are logged as bitNtech’s.' : 'Only owners (and bitNtech’s master admin) see this page.'}</p>}>
       <p className="sr-only" role="status">
         {note}
       </p>

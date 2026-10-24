@@ -1,60 +1,230 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { asAuthError } from '../../../auth/types'
-import { useConsole } from '../../../console/ConsoleProvider'
-import type { Callback, Member } from '../../../console/types'
-import { useOrg } from '../../../console/useOrg'
 import { pageAccess } from '../../../console/access'
+import { useConsole } from '../../../console/ConsoleProvider'
+import type { Callback, OrgSettings } from '../../../console/types'
+import { useAttention } from '../../../console/useAttention'
+import { useOrg } from '../../../console/useOrg'
 import { ConsolePage } from '../../../components/console/ConsolePage'
-import { SegFilter } from '../../../components/console/ListTools'
+import { useShortcuts } from '../../../components/console/KeyboardHelp'
+import { useSettled } from '../../../components/console/ListTools'
+import { SplitView } from '../../../components/console/SplitView'
+import { Toolbar, type FilterChip } from '../../../components/console/Toolbar'
+import { useToast } from '../../../components/console/Toast'
+import { UpdatedAgo } from '../../../components/console/UpdatedAgo'
 import { Alert } from '../../../components/ui/Alert'
-import { Button } from '../../../components/ui/Button'
-import { ChoiceGroup } from '../../../components/ui/Choice'
-import { Modal } from '../../../components/ui/Dialog'
-import { SelectField, TextAreaField } from '../../../components/ui/Field'
-import { Spinner } from '../../../components/ui/Spinner'
+import { SelectField, TextField } from '../../../components/ui/Field'
 import { useAsync } from '../../../lib/useAsync'
-import { shortDate } from '../../../lib/time'
-import { since, timeOfDay, useNow } from './shared'
-import { useAnnouncer } from './LiveBits'
+import { useMediaQuery } from '../../../lib/useMediaQuery'
+import { useNow } from '../../../lib/useNow'
+import { BulkBar, type BulkReport } from './callbacks/BulkBar'
+import { CallbackDetail } from './callbacks/CallbackDetail'
+import { CallbackQueue } from './callbacks/CallbackQueue'
+import { buildQueue, nameOf, nextCallback, NO_FILTER, summarize, type QueueFilter, type Sort } from './callbacks/queue'
+import { StaleNote, useAnnouncer } from './LiveBits'
+import { useLiveData } from './shared'
 import './Operate.css'
+import './callbacks/Callbacks.css'
 
-type Show = 'open' | 'done' | 'unreachable'
-type Whose = 'all' | 'mine' | 'nobody'
-const SHOW_LABEL: Record<Show, string> = { open: 'To call', done: 'Done', unreachable: 'Couldn’t reach' }
-const WHOSE_LABEL: Record<Whose, string> = { all: 'Everyone’s', mine: 'Mine', nobody: 'Nobody’s yet' }
+/** How often the list is read again (it pauses while the tab is hidden). */
+const POLL_MS = 10_000
+const WIDE = '(min-width: 1100px)'
 
-/** /o/:slug/callbacks: missed calls and callers who asked to be called back. */
+const SORT_LABEL: Record<Sort, string> = { urgency: 'Most urgent first', newest: 'Newest request first', oldest: 'Oldest request first' }
+const TRIES_LABEL = { untried: 'Not tried yet', tried: 'Tried at least once' } as const
+const STATUS_LABEL = { open: 'To call', done: 'Done', unreachable: 'Couldn’t reach' } as const
+
+/**
+ * /o/:slug/callbacks: missed calls and callers who asked to be called back,
+ * as one queue by urgency beside the callback that is open (in a drawer on a
+ * phone). Whoever has "Assign callbacks" sees every callback and gives them
+ * to anyone, one at a time or ticked in bulk; whoever only takes calls sees
+ * their own and the ones nobody has yet, and takes, rings and logs those.
+ * The list is read again every few seconds; a change made here shows at once.
+ */
 export default function CallbacksPage() {
   const { org, user, access } = useOrg()
   const client = useConsole()
-  // Without “Assign callbacks”: their own, and ones nobody has yet.
-  const frontDesk = pageAccess(access, 'callbacks') === 'own'
-  const load = useCallback(async () => {
-    const [callbacks, members] = await Promise.all([client.listCallbacks(org.orgSlug), client.listMembers(org.orgSlug)])
-    // Only people who handle calls can be given one.
-    return { callbacks, members: members.filter((m) => m.status === 'active' && m.role !== 'viewer') }
-  }, [client, org.orgSlug])
-  const [lib, reload, setLib] = useAsync(load)
-  const [show, setShow] = useState<Show>('open')
-  const [whose, setWhose] = useState<Whose>('all')
-  const [logging, setLogging] = useState<Callback | null>(null)
-  const [note, say] = useAnnouncer()
-  const now = useNow(30000)
-  const listHeading = useRef<HTMLHeadingElement>(null)
+  const toast = useToast()
+  const attention = useAttention()
+  const manage = pageAccess(access, 'callbacks') === 'edit'
+  const mayReadSettings = pageAccess(access, 'settings') === 'edit'
 
-  const all = lib.state === 'ready' ? lib.data.callbacks : []
-  const mine = (c: Callback) => c.assignedTo?.id === user.id
-  const inWhose = (c: Callback, w: Whose) => w === 'all' || (w === 'mine' ? mine(c) : !c.assignedTo)
-  const shown = all
-    .filter((c) => c.status === show && inWhose(c, whose))
-    // Overdue first, then soonest due.
-    .sort((a, b) => a.dueBy.localeCompare(b.dueBy))
+  const load = useCallback(() => client.listCallbacks(org.orgSlug), [client, org.orgSlug])
+  const feed = useLiveData(load, POLL_MS)
+  const callbacks = useMemo(() => feed.data ?? [], [feed.data])
+  const now = useNow(30_000)
+  const [said, say] = useAnnouncer()
 
-  /** Replace one in the list from the server's copy, and say what happened. */
-  const changed = (c: Callback, text: string) => {
-    setLib((r) => (r.state === 'ready' ? { ...r, data: { ...r.data, callbacks: r.data.callbacks.map((x) => (x.id === c.id ? c : x)) } } : r))
-    say(text)
+  // The team: only people who handle calls can be given one.
+  const loadTeam = useCallback(() => client.listMembers(org.orgSlug), [client, org.orgSlug])
+  const [teamResult] = useAsync(loadTeam)
+  const teamKnown = teamResult.state === 'ready'
+  const team = useMemo(() => (teamResult.state === 'ready' ? teamResult.data.filter((m) => m.status === 'active' && m.role !== 'viewer') : []), [teamResult])
+
+  // Opening hours, for "due outside hours": only those who may read the settings ask; no access is no warning, not an error.
+  const loadSettings = useCallback(async (): Promise<OrgSettings | null> => {
+    if (!mayReadSettings) return null
+    try {
+      return await client.getOrgSettings(org.orgSlug)
+    } catch {
+      return null
+    }
+  }, [client, org.orgSlug, mayReadSettings])
+  const [settingsResult] = useAsync(loadSettings)
+  const settings = settingsResult.state === 'ready' ? settingsResult.data : null
+
+  // ---- filters
+  const [filter, setFilter] = useState<QueueFilter>(NO_FILTER)
+  const [sort, setSort] = useState<Sort>('urgency')
+  const search = useRef<HTMLInputElement>(null)
+  const items = useMemo(() => buildQueue(callbacks, filter, sort, now, user.id), [callbacks, filter, sort, now, user.id])
+  const summary = summarize(items)
+  const filtering = filter.text.trim() !== '' || filter.assignee !== '' || filter.tries !== '' || filter.status !== ''
+  const filterSaid = useSettled(`${items.length} of ${callbacks.length} shown`, filtering)
+
+  // Everyone who has one, so a callback given to someone who has since left can still be found.
+  const assigneeOptions = useMemo(() => {
+    const known = new Set(team.map((m) => m.id))
+    const gone = new Map<string, string>()
+    for (const c of callbacks) if (c.assignedTo && !known.has(c.assignedTo.id)) gone.set(c.assignedTo.id, c.assignedTo.name)
+    return [
+      { value: '', label: 'Anyone' },
+      { value: 'me', label: 'Me' },
+      { value: 'nobody', label: 'Not given to anyone' },
+      ...team.filter((m) => m.id !== user.id).map((m) => ({ value: m.id, label: m.name })),
+      ...[...gone].map(([id, name]) => ({ value: id, label: `${name} (not on the team)` })),
+    ]
+  }, [team, callbacks, user.id])
+  const assigneeLabel = assigneeOptions.find((o) => o.value === filter.assignee)?.label ?? ''
+  const chips: FilterChip[] = [
+    ...(filter.text.trim() ? [{ id: 'text', label: `Search: ${filter.text.trim()}`, onRemove: () => setFilter((f) => ({ ...f, text: '' })) }] : []),
+    ...(filter.assignee ? [{ id: 'assignee', label: `Given to: ${assigneeLabel}`, onRemove: () => setFilter((f) => ({ ...f, assignee: '' })) }] : []),
+    ...(filter.tries ? [{ id: 'tries', label: TRIES_LABEL[filter.tries], onRemove: () => setFilter((f) => ({ ...f, tries: '' })) }] : []),
+    ...(filter.status ? [{ id: 'status', label: `Status: ${STATUS_LABEL[filter.status]}`, onRemove: () => setFilter((f) => ({ ...f, status: '' })) }] : []),
+  ]
+
+  // ---- which one is open
+  const wide = useMediaQuery(WIDE, true)
+  // undefined: nobody has chosen yet.
+  const [chosen, setChosen] = useState<string | null | undefined>(undefined)
+  // Beside the list there is room: start on the most urgent one, once.
+  // After that nothing moves the selection: a new callback arriving joins the
+  // list but doesn't take over what is being read.
+  if (chosen === undefined && wide && items.length > 0) setChosen(items[0].callback.id)
+  const picked = chosen ?? null
+  const found = callbacks.find((c) => c.id === picked) ?? null
+  const [snapshot, setSnapshot] = useState<Callback | null>(null)
+  useEffect(() => {
+    if (found) setSnapshot(found)
+  }, [found])
+  // One that has left the list (taken by someone else, or removed) stays
+  // on screen as it was, marked as gone, until something else is picked.
+  const shown = useMemo(() => {
+    if (!picked) return null
+    if (found) return { callback: found, gone: false }
+    return snapshot && snapshot.id === picked ? { callback: snapshot, gone: true } : null
+  }, [picked, found, snapshot])
+  const [focusId, setFocusId] = useState<string | null>(null)
+
+  // ---- next callback
+  /** The next one for this person to ring after `from`: from what is shown if there is one, else from everything. */
+  const nextAfter = useCallback(
+    (from: string | null) => nextCallback(items.map((i) => i.callback), from, user.id) ?? nextCallback(callbacks, from, user.id),
+    [items, callbacks, user.id],
+  )
+  function openNext() {
+    const n = nextAfter(picked)
+    if (!n) {
+      toast.show({ message: 'No other callbacks are waiting for you.', tone: 'info' })
+      return
+    }
+    setChosen(n.id)
+    setFocusId(n.id)
+    say(`Opened ${nameOf(n)}.`)
   }
+
+  useShortcuts({
+    '/': { description: 'Search the callbacks', run: () => search.current?.focus() },
+    n: { description: 'Open the next callback waiting for you', run: openNext },
+  })
+
+  // ---- changes made here show at once; a fresh read follows
+  const apply = useCallback((c: Callback) => feed.setData((d) => (d ? d.map((x) => (x.id === c.id ? c : x)) : d)), [feed])
+  const refresh = () => {
+    feed.reload()
+    attention?.refresh()
+  }
+
+  // ---- ticking rows to give several at once
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [report, setReport] = useState<BulkReport | null>(null)
+  // Ticks for callbacks that have gone from the list go with them.
+  useEffect(() => {
+    if (!feed.data) return
+    setTicked((t) => {
+      const present = new Set(feed.data!.map((c) => c.id))
+      const kept = [...t].filter((id) => present.has(id))
+      return kept.length === t.size ? t : new Set(kept)
+    })
+  }, [feed.data])
+  const tick = (id: string, on: boolean) =>
+    setTicked((t) => {
+      const n = new Set(t)
+      if (on) n.add(id)
+      else n.delete(id)
+      return n
+    })
+
+  async function giveTicked(memberId: string) {
+    const member = team.find((m) => m.id === memberId)
+    if (!member) return
+    const targets = callbacks.filter((c) => ticked.has(c.id))
+    setBulkBusy(true)
+    setReport(null)
+    const done: { before: Callback }[] = []
+    const failed: { id: string; name: string; message: string }[] = []
+    // One by one: each has its own checks, and a failure shouldn't stop the rest.
+    for (const c of targets) {
+      try {
+        apply(await client.updateCallback(org.orgSlug, c.id, { assignedTo: memberId }))
+        done.push({ before: c })
+      } catch (err) {
+        failed.push({ id: c.id, name: nameOf(c), message: asAuthError(err).message })
+      }
+    }
+    setBulkBusy(false)
+    setTicked(new Set(failed.map((f) => f.id)))
+    setReport({ to: member.name, total: targets.length, gave: done.length, failed: failed.map(({ name, message }) => ({ name, message })) })
+    refresh()
+    if (done.length > 0) {
+      toast.show({
+        message: `Gave ${done.length} ${done.length === 1 ? 'callback' : 'callbacks'} to ${member.name}${failed.length ? `; ${failed.length} couldn’t be given` : ''}.`,
+        tone: failed.length ? 'warn' : 'ok',
+        action: { label: 'Undo', onClick: () => void undoBulk(done.map((d) => d.before)) },
+      })
+    }
+  }
+
+  /** Each given callback goes back to who had it, where that person is still on the team. */
+  async function undoBulk(before: Callback[]) {
+    let back = 0
+    for (const c of before) {
+      if (c.assignedTo && !team.some((m) => m.id === c.assignedTo!.id)) continue
+      try {
+        apply(await client.updateCallback(org.orgSlug, c.id, { assignedTo: c.assignedTo?.id ?? null }))
+        back++
+      } catch {
+        // Left as it is: the count below says how many went back.
+      }
+    }
+    setReport(null)
+    refresh()
+    toast.show({ message: back === before.length ? 'Undone.' : `Put ${back} of ${before.length} back as they were.`, tone: back === before.length ? 'ok' : 'warn' })
+  }
+
+  const loading = !feed.data && !feed.error
 
   return (
     <ConsolePage
@@ -62,274 +232,129 @@ export default function CallbacksPage() {
       kicker="Operate"
       title="Callbacks"
       docTitle="Callbacks"
-      lede={<p>Missed calls and callers who asked to be called back. {frontDesk ? 'You see yours, and ones nobody has taken yet.' : 'Give each to someone on the team.'}</p>}
+      status={<UpdatedAgo at={feed.checkedAt} />}
+      lede={<p>Missed calls and callers who asked to be called back. {manage ? 'Give each to someone on the team.' : 'You see yours, and ones nobody has taken yet.'}</p>}
     >
       <p className="sr-only" role="status">
-        {note}
+        {said}
       </p>
-      {lib.state === 'loading' && (
-        <div className="loading-row" role="status">
-          <Spinner />
-          <span>Loading callbacks…</span>
-        </div>
+      {filtering && (
+        <p className="sr-only" role="status">
+          {filterSaid}
+        </p>
       )}
-      {lib.state === 'error' && (
+      {feed.data && feed.error ? <StaleNote error={feed.error} checkedAt={feed.checkedAt} onRetry={feed.reload} /> : null}
+      {!feed.data && feed.error ? (
         <Alert tone="error" title="Couldn't load callbacks">
-          <p>{asAuthError(lib.error).message}</p>
-          <button type="button" className="btn-text" onClick={reload}>
+          <p>{asAuthError(feed.error).message}</p>
+          <button type="button" className="btn-text" onClick={feed.reload}>
             Try again
           </button>
         </Alert>
-      )}
-      {lib.state === 'ready' && (
+      ) : (
         <>
-          <div className="list-tools">
-            <SegFilter<Show>
-              legend="Show"
-              value={show}
-              onChange={setShow}
-              options={(Object.keys(SHOW_LABEL) as Show[]).map((s) => ({ value: s, label: SHOW_LABEL[s], count: all.filter((c) => c.status === s && inWhose(c, whose)).length }))}
-            />
-            <SegFilter<Whose>
-              legend="Whose"
-              value={whose}
-              onChange={setWhose}
-              options={(Object.keys(WHOSE_LABEL) as Whose[]).map((w) => ({ value: w, label: WHOSE_LABEL[w], count: all.filter((c) => c.status === show && inWhose(c, w)).length }))}
-            />
-          </div>
-          <h2 className="op-section__title op-list-head" ref={listHeading} tabIndex={-1}>
-            {SHOW_LABEL[show]}, {WHOSE_LABEL[whose].toLowerCase()} <span className="op-count">{shown.length}</span>
-          </h2>
-          {shown.length === 0 ? (
-            <p className="empty-note">{show === 'open' ? 'Nobody to call back. Missed calls and requests appear here.' : 'None here.'}</p>
-          ) : (
-            <ul className="op-cards" aria-label="Callbacks">
-              {shown.map((c) => (
-                <CallbackCard
-                  key={c.id}
-                  callback={c}
-                  now={now}
-                  members={lib.data.members}
-                  frontDesk={frontDesk}
-                  meId={user.id}
-                  onChanged={(next, text) => {
-                    changed(next, text)
-                    // It may leave this view (done, or taken by someone else).
-                    if (next.status !== show || !inWhose(next, whose)) requestAnimationFrame(() => listHeading.current?.focus())
-                  }}
-                  onLog={() => setLogging(c)}
+          <Toolbar
+            label="Filter the callbacks"
+            sticky={false}
+            search={<TextField ref={search} label="Search callbacks" type="search" value={filter.text} placeholder="Name, number or reason" onChange={(e) => setFilter((f) => ({ ...f, text: e.target.value }))} />}
+            filters={
+              <>
+                {manage && <SelectField label="Given to" value={filter.assignee} options={assigneeOptions} onChange={(e) => setFilter((f) => ({ ...f, assignee: e.target.value }))} />}
+                <SelectField
+                  label="Tries"
+                  value={filter.tries}
+                  options={[
+                    { value: '', label: 'Any' },
+                    { value: 'untried', label: TRIES_LABEL.untried },
+                    { value: 'tried', label: TRIES_LABEL.tried },
+                  ]}
+                  onChange={(e) => setFilter((f) => ({ ...f, tries: e.target.value as QueueFilter['tries'] }))}
                 />
-              ))}
-            </ul>
-          )}
+                <SelectField
+                  label="Status"
+                  value={filter.status}
+                  options={[
+                    { value: '', label: 'To call, and recent' },
+                    { value: 'open', label: STATUS_LABEL.open },
+                    { value: 'done', label: STATUS_LABEL.done },
+                    { value: 'unreachable', label: STATUS_LABEL.unreachable },
+                  ]}
+                  onChange={(e) => setFilter((f) => ({ ...f, status: e.target.value as QueueFilter['status'] }))}
+                />
+                <SelectField label="Order" value={sort} options={(Object.keys(SORT_LABEL) as Sort[]).map((s) => ({ value: s, label: SORT_LABEL[s] }))} onChange={(e) => setSort(e.target.value as Sort)} />
+              </>
+            }
+            summary={loading ? undefined : `${summary.open} open · ${summary.overdue} overdue`}
+            chips={chips}
+            onClearAll={() => setFilter(NO_FILTER)}
+          />
+          <SplitView
+            storageKey="aica.split.callbacks"
+            defaultWidth={420}
+            listLabel="Callbacks"
+            detailLabel="Callback details"
+            detailOpen={shown !== null}
+            onCloseDetail={() => setChosen(null)}
+            detailEmpty={<p className="split__empty">Pick a callback to see who it is, why they asked, who has it and what happened on earlier calls. Press N for the next one waiting for you.</p>}
+            list={
+              <CallbackQueue
+                items={items}
+                total={callbacks.length}
+                sort={sort}
+                selectedId={picked}
+                onSelect={setChosen}
+                manage={manage}
+                ticked={ticked}
+                onTick={tick}
+                now={now}
+                loading={loading}
+                openClosed={filter.status === 'done' || filter.status === 'unreachable'}
+                onClearFilters={() => setFilter(NO_FILTER)}
+                header={
+                  manage && callbacks.length > 0 ? (
+                    <BulkBar
+                      shown={items.length}
+                      ticked={ticked.size}
+                      team={team}
+                      busy={bulkBusy}
+                      report={report}
+                      onTickAll={() => setTicked(new Set(items.map((i) => i.callback.id)))}
+                      onClear={() => setTicked(new Set())}
+                      onGive={(id) => void giveTicked(id)}
+                      onDismissReport={() => setReport(null)}
+                    />
+                  ) : null
+                }
+              />
+            }
+            detail={
+              shown && (
+                <CallbackDetail
+                  key={shown.callback.id}
+                  callback={shown.callback}
+                  all={callbacks}
+                  team={team}
+                  teamKnown={teamKnown}
+                  manage={manage}
+                  me={{ id: user.id, name: user.name }}
+                  settings={settings}
+                  gone={shown.gone}
+                  next={nextAfter(shown.callback.id)}
+                  focus={focusId === shown.callback.id}
+                  now={now}
+                  onChanged={apply}
+                  onOpen={(id) => {
+                    setChosen(id)
+                    setFocusId(id)
+                  }}
+                  onNext={openNext}
+                  onRefresh={refresh}
+                />
+              )
+            }
+          />
         </>
       )}
-      <LogDialog
-        orgSlug={org.orgSlug}
-        callback={logging}
-        onClose={() => setLogging(null)}
-        onLogged={(c, text) => {
-          setLogging(null)
-          changed(c, text)
-          if (c.status !== show) requestAnimationFrame(() => listHeading.current?.focus())
-        }}
-      />
     </ConsolePage>
-  )
-}
-
-function CallbackCard({
-  callback: c,
-  now,
-  members,
-  frontDesk,
-  meId,
-  onChanged,
-  onLog,
-}: {
-  callback: Callback
-  now: number
-  members: Member[]
-  frontDesk: boolean
-  meId: string
-  onChanged(c: Callback, text: string): void
-  onLog(): void
-}) {
-  const client = useConsole()
-  const { org } = useOrg()
-  const id = useId()
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  /** Chosen in the list, saved with Assign: arrowing through the list
-   * mustn't hand it to each person in turn. */
-  const [pick, setPick] = useState(c.assignedTo?.id ?? '')
-  const heading = useRef<HTMLHeadingElement>(null)
-  const overdue = c.status === 'open' && Date.parse(c.dueBy) < now
-
-  async function update(patch: Parameters<typeof client.updateCallback>[2], text: string) {
-    setBusy(true)
-    setError(null)
-    try {
-      onChanged(await client.updateCallback(org.orgSlug, c.id, patch), text)
-      // The button that was pressed may be gone ("Take it"): focus the card.
-      requestAnimationFrame(() => heading.current?.isConnected && heading.current.focus())
-    } catch (err) {
-      setError(asAuthError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <li className={`op-card${overdue ? ' op-card--flag' : ''}`} aria-labelledby={`${id}-h`}>
-      <div className="op-card__head">
-        <h3 className="op-card__title" id={`${id}-h`} ref={heading} tabIndex={-1}>
-          {c.callerName ?? 'Unknown caller'}{' '}
-          <a className="op-card__phone" href={`tel:${c.callerPhone.replace(/\s/g, '')}`}>
-            {c.callerPhone}
-          </a>
-        </h3>
-        <span className={`op-card__time${overdue ? ' op-card__time--late' : ''}`}>
-          {c.status === 'open' ? (overdue ? `Overdue by ${since(c.dueBy, now)}` : `Due by ${timeOfDay(c.dueBy)}${new Date(c.dueBy).toDateString() === new Date(now).toDateString() ? '' : `, ${shortDate(c.dueBy)}`}`) : null}
-        </span>
-      </div>
-      <p className="op-card__summary">{c.reason}</p>
-      <p className="row__meta">
-        Asked {since(c.requestedAt, now)} ago
-        {c.attempts > 0 && (
-          <>
-            {' '}
-            <i aria-hidden="true">·</i> tried {c.attempts} {c.attempts === 1 ? 'time' : 'times'}
-          </>
-        )}
-      </p>
-      {c.notes.length > 0 && (
-        <ul className="op-notes" aria-label="Notes">
-          {c.notes.map((n) => (
-            <li key={n.id}>
-              <span className="op-notes__by">
-                {n.by}, {timeOfDay(n.at)}:
-              </span>{' '}
-              {n.text}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="op-card__actions">
-        {frontDesk ? (
-          c.assignedTo ? (
-            <p className="op-card__taken">{c.assignedTo.id === meId ? 'Yours' : `With ${c.assignedTo.name}`}</p>
-          ) : (
-            <Button variant="line" size="sm" busy={busy} busyLabel="Taking…" onClick={() => void update({ assignedTo: meId }, 'It’s yours now.')}>
-              Take it
-            </Button>
-          )
-        ) : (
-          <form
-            className="op-assign"
-            onSubmit={(e) => {
-              e.preventDefault()
-              if (busy || pick === (c.assignedTo?.id ?? '')) return
-              const m = members.find((x) => x.id === pick)
-              void update({ assignedTo: pick || null }, m ? `Given to ${m.name}.` : 'Unassigned.')
-            }}
-          >
-            <SelectField
-              label="Who calls back"
-              value={pick}
-              options={[{ value: '', label: 'Nobody yet' }, ...members.map((m) => ({ value: m.id, label: m.name }))]}
-              onChange={(e) => setPick(e.target.value)}
-            />
-            <Button type="submit" variant="line" size="sm" aria-disabled={busy || pick === (c.assignedTo?.id ?? '') || undefined}>
-              {busy ? 'Saving…' : 'Assign'}
-            </Button>
-          </form>
-        )}
-        {c.status === 'open' ? (
-          <Button variant="plum" size="sm" onClick={onLog} aria-label={`Log a call to ${c.callerName ?? c.callerPhone}`}>
-            Log a call
-          </Button>
-        ) : (
-          <Button variant="line" size="sm" busy={busy} busyLabel="Opening…" onClick={() => void update({ reopen: true }, 'Back on the list to call.')}>
-            Open again
-          </Button>
-        )}
-      </div>
-      {error && (
-        <p className="field__error" role="alert">
-          {error}
-        </p>
-      )}
-    </li>
-  )
-}
-
-/** Record a try at calling back: reached them, or no answer, with a note. */
-function LogDialog({ orgSlug, callback, onClose, onLogged }: { orgSlug: string; callback: Callback | null; onClose(): void; onLogged(c: Callback, text: string): void }) {
-  const client = useConsole()
-  const [result, setResult] = useState<'reached' | 'no_answer'>('reached')
-  const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!callback) return
-    setResult('reached')
-    setText('')
-    setError(null)
-  }, [callback])
-
-  async function save(e: FormEvent) {
-    e.preventDefault()
-    if (!callback) return
-    setBusy(true)
-    setError(null)
-    try {
-      const c = await client.updateCallback(orgSlug, callback.id, { attempt: result, note: text })
-      onLogged(c, result === 'reached' ? 'Marked done.' : c.status === 'unreachable' ? 'Third try with no answer: moved to Couldn’t reach.' : 'No answer logged. It stays on the list.')
-    } catch (err) {
-      setError(asAuthError(err).message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal open={!!callback} title={`Call ${callback?.callerName ?? callback?.callerPhone ?? 'the caller'}`} onClose={() => !busy && onClose()}>
-      <form className="op-form" onSubmit={save} noValidate>
-        <p>
-          <a className="link" href={`tel:${callback?.callerPhone.replace(/\s/g, '')}`}>
-            {callback?.callerPhone}
-          </a>{' '}
-          <span className="row__meta">{callback?.reason}</span>
-        </p>
-        <ChoiceGroup<'reached' | 'no_answer'>
-          legend="How did it go?"
-          type="radio"
-          columns={2}
-          options={[
-            { value: 'reached', label: 'Reached them', hint: 'Done: it leaves the list.' },
-            { value: 'no_answer', label: 'No answer', hint: `Stays on the list. After 3 tries it moves to “Couldn’t reach”.` },
-          ]}
-          value={[result]}
-          onChange={([v]) => setResult(v)}
-        />
-        <TextAreaField label="Note" hint="Optional. Your team sees it." rows={3} maxLength={500} value={text} onChange={(e) => setText(e.target.value)} />
-        {error && (
-          <p className="field__error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="dialog__actions">
-          <Button type="submit" variant="plum" size="sm" busy={busy} busyLabel="Saving…">
-            Save
-          </Button>
-          <Button variant="line" size="sm" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Modal>
   )
 }

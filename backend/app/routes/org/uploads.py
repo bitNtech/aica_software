@@ -8,7 +8,7 @@ and transcripts aren't available.
 - Reading: `library.uploads`, or someone who sees agents and callers'
   details (recordings hold personal details); bitNtech's master admin.
 - Adding and removing: `library.uploads`. Recordings go straight from the
-  browser to the private bucket with a signed URL (app/blobs.py), up to
+  browser to the private bucket with a signed URL (app/data/blobs.py), up to
   200 MB each; the browser then calls /{id}/uploaded.
 """
 from __future__ import annotations
@@ -19,13 +19,13 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends
 from pydantic import Field
 
-from ...accounts import iso
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member, org_permission
+from ...auth.accounts import iso
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import Tx, UploadDoc, new_id, now
+from ...domain.usage import usage_map
 from ...models import Camel
-from ...orgs import OrgContext, org_member, org_permission
-from ...ratelimit import limit_caller
-from ...store import Tx, UploadDoc, new_id, now
-from ...usage import usage_map
 from .knowledge import upload_instructions
 
 router = APIRouter(prefix="/api/orgs/{slug}/uploads", tags=["org"])

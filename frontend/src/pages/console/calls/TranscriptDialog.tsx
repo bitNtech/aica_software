@@ -6,7 +6,7 @@ import { Alert } from '../../../components/ui/Alert'
 import { Modal } from '../../../components/ui/Dialog'
 import { Spinner } from '../../../components/ui/Spinner'
 
-const SPEAKER: Record<TranscriptTurn['speaker'], string> = { caller: 'Caller', staff: 'Staff', agent: 'AICA' }
+export const SPEAKER: Record<TranscriptTurn['speaker'], string> = { caller: 'Caller', staff: 'Staff', agent: 'AICA' }
 
 /** Personal details are marked {{kind:value}} in transcripts. Redacted,
  * they read as "[name]", "[phone]"…; otherwise the value shows. */

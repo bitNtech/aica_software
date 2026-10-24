@@ -33,10 +33,23 @@
   --ok: #3ccf91;
   --miss: #ff4d5e;
 
-  --display: 'Archivo', 'DM Sans', system-ui, sans-serif;
-  --sans: 'DM Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'DM Mono', ui-monospace, Consolas, monospace;
-  --tamil: 'Noto Sans Tamil', 'DM Sans', system-ui, sans-serif;
+  /* One family and one scale, shared with the console (styles/tokens.css). */
+  --display: 'Rubik', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'Rubik', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --tamil: 'Noto Sans Tamil', 'Rubik', system-ui, sans-serif;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.5rem;
+  --fs-3xl: 2rem;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
 
   /* One curve for every state change, as on bitntech.in. */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -88,7 +101,7 @@ body {
   margin: 0;
   background: var(--night);
   color: var(--ivory-2);
-  font: 400 1.0625rem/1.6 var(--sans);
+  font: 400 var(--fs-lg)/1.6 var(--sans);
   letter-spacing: 0.005em;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -121,9 +134,9 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   position: fixed; top: 0; left: 0; z-index: 10000;
   padding: 0.85rem 1.25rem;
   background: var(--plum); color: #fff;
-  font: 600 0.85rem var(--sans);
+  font: 600 var(--fs-sm) var(--sans);
   text-decoration: none;
-  border-radius: 0 0 8px 0;
+  border-radius: 0 0 var(--r-md) 0;
   transform: translateY(-120%);
   transition: transform 0.18s var(--ease);
 }
@@ -137,9 +150,7 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   display: inline-flex;
   align-items: center;
   gap: 0.6em;
-  font: 500 0.7rem/1.4 var(--mono);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font: 500 var(--fs-xs)/1.4 var(--sans);
   color: var(--orange);
 }
 .label i { font-style: normal; opacity: 0.55; color: currentColor; }
@@ -150,24 +161,20 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 
 .display {
   font-family: var(--display);
-  font-weight: 800;
-  font-stretch: 100%;
-  letter-spacing: -0.045em;
-  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
   color: var(--ivory);
   text-wrap: balance;
 }
 .paper .display { color: var(--ink); }
 .display em { font-style: normal; color: var(--orange); }
 
-.h2 { font-size: clamp(2.4rem, 1.2rem + 5vw, 5.4rem); }
+.h2 { font-size: clamp(2rem, 1.2rem + 3.6vw, 4rem); }
 
-/* An outlined word: "Our" in "Our Products". */
-.ghost {
-  color: transparent !important;
-  -webkit-text-stroke: var(--stroke-w, 1.5px) var(--stroke, var(--ivory-2));
-}
-.paper .ghost { --stroke: var(--ink); }
+/* A quieter word in a headline: "with" in "Watch it with sound". */
+.ghost { color: var(--ivory-3) !important; font-weight: 400; }
+.paper .ghost { color: var(--text) !important; }
 
 /* ---- buttons: bitntech.in's pills ---- */
 
@@ -176,13 +183,12 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
-  min-height: 52px;
-  padding: 0.85rem 1.6rem;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.25rem;
   border: 1px solid transparent;
-  border-radius: 999px;
-  font: 700 1rem/1.1 var(--sans);
-  letter-spacing: -0.005em;
+  border-radius: var(--r-pill);
+  font: 500 var(--fs-md)/1.1 var(--sans);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
@@ -191,27 +197,17 @@ a, button, label, summary, input, select { touch-action: manipulation; -webkit-t
 }
 .btn .arrow { display: inline-block; transition: transform 0.35s var(--out); }
 .btn:hover .arrow { transform: translate(2px, -2px); }
-.btn:active { transform: scale(0.98); }
 
 .btn--orange { background: var(--orange); color: var(--orange-ink); }
-/* A darker fill sweeps in from the left on hover. */
-.btn--orange::before {
-  content: '';
-  position: absolute; inset: 0; z-index: -1;
-  background: var(--orange-2);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s var(--out);
-}
-.btn--orange:hover::before { transform: scaleX(1); }
+.btn--orange:hover { background: var(--orange-2); }
 
-.btn--white { background: #fff; color: #14161a; }
-.btn--white:hover { background: var(--ivory); }
+.btn--white { background: var(--ivory); color: var(--coal); }
+.btn--white:hover { background: #fff; }
 
 .btn--line { border-color: var(--line-d2); color: var(--ivory); background: transparent; }
 .btn--line:hover { border-color: var(--ivory); }
 
-.btn--sm { min-height: 42px; padding: 0.6rem 1.15rem; font-size: 0.875rem; }
+.btn--sm { min-height: 36px; padding: 0 0.9rem; font-size: var(--fs-sm); }
 
 /* ---- reveal ----
    Visible by default (the prerendered page shows everything); App marks what

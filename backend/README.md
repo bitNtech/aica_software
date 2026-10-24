@@ -35,6 +35,32 @@ Invite bitNtech staff from Ops → People. From the command line, for when nobod
 
 Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 
+## Layout
+
+Every module has one home. New code goes in the package that matches what it does; `app/` itself holds only `main.py` and `models.py`.
+
+```
+backend/
+  app/
+    main.py          the FastAPI app (uvicorn app.main:app; Vercel's entry point)
+    models.py        request and response bodies (camelCase on the wire)
+    core/            config (settings from .env), errors, logs, ratelimit, services (the container on app.state)
+    auth/            sessions (cookie + route guards), identity (Firebase Auth, Google), accounts, passwords
+    access/          permissions.py + permissions.json (role table, shared with the frontend), orgs (the /api/orgs/{slug} guard)
+    data/            store (Firestore), blobs (Cloud Storage), vault (encrypted system secrets)
+    domain/          rules that aren't storage or HTTP: agentspec, catalogue(.json), rollups (report counters), usage, redact
+    integrations/    outgoing calls to other services: mailer (Resend), toolhttp (SSRF-guarded tool tests)
+    routes/          HTTP endpoints; routes/org/ is everything under /api/orgs/{slug}
+    scripts/         one-off commands: python -m app.scripts.<name>
+  firestore/         indexes.json and firestore.rules
+  tests/             pytest; fakes.py and orgkit.py are the shared helpers
+```
+
+- Routes stay thin: they check input and permissions, then call `data/` and `domain/`.
+- Imports inside `app/` are relative (`from ..data.store import …`); tests import `app.…`.
+- A new route goes into `ROUTES` in `tests/test_permission_matrix.py`.
+- Anything that doesn't fit a package: decide where it belongs before adding it, rather than leaving it loose in `app/`.
+
 ## Configuration (`backend/.env`, git-ignored)
 
 | Key | What |
@@ -45,7 +71,7 @@ Tests use in-memory fakes, with no network: `.venv/bin/python -m pytest`.
 | `FIRESTORE_DATABASE` | `(default)`, the project's only Firestore database (asia-south1) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `EMAIL_FROM` must be on a domain verified in Resend. `onboarding@resend.dev` only delivers to the Resend account owner |
 | `DEMO_REQUEST_TO` | Who receives the landing page's "Book a demo" requests, comma-separated. Default `support@bitntech.in` |
-| `SECRETS_KEY` | 32 random bytes, base64, encrypting system secrets (`app/secrets.py`). Make one with `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Without it, secrets can't be set. Keep a copy: losing it means re-entering every secret. `SECRETS_KEY_PREVIOUS` only while rotating |
+| `SECRETS_KEY` | 32 random bytes, base64, encrypting system secrets (`app/data/vault.py`). Make one with `python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode())"`. Without it, secrets can't be set. Keep a copy: losing it means re-entering every secret. `SECRETS_KEY_PREVIOUS` only while rotating |
 | `STORAGE_BUCKET` | The private Cloud Storage bucket for recordings and knowledge files. Without it, uploads are refused with an explanation |
 | `CHANGE_REQUESTS_TO` | Who at bitNtech is emailed about new requests and hospitals' replies, comma-separated. Default `support@bitntech.in` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | The OAuth web client Firebase created for Google sign-in. Leave both empty to switch Google sign-in off: the button then returns to the login page with a "not set up yet" message |
@@ -60,7 +86,7 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 
 ## Firebase console setup
 
-1. **Firestore → Rules:** paste [`firestore.rules`](firestore.rules), which denies all client access. Only this API, through the Admin SDK, uses the database.
+1. **Firestore → Rules:** paste [`firestore/firestore.rules`](firestore/firestore.rules), which denies all client access. Only this API, through the Admin SDK, uses the database.
 2. **Authentication → Settings → User account linking:** keep "Link accounts that use the same email" (the default).
 3. **Google sign-in:** any Google OAuth web client works. The backend verifies Google's ID token itself (signature, issuer, expiry, audience = `GOOGLE_CLIENT_ID`, verified email). It then signs the matching Firebase user in with a custom token, so Firebase's own Google provider settings aren't involved. On the client (Google Cloud console → APIs & Services → Credentials), add the authorised redirect URI `http://localhost:5173/api/auth/google/callback`, plus `<API_URL>/api/auth/google/callback` for each deployed environment. The app name Google shows comes from that project's OAuth consent screen (Branding).
 
@@ -90,11 +116,11 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | POST | `/api/orgs/{slug}/calls/{id}/notes` | anyone who can see the call, except viewers and bitNtech staff |
 | GET/POST | `/api/orgs/{slug}/callbacks`, `/callbacks/{id}` | `calls.take` (own and unassigned) or `callbacks.assign` (all). Patch: `assignedTo`, `attempt`, `reopen`, `note` |
 | GET/POST | `/api/orgs/{slug}/appointments?from=&to=`, `/appointments/{id}` | read: `appointments.manage` or `calls.viewAll`; change: `appointments.manage` |
-| GET/POST | `/api/orgs/{slug}/handoffs`, `/handoffs/{id}/take`, `/to-callback` | `calls.take`. Taking one marks the call as handled by that person |
-| GET | `/api/orgs/{slug}/reports?days=&agentId=` | `reports.view`. From the rollups (`app/reports.py`) |
+| GET/POST | `/api/orgs/{slug}/handoffs`, `/handoffs/{id}/take`, `/to-callback` | Reading: `calls.viewAll` or `calls.take`. Taking and making a callback: `calls.take`. Taking one marks the call as handled by that person |
+| GET | `/api/orgs/{slug}/reports?days=&agentId=` | `reports.view`. From the rollups (`app/domain/rollups.py`) |
 | GET | `/api/orgs/{slug}/reports/calls.csv?days=&agentId=` | `reports.export`, with the call log's visibility rules |
 | GET/POST | `/api/orgs/{slug}/numbers`, `/numbers/{id}`, `/numbers/{id}/delete` | read: `library.numbers` or non-viewers who see agents; change: `library.numbers`; add and remove: master admin |
-| GET/POST | `/api/orgs/{slug}/tools`, `/tools/{id}/delete`, `/tools/{id}/test` | read as numbers; set up, delete, test: master admin. Tests are SSRF-guarded (`app/toolhttp.py`), 5 a minute |
+| GET/POST | `/api/orgs/{slug}/tools`, `/tools/{id}/delete`, `/tools/{id}/test` | read as numbers; set up, delete, test: master admin. Tests are SSRF-guarded (`app/integrations/toolhttp.py`), 5 a minute |
 | GET/POST | `/api/orgs/{slug}/credentials`, `/credentials/{name}/delete` | read names: as tools; set and delete: `library.secrets`. Values are encrypted and never returned |
 | GET/POST | `/api/orgs/{slug}/knowledge`, `/{id}`, `/{id}/uploaded`, `/{id}/refresh`, `/{id}/delete`, `/{id}/passages`, `/search` | read: `library.knowledge` or `agents.view`; change: `library.knowledge` |
 | GET/POST | `/api/orgs/{slug}/uploads`, `/{id}/uploaded`, `/{id}/delete`, `/{id}/transcript` | read: `library.uploads`, or `agents.view` with `calls.personal`; change: `library.uploads` |
@@ -127,7 +153,7 @@ Protections:
 
 ### Organisations
 
-`app/orgs.py` guards every `/api/orgs/{slug}` route. The member record (`orgs/{slug}/members/{uid}`) decides, on every request; the browser's idea of a role is never used. The table of role defaults and who may hold each permission is [`app/permissions.json`](app/permissions.json), shared with `frontend/src/console/access.ts` (a test on each side fails if they drift).
+`app/access/orgs.py` guards every `/api/orgs/{slug}` route. The member record (`orgs/{slug}/members/{uid}`) decides, on every request; the browser's idea of a role is never used. The table of role defaults and who may hold each permission is [`app/access/permissions.json`](app/access/permissions.json), shared with `frontend/src/console/access.ts` (a test on each side fails if they drift).
 
 - Non-members, and organisations that don't exist, get the same 403. Members of an organisation that isn't active get a 403 that says why.
 - bitNtech: the master admin may do everything, staff only look. Acting as someone, the person acted as is the caller; the change shows as bitNtech's in the organisation's activity and goes to the platform audit log too.
@@ -148,7 +174,7 @@ A master admin can act as a client user to see exactly what they see. It's audit
 
 ### Firestore indexes
 
-`firestore.indexes.json` lists every composite index the API's queries need. Create them **before** deploying code that uses them, either with `firebase deploy --only firestore:indexes` from `backend/` (needs a `firebase.json` pointing at the file), or by hand in Firebase console → Firestore Database → Indexes → Composite:
+`firestore/indexes.json` lists every composite index the API's queries need. Create them **before** deploying code that uses them, either with `firebase deploy --only firestore:indexes` from `backend/` (needs a `firebase.json` pointing at the file), or by hand in Firebase console → Firestore Database → Indexes → Composite:
 
 - collection `audit`: `action` (or `actor`, or `target`) Ascending, then `at` Descending;
 - collection `calls`: `agentId`, `outcome`, `handledById` (any combination, Ascending), optionally `searchTokens` (Array contains), then `startedAt` Descending — 15 indexes;
@@ -175,7 +201,7 @@ Create a bucket in asia-south1 (or use the Firebase project's default one): priv
 
 ### Report rollups
 
-Reports read `rollups`, which `app.reports.record_call` keeps up to date as calls are written. To recount an organisation: `.venv/bin/python -m app.scripts.rebuild_rollups --org <slug>`.
+Reports read `rollups`, which `app.domain.rollups.record_call` keeps up to date as calls are written. To recount an organisation: `.venv/bin/python -m app.scripts.rebuild_rollups --org <slug>`.
 
 ### Firestore TTL for rate-limit counters
 

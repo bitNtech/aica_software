@@ -5,11 +5,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 
-from ...accounts import iso
-from ...errors import ApiError
+from ...access.orgs import OrgContext, org_permission
+from ...auth.accounts import iso
+from ...core.errors import ApiError
+from ...data.store import IndexMissing
 from ...models import ActivityArea, ActivityEntryOut, ActivityPageOut
-from ...orgs import OrgContext, org_permission
-from ...store import IndexMissing
 
 router = APIRouter(prefix="/api/orgs/{slug}/activity", tags=["org"])
 

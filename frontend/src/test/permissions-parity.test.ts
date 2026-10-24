@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 // @ts-ignore -- Vercel builds frontend/ on its own, without backend/, and the
 // build typechecks tests too. Tests run (CI, locally) with the whole repo.
-import shared from '../../../backend/app/permissions.json'
+import shared from '../../../backend/app/access/permissions.json'
 import type { Role } from '../auth/types'
 import { ALL_PERMISSIONS, PERMISSIONS, platformAccess } from '../console/access'
 
 /**
- * The backend enforces backend/app/permissions.json; the console shows and
+ * The backend enforces backend/app/access/permissions.json; the console shows and
  * hides from console/access.ts. They must say the same, or the console
  * offers what the server refuses (or hides what it allows). Change both.
  */

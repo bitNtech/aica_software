@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from pydantic.alias_generators import to_camel
 
-from .access import ALL_PERMISSIONS
+from .access.permissions import ALL_PERMISSIONS
 
 Role = Literal["owner", "admin", "supervisor", "front_desk", "viewer"]
 PlatformRole = Literal["master_admin", "staff"]

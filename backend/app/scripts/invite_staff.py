@@ -10,9 +10,9 @@ from __future__ import annotations
 import argparse
 import sys
 
+from ..core.config import get_settings
+from ..core.services import build_services
 from ..routes.invites import issue_invite
-from ..services import build_services
-from ..settings import get_settings
 
 
 def main() -> int:

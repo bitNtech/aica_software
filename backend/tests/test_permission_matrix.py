@@ -1,16 +1,16 @@
 """Every organisation route against every role with its default permissions:
-allowed exactly when app/access.py says so. A new route belongs here
+allowed exactly when app/access/permissions.py says so. A new route belongs here
 (test_every_org_route_is_in_the_matrix fails until it is)."""
 from __future__ import annotations
 
 import pytest
 
-from app.access import ROLES, default_permissions
+from app.access.permissions import ROLES, default_permissions
 
 from .orgkit import api, env, login, post, sample_spec, seed, seed_library, seed_ops  # noqa: F401
 
 SETTINGS = {"name": "Arogya", "city": "Coimbatore", "languages": ["tamil"], "hours": [{"open": True, "from": "09:00", "to": "18:00"}] * 7, "closed": []}
-TODAY = __import__("app.store", fromlist=["now"]).now().date().isoformat()
+TODAY = __import__("app.data.store", fromlist=["now"]).now().date().isoformat()
 REQUEST = {"kind": "other", "agentId": None, "title": "Add Sunday hours", "detail": "Please add Sunday hours to the agent.", "urgency": "normal"}
 
 
@@ -49,7 +49,7 @@ ROUTES = [
     ("POST", "/callbacks/cb_1", {"note": "Tried once"}, perm("calls.take", "callbacks.assign")),
     ("GET", f"/appointments?from={TODAY}&to={TODAY}", None, perm("appointments.manage", "calls.viewAll")),
     ("POST", "/appointments/apt_1", {"status": "confirmed"}, perm("appointments.manage")),
-    ("GET", "/handoffs", None, perm("calls.take")),
+    ("GET", "/handoffs", None, perm("calls.viewAll", "calls.take")),
     ("POST", "/handoffs/ho_1/take", None, perm("calls.take")),
     ("POST", "/handoffs/ho_1/to-callback", None, perm("calls.take")),
     # Phase 4

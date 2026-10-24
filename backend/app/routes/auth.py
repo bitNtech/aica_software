@@ -8,15 +8,15 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from ..accounts import create_org_for, ensure_profile, link, mark_active, session_out
-from ..errors import ApiError, bad_input
-from ..identity import EmailExists
+from ..auth.accounts import create_org_for, ensure_profile, link, mark_active, session_out
+from ..auth.identity import EmailExists
+from ..auth.passwords import password_problem
+from ..auth.sessions import ACT_COOKIE, Caller, acting_record, clear_act_cookie, end_session, not_acting, read_session, start_session
+from ..core.errors import ApiError, bad_input
+from ..core.ratelimit import limit
+from ..core.services import Services, get_services
+from ..data.store import UserDoc, hash_key, now
 from ..models import BusinessIn, CodeIn, EmailIn, EmailOut, LoginIn, ResetIn, SessionOut, SignupIn
-from ..passwords import password_problem
-from ..ratelimit import limit
-from ..services import Services, get_services
-from ..sessions import ACT_COOKIE, Caller, acting_record, clear_act_cookie, end_session, not_acting, read_session, start_session
-from ..store import UserDoc, hash_key, now
 
 log = logging.getLogger("aica.auth")
 router = APIRouter(prefix="/api/auth", tags=["auth"])

@@ -1,5 +1,10 @@
 import { AuthError } from '../auth/types'
+import { fromRecord, isOpen, needsCheck, nowKey, startsAt } from './appointmentRecords'
 import type {
+  AlertKey,
+  AlertRule,
+  AlertSettings,
+  AppointmentChange,
   AgentDetail,
   AgentDraft,
   AgentSpec,
@@ -9,8 +14,10 @@ import type {
   ActivityEntry,
   AnswerFlag,
   Appointment,
+  BookingSettings,
   Billing,
   Callback,
+  CallSummary,
   CallNote,
   ChangeRequest,
   ConsoleClient,
@@ -38,7 +45,8 @@ import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
 import { passagesOf, search, seedCredentials } from './demo/passages'
-import { callLog, callRecord, DEPARTMENTS, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
+import { advanceUpdates, queueUpdates, refreshRanks, runAuto, seedBookingSettings, seedRequests, withdrawQueued } from './demo/bookingRequests'
+import { callLog, callRecord, DEPARTMENTS, handoffCalls, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
 import { defaultPipeline } from './demo/agentConfig'
 import { seedChangeRequests } from './demo/requests'
 import { seedDoctorChanges, seedFlags, seedNotices, type LineMode } from './demo/desk'
@@ -96,6 +104,11 @@ interface OrgData {
   handoffs: Handoff[]
   callbacks: Callback[]
   appointments: Appointment[]
+  /** Absent in demo data saved before requests were ranked: seeded on first read. */
+  booking?: BookingSettings
+  /** When the agent last sent in a new request (the demo makes one every few minutes, a few at most). */
+  incomingAt?: number
+  incomingCount?: number
   /** Notes people added to past calls, by call id. */
   callNotes: Record<string, CallNote[]>
   /** Live calls someone took over: id → their name. */
@@ -106,6 +119,8 @@ interface OrgData {
   /** Newest first. */
   activity: ActivityEntry[]
   billing: Omit<Billing, 'plans' | 'usage'>
+  /** Absent in demo data saved before alerts existed: seeded on first read. */
+  alerts?: AlertSettings
   /** Requests to bitNtech, newest first. */
   requests: ChangeRequest[]
   notices: Notice[]
@@ -144,7 +159,7 @@ function seedOrg(slug: string): OrgData {
     members: seedMembers(slug),
     handoffs: seedHandoffs(slug),
     callbacks: seedCallbacks(slug),
-    appointments: seedAppointments(slug),
+    appointments: seedRequests(slug, seedAppointments(slug)),
     callNotes: {},
     liveTaken: {},
     // The sample lab agent was paused 9 days ago.
@@ -203,6 +218,44 @@ function readStore(): Record<string, OrgData> {
 }
 
 const notFound = (what: string) => new AuthError('invalid_input', `That ${what} doesn't exist any more. It may have been deleted.`)
+
+/** Short names for the alerts, for messages. */
+const ALERT_NAME: Record<AlertKey, string> = {
+  emergency: 'Emergency calls',
+  handoff_waiting: 'Callers waiting',
+  handoff_missed: 'Missed handoffs',
+  callback_overdue: 'Overdue callbacks',
+  agent_failing: 'Agent problems',
+  usage_threshold: 'Minutes running out',
+  invoice: 'Invoices',
+  daily_summary: 'Daily summary',
+  weekly_report: 'Weekly report',
+  agent_published: 'Agent published',
+  team_changes: 'Team changes',
+}
+
+/** Who gets what, until someone changes it. */
+function seedAlerts(): AlertSettings {
+  const rule = (key: AlertKey, roles: Role[], threshold?: number, enabled = true): AlertRule => ({ key, enabled, roles, memberIds: [], ...(threshold !== undefined ? { threshold } : {}) })
+  return {
+    rules: [
+      rule('emergency', ['owner', 'admin', 'supervisor', 'front_desk']),
+      rule('handoff_waiting', ['supervisor'], 3),
+      rule('handoff_missed', ['supervisor', 'front_desk']),
+      rule('callback_overdue', ['supervisor'], 30),
+      rule('agent_failing', ['owner', 'admin']),
+      rule('usage_threshold', ['owner'], 80),
+      rule('invoice', ['owner']),
+      rule('daily_summary', ['owner', 'admin', 'supervisor'], undefined, false),
+      rule('weekly_report', ['owner', 'admin']),
+      rule('agent_published', ['owner', 'admin', 'supervisor']),
+      rule('team_changes', ['owner', 'admin']),
+    ],
+    quietHours: { enabled: false, from: '21:00', to: '07:00' },
+    updatedAt: new Date(Date.now() - 30 * DAY).toISOString(),
+    updatedBy: 'AICA (defaults)',
+  }
+}
 
 export function createDemoConsoleClient({ latency = 600, processingMs = 9000, persist = true }: DemoConsoleOptions = {}): ConsoleClient {
   const wait = makeWait(latency)
@@ -426,6 +479,62 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     const d = org(o)
     return { orgSlug: o, paused: new Set(d.agents.filter((a) => a.status === 'paused').map((a) => a.id)), pauses: d.pauses }
   }
+  /** Ties some sample callbacks and appointments to sample calls, once per
+   * organisation, so "where it came from" and the booking call show
+   * something: the seeds can't, as call ids depend on the date. Only the
+   * link is set; the callers' own names and numbers stay as seeded. */
+  const linked = new Set<string>()
+  /** The agent keeps taking calls: every few minutes (a few times at most) a new request arrives, for a time someone else already asked for. */
+  const INCOMING = ['Breathless at night, ankles swollen', 'Follow-up after the angiogram', 'Ear pain and fever', 'Routine check-up']
+  const incoming = (o: string) => {
+    const d = org(o)
+    const t = Date.now()
+    if (d.incomingAt === undefined) return void (d.incomingAt = t)
+    if (t - d.incomingAt < 4 * 60e3 || (d.incomingCount ?? 0) >= INCOMING.length) return
+    const rival = d.appointments.find((a) => a.status === 'pending' && a.source === 'ai_call' && startsAt(a) > nowKey(t + 864e5))
+    if (!rival) return
+    const n = d.incomingCount ?? 0
+    const at = new Date(t).toISOString()
+    d.appointments.push({
+      ...rival,
+      id: `apt_in${t.toString(36)}`,
+      patientName: ['Saravanan P', 'Kavitha R', 'Abdul Rahman', 'Jaya Lakshmi'][n],
+      phone: `+91 98400 ${String(61000 + n * 137).slice(0, 5)}`,
+      visitReason: INCOMING[n],
+      type: n === 1 || n === 3 ? 'follow_up' : 'new_visit',
+      callId: null,
+      createdAt: at,
+      updatedAt: at,
+      updatedBy: rival.agentName ?? 'The agent',
+      history: [{ at, by: rival.agentName ?? 'The agent', kind: 'created', text: 'Booked on a call by the agent' }],
+      rank: undefined,
+      checkReason: undefined,
+      note: undefined,
+    })
+    d.incomingAt = t
+    d.incomingCount = n + 1
+    keep()
+  }
+
+  const linkSamples = (o: string) => {
+    if (linked.has(o)) return
+    linked.add(o)
+    const d = org(o)
+    const calls = callLog(logContext(o), 3)
+    const take = (test: (c: CallSummary) => boolean) => {
+      const i = calls.findIndex(test)
+      return i < 0 ? undefined : calls.splice(i, 1)[0]
+    }
+    // Anand's insurance question: an unnamed billing call from before he asked.
+    const anand = d.callbacks.find((c) => c.id === 'cb_5' && !c.callId)
+    const billing = anand && take((c) => /bill|insurance/i.test(c.intent) && !c.callerName && Date.parse(c.startedAt) < Date.parse(anand.requestedAt))
+    if (anand && billing) anand.callId = billing.id
+    // The first few bookings the agents made link to booking calls.
+    for (const a of d.appointments.filter((x) => x.bookedBy === 'agent' && !x.callId).slice(0, 4)) {
+      const call = take((c) => c.outcome === 'booked')
+      if (call) a.callId = call.id
+    }
+  }
   /** Writes to the organisation's activity log, as the server would. */
   const log = (o: string, area: ActivityEntry['area'], text: string, detail?: string) => {
     org(o).activity.unshift({
@@ -537,9 +646,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     findAgent(o, agentId)
     return (org(o).scenarios[agentId] ??= seedScenarios(agentId))
   }
-  const findLive = (o: string, id: string): LiveCall => {
+  /** Calls in progress: the lines' own, and the ones behind the handovers. */
+  const liveOf = (o: string): LiveCall[] => {
     const d = org(o)
-    const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
+    const off = liveOff(o)
+    return [...liveCalls(o, d.liveTaken, off, d.live), ...handoffCalls(d.handoffs, d.liveTaken, off, d.live)]
+  }
+  const findLive = (o: string, id: string): LiveCall => {
+    const call = liveOf(o).find((c) => c.id === id)
     if (!call) throw new AuthError('invalid_input', 'That call has ended.')
     return call
   }
@@ -1206,6 +1320,34 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       return copy({ entries: page, nextBefore: rows.length > page.length ? page[page.length - 1].at : null })
     },
 
+    async getAlertSettings(o) {
+      await wait()
+      allowPerm(o, 'settings.manage', 'see the organisation’s alerts')
+      return copy((org(o).alerts ??= seedAlerts()))
+    },
+
+    async updateAlertSettings(o, input) {
+      await wait()
+      allowPerm(o, 'settings.manage', 'change the organisation’s alerts')
+      const d = org(o)
+      const members = new Set(d.members.map((m) => m.id))
+      const known = new Set(seedAlerts().rules.map((r) => r.key))
+      const time = /^([01]\d|2[0-3]):[0-5]\d$/
+      // Check everything first: a refused change changes nothing.
+      for (const r of input.rules) {
+        if (!known.has(r.key)) throw new AuthError('invalid_input', 'That alert doesn’t exist.')
+        if (r.memberIds.some((id) => !members.has(id))) throw new AuthError('invalid_input', 'One of the people chosen isn’t in the team any more.')
+        if (r.enabled && r.roles.length === 0 && r.memberIds.length === 0) throw new AuthError('invalid_input', `${ALERT_NAME[r.key]}: choose who gets it, or turn it off.`)
+        if (r.threshold !== undefined && (!Number.isInteger(r.threshold) || r.threshold < 1 || r.threshold > (r.key === 'usage_threshold' ? 100 : 240)))
+          throw new AuthError('invalid_input', `${ALERT_NAME[r.key]}: ${r.key === 'usage_threshold' ? 'a percentage from 1 to 100' : 'minutes from 1 to 240'}.`)
+      }
+      if (input.quietHours.enabled && (!time.test(input.quietHours.from) || !time.test(input.quietHours.to))) throw new AuthError('invalid_input', 'Quiet hours: write times like 21:00.')
+      d.alerts = { rules: input.rules.map((r) => ({ ...r, roles: [...r.roles], memberIds: [...r.memberIds] })), quietHours: { ...input.quietHours }, updatedAt: new Date().toISOString(), updatedBy: by() }
+      log(o, 'settings', 'Changed who gets the organisation’s alerts')
+      keep()
+      return copy(d.alerts)
+    },
+
     async getOrgSettings(o) {
       await wait()
       allowPerm(o, 'settings.manage', 'see the organisation’s settings')
@@ -1261,13 +1403,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async getBilling(o) {
       await wait()
-      allow(o, ['owner'], 'see billing')
+      // bitNtech's master admin manages every organisation's billing.
+      if (!master()) allow(o, ['owner'], 'see billing')
       return billingOf(o)
     },
 
     async changePlan(o, planId) {
       await wait()
-      allow(o, ['owner'], 'change the plan')
+      if (!master()) allow(o, ['owner'], 'change the plan')
       const d = org(o)
       const b = d.billing
       if (planId === null) {
@@ -1303,7 +1446,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async updateBillingDetails(o, input) {
       await wait()
-      allow(o, ['owner'], 'change billing details')
+      if (!master()) allow(o, ['owner'], 'change billing details')
       const legalName = input.legalName.trim()
       const email = input.email.trim().toLowerCase()
       const gstin = input.gstin.trim().toUpperCase()
@@ -1319,16 +1462,16 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listLiveCalls(o) {
       await wait()
-      allowPerm(o, 'calls.take', 'see live calls')
-      const d = org(o)
-      return copy(liveCalls(o, d.liveTaken, liveOff(o), d.live))
+      // Anyone who may see calls can watch; taking and guiding need calls.take.
+      allowPerm(o, ['calls.take', 'calls.viewAll'], 'see live calls')
+      return copy(liveOf(o))
     },
 
     async takeOverCall(o, id) {
       await wait()
       allowPerm(o, 'calls.take', 'take calls')
       const d = org(o)
-      const call = liveCalls(o, d.liveTaken, liveOff(o), d.live).find((c) => c.id === id)
+      const call = liveOf(o).find((c) => c.id === id)
       if (!call) throw new AuthError('invalid_input', 'That call has ended.')
       if (call.takenBy && call.takenBy !== by()) throw new AuthError('invalid_input', `${call.takenBy} has already taken this call.`)
       d.liveTaken[id] = by()
@@ -1338,8 +1481,14 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listHandoffs(o) {
       await wait()
-      allowPerm(o, 'calls.take', 'see the handoff queue')
-      return copy([...org(o).handoffs].sort((a, b) => a.waitingSince.localeCompare(b.waitingSince)))
+      allowPerm(o, ['calls.viewAll', 'calls.take'], 'see who is waiting for a person')
+      // As the server does: a personal value is blank for someone without calls.personal.
+      const personal = !viewer || has(o, 'calls.personal')
+      return copy(
+        [...org(o).handoffs]
+          .sort((a, b) => a.waitingSince.localeCompare(b.waitingSince))
+          .map((h) => (personal ? h : { ...h, details: h.details.map((x) => (x.personal ? { ...x, value: '' } : x)) })),
+      )
     },
 
     async takeHandoff(o, id) {
@@ -1351,6 +1500,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       h.status = 'taken'
       h.takenBy = by()
       h.takenAt = new Date().toISOString()
+      // Its call goes to them too.
+      org(o).liveTaken[h.callId] = by()
       keep()
       return copy(h)
     },
@@ -1387,6 +1538,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listCallbacks(o) {
       await wait()
+      linkSamples(o)
       const d = org(o)
       // Without "Assign callbacks": theirs, and ones nobody has yet.
       const own = !has(o, 'callbacks.assign')
@@ -1405,7 +1557,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const member = patch.assignedTo ? d.members.find((m) => m.id === patch.assignedTo && m.status === 'active') : null
       if (patch.assignedTo && !member) throw notFound('team member')
       if (member && member.role === 'viewer') throw new AuthError('invalid_input', `${member.name} is a viewer and can’t make calls for the team.`)
-      if (own && patch.assignedTo !== undefined && patch.assignedTo !== viewer?.id)
+      // They can take one for themselves, or give it back (null), as the API allows.
+      if (own && patch.assignedTo !== undefined && patch.assignedTo !== null && patch.assignedTo !== viewer?.id)
         throw new AuthError('forbidden', 'You can take callbacks for yourself, not assign them to others.')
       if (patch.note !== undefined && !patch.note.trim() && !patch.attempt) throw new AuthError('invalid_input', 'Write the note first.')
 
@@ -1424,23 +1577,209 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async listAppointments(o, from, to) {
       await wait()
-      return copy(org(o).appointments.filter((a) => a.date >= from && a.date <= to).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
+      linkSamples(o)
+      // Demo data saved before the statuses changed is read the new way.
+      const d = org(o)
+      d.appointments = d.appointments.map(fromRecord)
+      const s = (d.booking ??= seedBookingSettings())
+      incoming(o)
+      refreshRanks(d.appointments)
+      for (const a of d.appointments) advanceUpdates(a, s)
+      return copy(d.appointments.filter((a) => a.date >= from && a.date <= to).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)))
     },
 
     async updateAppointment(o, id, patch) {
       await wait()
       allowPerm(o, 'appointments.manage', 'change appointments')
-      const a = org(o).appointments.find((x) => x.id === id)
-      if (!a) throw notFound('appointment')
+      const d = org(o)
+      const i = d.appointments.findIndex((x) => x.id === id)
+      if (i < 0) throw notFound('appointment')
+      const a = fromRecord(d.appointments[i])
       // A real date, not just the right shape (no 31 February).
-      if (patch.date !== undefined && new Date(`${patch.date}T12:00:00`).toISOString().slice(0, 10) !== patch.date) throw new AuthError('invalid_input', 'Choose a real date.')
       if (patch.date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.date)) throw new AuthError('invalid_input', 'Choose a date.')
+      if (patch.date !== undefined && new Date(`${patch.date}T12:00:00`).toISOString().slice(0, 10) !== patch.date) throw new AuthError('invalid_input', 'Choose a real date.')
       if (patch.time !== undefined && !/^\d{2}:\d{2}$/.test(patch.time)) throw new AuthError('invalid_input', 'Choose a time.')
-      if (a.status === 'cancelled' && patch.status && patch.status !== 'booked') throw new AuthError('invalid_input', 'This appointment was cancelled. Book it again first.')
-      Object.assign(a, Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)))
-      // An empty note clears it.
-      if (a.note === '') delete a.note
-      if (patch.status && patch.status !== 'needs_check') delete a.checkReason
+      const reason = patch.changeReason?.trim() ?? ''
+      if (reason.length > 300) throw new AuthError('invalid_input', 'Keep the reason under 300 characters.')
+      const now = new Date().toISOString()
+      const change = (kind: AppointmentChange['kind'], text: string, why?: string) => (a.history = [{ at: now, by: by(), kind, text, ...(why ? { reason: why } : {}) }, ...(a.history ?? [])])
+      const slot = (x: Pick<Appointment, 'date' | 'time' | 'doctor'>) => `${new Date(`${x.date}T12:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}, ${x.time} with ${x.doctor}`
+
+      const s = (d.booking ??= seedBookingSettings())
+      if (patch.undo) {
+        // Undo puts back exactly what was there, and stops any message to the patient that hasn't gone yet.
+        const was = slot(a)
+        for (const k of ['status', 'date', 'time', 'doctor', 'department', 'note', 'type', 'visitReason'] as const) if (patch[k] !== undefined) (a as unknown as Record<string, unknown>)[k] = patch[k]
+        if (a.status !== 'cancelled') delete a.cancelReason
+        if (a.status !== 'declined') delete a.declineReason
+        if (a.status !== 'confirmed' && a.status !== 'completed' && a.status !== 'no_show') delete a.confirmedBy
+        const withdrawn = withdrawQueued(a)
+        change('undone', `${slot(a) === was ? 'Undone' : `Undone: back to ${slot(a)}`}${withdrawn ? '. The patient wasn’t told' : ''}`)
+      } else {
+        const moving = (patch.date !== undefined && patch.date !== a.date) || (patch.time !== undefined && patch.time !== a.time) || (patch.doctor !== undefined && patch.doctor !== a.doctor)
+        const target = patch.status
+        const open = isOpen(a)
+        const passed = startsAt(a) <= nowKey()
+        if (a.status === 'cancelled' && (moving || (target && target !== 'pending'))) throw new AuthError('invalid_input', 'This appointment was cancelled. Book it again first.')
+        if (a.status === 'declined' && (moving || (target && target !== 'pending'))) throw new AuthError('invalid_input', 'This request was declined. Book it again first.')
+        if (moving) {
+          if (!open && a.status !== 'no_show') throw new AuthError('invalid_input', 'Only an appointment still to come, or one that was missed, can be moved.')
+          if (reason.length < 3) throw new AuthError('invalid_input', 'Say why it’s being moved. It goes in the history.')
+          const from = slot(a)
+          if (patch.date !== undefined) a.date = patch.date
+          if (patch.time !== undefined) a.time = patch.time
+          if (patch.doctor !== undefined) a.doctor = patch.doctor
+          if (patch.department !== undefined) a.department = patch.department
+          a.status = target === 'confirmed' ? 'confirmed' : 'rescheduled'
+          if (a.status === 'confirmed') a.confirmedBy = 'staff'
+          change('rescheduled', `Moved from ${from} to ${slot(a)}${a.status === 'confirmed' ? ', confirmed with the patient' : ''}`, reason)
+          queueUpdates(a, a.status === 'confirmed' ? 'confirmed' : 'moved', s, now)
+        } else if (target && target !== a.status) {
+          if (target === 'confirmed') {
+            if (a.status !== 'pending' && a.status !== 'rescheduled') throw new AuthError('invalid_input', 'Only a pending or moved appointment can be confirmed.')
+            change('confirmed', a.rank && a.rank.of > 1 ? `Confirmed: ranked ${a.rank.position} of ${a.rank.of} for this time` : 'Confirmed')
+            a.confirmedBy = 'staff'
+            queueUpdates(a, 'confirmed', s, now)
+          } else if (target === 'declined') {
+            if (a.status !== 'pending' && a.status !== 'rescheduled') throw new AuthError('invalid_input', 'Only a request still waiting can be declined.')
+            if (reason.length < 3) throw new AuthError('invalid_input', 'Say why it’s declined. The agent tells the patient.')
+            a.declineReason = reason
+            change('declined', 'Declined', reason)
+            queueUpdates(a, 'declined', s, now)
+          } else if (target === 'cancelled') {
+            if (!open) throw new AuthError('invalid_input', 'Only an appointment still to come can be cancelled.')
+            if (reason.length < 3) throw new AuthError('invalid_input', 'Say why it’s being cancelled. It goes in the history.')
+            a.cancelReason = reason
+            change('cancelled', 'Cancelled', reason)
+          } else if (target === 'completed' || target === 'no_show') {
+            if (!open) throw new AuthError('invalid_input', 'Only an appointment that was booked can be marked.')
+            if (!passed) throw new AuthError('invalid_input', 'Mark it once the appointment time has come.')
+            change(target, target === 'completed' ? 'Marked completed' : 'Marked as a no-show')
+          } else if (target === 'pending') {
+            if (a.status !== 'cancelled' && a.status !== 'no_show' && a.status !== 'declined') throw new AuthError('invalid_input', 'That appointment is already booked.')
+            delete a.cancelReason
+            delete a.declineReason
+            delete a.confirmedBy
+            change('restored', a.status === 'cancelled' ? 'Booked again after being cancelled' : a.status === 'declined' ? 'Booked again after being declined' : 'Booked again after a no-show')
+          } else {
+            throw new AuthError('invalid_input', 'Move the appointment to a new time to reschedule it.')
+          }
+          a.status = target
+        }
+        const edits: string[] = []
+        if (patch.note !== undefined && (patch.note || undefined) !== a.note) edits.push('the note')
+        if (patch.type !== undefined && patch.type !== a.type) edits.push('the type')
+        if (patch.visitReason !== undefined && patch.visitReason !== a.visitReason) edits.push('the reason for the visit')
+        if (patch.note !== undefined) a.note = patch.note.trim() || undefined
+        if (patch.type !== undefined) a.type = patch.type
+        if (patch.visitReason !== undefined) a.visitReason = patch.visitReason.trim() || undefined
+        if (edits.length) change('edited', `Changed ${edits.join(' and ')}`)
+      }
+      if (!a.note) delete a.note
+      if (!needsCheck(a) || a.status === 'confirmed') delete a.checkReason
+      a.updatedAt = now
+      a.updatedBy = by()
+      d.appointments[i] = a
+      keep()
+      return copy(a)
+    },
+
+    async createAppointment(o, input) {
+      await wait()
+      allowPerm(o, 'appointments.manage', 'add appointments')
+      const name = input.patientName.trim()
+      const digits = input.phone.replace(/\D/g, '')
+      const doctor = input.doctor.trim()
+      const department = input.department.trim()
+      if (name.length < 2 || name.length > 80) throw new AuthError('invalid_input', 'Write the patient’s name.')
+      if (digits.length < 10 || digits.length > 13) throw new AuthError('invalid_input', 'Write a 10-digit phone number.')
+      if (!doctor || !department) throw new AuthError('invalid_input', 'Choose a doctor.')
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || new Date(`${input.date}T12:00:00`).toISOString().slice(0, 10) !== input.date) throw new AuthError('invalid_input', 'Choose a real date.')
+      if (!/^\d{2}:\d{2}$/.test(input.time)) throw new AuthError('invalid_input', 'Choose a time.')
+      if (input.date < localDay(0)) throw new AuthError('invalid_input', 'Choose today or a later day.')
+      if (input.visitReason.trim().length > 200) throw new AuthError('invalid_input', 'Keep the reason for the visit under 200 characters.')
+      const now = new Date().toISOString()
+      const local = digits.slice(-10)
+      const history: AppointmentChange[] = [{ at: now, by: by(), kind: 'created', text: input.source === 'front_desk' ? 'Booked on a phone call by the front desk' : 'Entered by hand' }]
+      if (input.confirmed) history.unshift({ at: now, by: by(), kind: 'confirmed', text: 'Confirmed with the patient' })
+      const a: Appointment = {
+        id: `apt_${Date.now().toString(36)}`,
+        patientName: name,
+        phone: `+91 ${local.slice(0, 5)} ${local.slice(5)}`,
+        department,
+        doctor,
+        date: input.date,
+        time: input.time,
+        status: input.confirmed ? 'confirmed' : 'pending',
+        source: input.source,
+        bookedBy: 'staff',
+        agentName: null,
+        callId: null,
+        type: input.type,
+        ...(input.visitReason.trim() ? { visitReason: input.visitReason.trim() } : {}),
+        ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+        createdAt: now,
+        updatedAt: now,
+        updatedBy: by(),
+        history,
+      }
+      org(o).appointments.push(a)
+      keep()
+      return copy(a)
+    },
+
+    async getBookingSettings(o) {
+      await wait()
+      allowPerm(o, ['appointments.manage', 'calls.viewAll'], 'see the booking settings')
+      return copy((org(o).booking ??= seedBookingSettings()))
+    },
+
+    async updateBookingSettings(o, input) {
+      await wait()
+      allowPerm(o, 'settings.manage', 'change the booking settings')
+      if (input.confirm !== 'staff' && input.confirm !== 'auto') throw new AuthError('invalid_input', 'Choose how requests are confirmed.')
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.autoAt)) throw new AuthError('invalid_input', 'Choose a time for the automatic confirmation.')
+      if (input.others !== 'offer' && input.others !== 'decline') throw new AuthError('invalid_input', 'Choose what happens to the other requests.')
+      const d = org(o)
+      d.booking = {
+        confirm: input.confirm,
+        autoAt: input.autoAt,
+        autoSkipUrgent: !!input.autoSkipUrgent,
+        autoSkipFlagged: !!input.autoSkipFlagged,
+        others: input.others,
+        callback: !!input.callback,
+        whatsapp: !!input.whatsapp,
+        retryCallback: !!input.retryCallback,
+        updatedAt: new Date().toISOString(),
+        updatedBy: by(),
+      }
+      keep()
+      return copy(d.booking)
+    },
+
+    async runAutoConfirm(o) {
+      await wait()
+      allowPerm(o, 'appointments.manage', 'confirm requests')
+      const d = org(o)
+      const s = (d.booking ??= seedBookingSettings())
+      if (s.confirm !== 'auto') throw new AuthError('invalid_input', 'Automatic confirmation is off. Turn it on in Booking settings first.')
+      d.appointments = d.appointments.map(fromRecord)
+      const result = runAuto(d.appointments, s)
+      keep()
+      return result
+    },
+
+    async retryPatientUpdate(o, id, updateId) {
+      await wait()
+      allowPerm(o, 'appointments.manage', 'send updates to patients')
+      const d = org(o)
+      const a = d.appointments.find((x) => x.id === id)
+      const u = a?.updates?.find((x) => x.id === updateId)
+      if (!a || !u) throw notFound('update')
+      if (u.state !== 'failed' && u.state !== 'no_answer') throw new AuthError('invalid_input', 'That update didn’t fail: there is nothing to send again.')
+      const now = new Date().toISOString()
+      Object.assign(u, { state: 'queued', at: now, updatedAt: now, attempts: u.attempts + 1, detail: undefined })
+      a.history = [{ at: now, by: by(), kind: 'notified', text: u.channel === 'callback' ? 'Asked the agent to call the patient again' : 'Sent the WhatsApp message again' }, ...(a.history ?? [])]
       keep()
       return copy(a)
     },
@@ -1699,6 +2038,15 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       allowPerm(o, ['agents.configure', 'library.knowledge'], 'resolve flagged answers')
       const f = org(o).flags.find((x) => x.id === id)
       if (!f) throw notFound('flagged answer')
+      if (resolution.status === 'open') {
+        if (f.status === 'open') throw new AuthError('invalid_input', 'This is already open.')
+        f.status = 'open'
+        delete f.resolution
+        log(o, 'agents', 'Reopened a flagged answer')
+        const back = desk(o)
+        keep()
+        return back
+      }
       if (f.status !== 'open') throw new AuthError('invalid_input', `${f.resolution?.by ?? 'Someone'} has already dealt with this.`)
       const note = resolution.note.trim()
       if (note.length > 300) throw new AuthError('invalid_input', 'Keep the note under 300 characters.')

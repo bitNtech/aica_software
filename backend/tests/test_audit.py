@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.store import IndexMissing
+from app.data.store import IndexMissing
 
 from .test_api import env, login, post, seed_org  # noqa: F401 — env is a fixture
 from .test_people import add_staff, as_master

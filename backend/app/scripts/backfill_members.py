@@ -13,9 +13,9 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ..accounts import ensure_member
-from ..services import Services, build_services
-from ..settings import get_settings
+from ..auth.accounts import ensure_member
+from ..core.config import get_settings
+from ..core.services import Services, build_services
 
 
 def backfill(svc: Services, apply: bool) -> list[tuple[str, str]]:

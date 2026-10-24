@@ -2,12 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { ROLE_LABEL } from '../../auth/roles'
-import { navFor, type PageKey } from '../../console/access'
+import { canOpen, navFor, type PageKey } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
 import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../console/flowPatternConfig'
+import { AttentionProvider, useAttention } from '../../console/useAttention'
 import { useOrg } from '../../console/useOrg'
 import { initials } from '../../pages/ChooseOrgPage'
 import { Wordmark } from '../ui/Wordmark'
+import { ShortcutsProvider } from './KeyboardHelp'
+import { ToastProvider } from './Toast'
 import './ConsoleShell.css'
 
 /** Below this width the sidebar becomes a menu panel. Matches the CSS. */
@@ -19,9 +22,23 @@ const NARROW = '(max-width: 899px)'
  * (console/access.ts), the organisation, and who's signed in. On a narrow
  * screen the sidebar is a panel behind a Menu button; while it's open the
  * page underneath is inert, and Escape closes it. Each page draws its own
- * header with <ConsolePage>.
+ * header with <ConsolePage>. It also provides what every page shares: the
+ * sidebar's counts (one poll), toasts, and keyboard shortcuts with their
+ * "?" help.
  */
 export function ConsoleShell() {
+  return (
+    <AttentionProvider>
+      <ToastProvider>
+        <ShortcutsProvider>
+          <Frame />
+        </ShortcutsProvider>
+      </ToastProvider>
+    </AttentionProvider>
+  )
+}
+
+function Frame() {
   const { user, org, access } = useOrg()
   const client = useConsole()
   const { signOut } = useAuth()
@@ -29,6 +46,7 @@ export function ConsoleShell() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [hasNewFlowPattern, setHasNewFlowPattern] = useState(false)
+  const attention = useAttention()
   const root = useRef<HTMLDivElement>(null)
   const topBar = useRef<HTMLElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -148,17 +166,34 @@ export function ConsoleShell() {
                 </p>
               )}
               <ul aria-labelledby={s.heading ? `nav-${s.heading}` : undefined}>
-                {s.items.map((item) => (
-                  <li key={item.page}>
-                    <NavLink to={item.path ? `${base}/${item.path}` : base} end={!item.path} className="console__link">
-                      <NavIcon page={item.page} />
-                      <span>{item.label}</span>
-                      {item.page === 'calls' && hasNewFlowPattern && (
-                        <span className="console__badge-dot" aria-label="New call flow pattern detected" />
-                      )}
-                    </NavLink>
-                  </li>
-                ))}
+                {s.items.map((item) => {
+                  const badge = attention?.badgeFor(item.page)
+                  return (
+                    <li key={item.page}>
+                      <NavLink to={item.path ? `${base}/${item.path}` : base} end={!item.path} className="console__link">
+                        <NavIcon page={item.page} />
+                        <span>{item.label}</span>
+                        {item.page === 'calls' && hasNewFlowPattern && (
+                          <span className="console__badge-dot" aria-label="New call flow pattern detected" />
+                        )}
+                        {badge && (
+                          <>
+                            {/* A real space, so the name reads "Callbacks 3 overdue". */}
+                            {' '}
+                            <span className={`console__count console__count--${badge.tone}`}>
+                              {/* An exclamation as well as red: an emergency is not told by colour alone. */}
+                              <span aria-hidden="true">
+                                {badge.tone === 'danger' ? '! ' : ''}
+                                {badge.count}
+                              </span>
+                              <span className="sr-only">{badge.text}</span>
+                            </span>
+                          </>
+                        )}
+                      </NavLink>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}
@@ -166,7 +201,7 @@ export function ConsoleShell() {
 
         <div className="console__me">
           <span className="console__me-text">
-            <Link to="/account" className="console__me-name">
+            <Link to={canOpen(access, 'profile') ? `${base}/profile` : '/account'} className="console__me-name">
               {user.name}
               <span className="sr-only">: your account</span>
             </Link>
@@ -221,8 +256,6 @@ function NavIcon({ page }: { page: PageKey }) {
     numbers: <path d="M6.6 3.8 8.3 7a1 1 0 0 1-.2 1.2l-1 1a8.6 8.6 0 0 0 3.7 3.7l1-1a1 1 0 0 1 1.2-.2l3.2 1.7a1 1 0 0 1 .5 1.1l-.4 1.6a1.6 1.6 0 0 1-1.7 1.2A13 13 0 0 1 2.6 5.7a1.6 1.6 0 0 1 1.2-1.7l1.6-.4a1 1 0 0 1 1.2.2z" />,
     // Waves: a call in progress.
     live: <path d="M10 10h0M7 7.2a4 4 0 0 0 0 5.6M13 7.2a4 4 0 0 1 0 5.6M4.6 4.8a7.4 7.4 0 0 0 0 10.4M15.4 4.8a7.4 7.4 0 0 1 0 10.4" />,
-    // Passing on: an arrow to a person.
-    handoffs: <path d="M3.5 10h7M8 7.2 10.8 10 8 12.8M14.5 8.2a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6zM12 15.5a2.5 2.5 0 0 1 5 0" />,
     // Calling back: a curved arrow.
     callbacks: <path d="M15.5 9.5A5.5 5.5 0 1 1 13.9 5.6M15.5 3.8v3.4h-3.4" />,
     appointments: <path d="M4 5.5h12v10.5H4zM4 8.8h12M7.2 3.5v3.4M12.8 3.5v3.4M7.5 12h2" />,
@@ -233,6 +266,10 @@ function NavIcon({ page }: { page: PageKey }) {
     activity: <path d="M10 16.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM10 6.5V10l2.4 1.6" />,
     settings: <path d="M10 12.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8zM10 2.8v2M10 15.2v2M2.8 10h2M15.2 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4" />,
     billing: <path d="M3 5.5h14v9H3zM3 8.5h14M6 12h3" />,
+    owners: <path d="M4 15.5h12M4.5 13l-1-7 3.5 3L10 4.5 13 9l3.5-3-1 7z" />,
+    usage: <path d="M3.5 13a6.5 6.5 0 0 1 13 0M10 13l3-4M3.5 15.5h13" />,
+    notifications: <path d="M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 1.5h-12zM8.5 17h3" />,
+    profile: <path d="M10 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 17a6 6 0 0 1 12 0" />,
   }
   return (
     <svg

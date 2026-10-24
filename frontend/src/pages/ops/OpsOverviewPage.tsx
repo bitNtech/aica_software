@@ -1,66 +1,96 @@
-import { useCallback, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
-import { homeFor, useAuth } from '../../auth/AuthProvider'
-import { BUSINESS_LABEL, STATUS_LABEL } from '../../auth/roles'
-import { asAuthError, type OrgStatus, type OrgSummary } from '../../auth/types'
+import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../../auth/AuthProvider'
+import { SegFilter } from '../../components/console/ListTools'
+import { UpdatedAgo } from '../../components/console/UpdatedAgo'
 import { OpsLayout } from '../../components/ops/OpsLayout'
 import { Alert } from '../../components/ui/Alert'
-import { Button } from '../../components/ui/Button'
-import { ReasonForm } from '../../components/ui/ReasonForm'
-import { Spinner } from '../../components/ui/Spinner'
+import { asAuthError } from '../../auth/types'
 import { useAsync } from '../../lib/useAsync'
-import { shortDate } from '../../lib/time'
-import { initials } from '../ChooseOrgPage'
+import { useOpsData } from '../../ops/OpsDataProvider'
+import type { OverviewDays, PlatformOverview } from '../../ops/types'
+import { StaleNote } from '../console/operate/LiveBits'
+import { useLiveData } from '../console/operate/shared'
+import { Activity } from './overview/Activity'
+import { Agents } from './overview/Agents'
+import { Analytics } from './overview/Analytics'
+import { Group, Panel, PanelState } from './overview/bits'
+import { Kpis, PERIOD_LABEL } from './overview/Kpis'
+import { LiveOperations } from './overview/LiveOperations'
+import { OrgList, OrgSummaries } from './overview/Organisations'
+import { PendingActions } from './overview/PendingActions'
+import { PlatformHealth } from './overview/PlatformHealth'
+import '../console/operate/Operate.css'
+import './Ops.css'
+import './overview/Overview.css'
 
-/** Worst first: ops staff triage, they don't browse. */
-const ORDER: Record<OrgStatus, number> = { suspended: 0, pending_review: 1, declined: 2, active: 3 }
+const LIVE_REFRESH = 15_000
+const SECTIONS = [
+  ['ov-actions', 'Needs you'],
+  ['ov-live', 'Live'],
+  ['ov-analytics', 'Analytics'],
+  ['ov-orgs', 'Organisations'],
+  ['ov-agents', 'Agents'],
+  ['ov-activity', 'Activity'],
+  ['ov-health', 'Platform health'],
+] as const
 
-/** /ops — every organisation, and what needs a decision. */
+/**
+ * /ops — the whole platform for bitNtech staff: what needs a decision first,
+ * then what's happening now, how calls went over a period, and every
+ * organisation with the master admin's actions. Organisations come from the
+ * sign-in API; calls, agents and health come from the Ops data client
+ * (sample data until its API exists, and each such panel says so).
+ */
 export default function OpsOverviewPage() {
-  const { client, user, actAs } = useAuth()
-  const navigate = useNavigate()
+  const { client, user } = useAuth()
+  const ops = useOpsData()
   const isMaster = user?.platformRole === 'master_admin'
-  const load = useCallback(() => client.listOrgs(), [client])
-  const [orgs, reload] = useAsync(load)
-  /** Which row's reason box is open: suspending it, or acting as its owner. */
-  const [open, setOpen] = useState<{ slug: string; kind: 'suspend' | 'act' } | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
+  const demo = ops.isDemo
 
-  async function act(o: OrgSummary, suspend: boolean, reason?: string) {
-    setBusy(o.slug)
-    setNotice(null)
-    try {
-      await client.setOrgSuspended(o.slug, suspend, reason)
-      setNotice({ tone: 'ok', text: suspend ? `${o.name} is suspended. Its team can no longer sign in.` : `${o.name} is active again.` })
-      setOpen(null)
-      reload()
-    } catch (err) {
-      setNotice({ tone: 'error', text: asAuthError(err).message })
-    } finally {
-      setBusy(null)
+  const loadOrgs = useCallback(() => client.listOrgs(), [client])
+  const [orgsState, reloadOrgs] = useAsync(loadOrgs)
+  const orgs = orgsState.state === 'ready' ? orgsState.data : null
+  const orgsError = orgsState.state === 'error' ? orgsState.error : null
+
+  const [days, setDays] = useState<OverviewDays>(7)
+  const [overview, setOverview] = useState<PlatformOverview | null>(null)
+  const [overviewError, setOverviewError] = useState<unknown>(null)
+  const [overviewBusy, setOverviewBusy] = useState(true)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let live = true
+    setOverviewBusy(true)
+    ops.getOverview(days).then(
+      (o) => {
+        if (!live) return
+        setOverview(o)
+        setOverviewError(null)
+        setOverviewBusy(false)
+      },
+      (e) => {
+        if (!live) return
+        // Keep showing the last figures; the error says they're out of date.
+        setOverviewError(e)
+        setOverviewBusy(false)
+      },
+    )
+    return () => {
+      live = false
     }
-  }
+  }, [ops, days, tick])
+  const reloadOverview = useCallback(() => setTick((t) => t + 1), [])
 
-  async function actAsOwner(o: OrgSummary, reason: string) {
-    setBusy(o.slug)
-    setNotice(null)
-    try {
-      await actAs(o.ownerId, reason, (s) => navigate(homeFor(s.user), { replace: true }))
-    } catch (err) {
-      setNotice({ tone: 'error', text: asAuthError(err).message })
-      setBusy(null)
-    }
-  }
+  const loadLive = useCallback(() => ops.getLiveOps(), [ops])
+  const live = useLiveData(loadLive, LIVE_REFRESH)
 
-  const list = orgs.state === 'ready' ? [...orgs.data].sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.name.localeCompare(b.name)) : []
-  const count = (s: OrgStatus) => list.filter((o) => o.status === s).length
+  const loading = (!orgs && !orgsError) || (!overview && !overviewError) || (!live.data && !live.error)
+  const pendingCount = orgs?.filter((o) => o.status === 'pending_review').length
 
   return (
     <OpsLayout
       kicker="Overview"
       docTitle="Overview"
-      pendingCount={orgs.state === 'ready' ? count('pending_review') : undefined}
+      pendingCount={pendingCount}
       title={
         <>
           Every client, <em>one place.</em>
@@ -69,143 +99,107 @@ export default function OpsOverviewPage() {
       lede={
         <p>
           {isMaster
-            ? 'You can approve sign-ups, and suspend or restore any organisation.'
-            : 'You can review sign-ups. Only the master admin can suspend or restore an organisation.'}
+            ? 'What needs a decision, what’s happening now, and how calls are going across every organisation. You can approve sign-ups, and suspend or restore any organisation.'
+            : 'What needs a decision, what’s happening now, and how calls are going across every organisation. You can review sign-ups; only the master admin can suspend or restore an organisation.'}
         </p>
       }
     >
-      {orgs.state === 'loading' && (
-        <div className="loading-row">
-          <Spinner label="Loading organisations" />
-          <span>Loading organisations…</span>
-        </div>
-      )}
+      <p className="sr-only" role="status">
+        {loading ? 'Loading the overview…' : ''}
+      </p>
 
-      {orgs.state === 'error' && (
-        <Alert tone="error" title="Couldn't load organisations">
-          <p>{asAuthError(orgs.error).message}</p>
-          <button type="button" className="btn-text" onClick={reload}>
+      <div className="ov-toolbar">
+        <SegFilter<`${OverviewDays}`>
+          legend="Period for calls and agents"
+          value={`${days}`}
+          onChange={(v) => setDays(Number(v) as OverviewDays)}
+          options={([1, 7, 30] as OverviewDays[]).map((d) => ({ value: `${d}`, label: PERIOD_LABEL[d] }))}
+        />
+        <p className="ov-toolbar__status">
+          <UpdatedAgo at={live.checkedAt} label="Live figures updated" />
+          <span aria-hidden="true"> · </span>
+          <span>every 15 s</span>
+          <button
+            type="button"
+            className="btn-text"
+            onClick={() => {
+              reloadOrgs()
+              reloadOverview()
+              live.reload()
+            }}
+          >
+            Refresh all
+          </button>
+        </p>
+      </div>
+
+      <nav className="ov-jump" aria-label="On this page">
+        <ul>
+          {SECTIONS.map(([id, label]) => (
+            <li key={id}>
+              <a href={`#${id}`}>{label}</a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {overview && overviewError ? (
+        <Alert tone="error" title="Couldn’t update calls and agents" className="ov-alert">
+          <p>
+            {asAuthError(overviewError).message} The figures below are from {PERIOD_LABEL[overview.days].toLowerCase()}, as last loaded.
+          </p>
+          <button type="button" className="btn-text" onClick={reloadOverview}>
             Try again
           </button>
         </Alert>
-      )}
+      ) : null}
+      {live.data && live.error ? <StaleNote error={live.error} checkedAt={live.checkedAt} onRetry={live.reload} /> : null}
 
-      {orgs.state === 'ready' && (
-        <>
-          <section className="stats" aria-label="Summary">
-            <Link to="/ops/requests" className="stat stat--link">
-              <span className="stat__num">{count('pending_review')}</span>
-              <span className="stat__body">
-                <span className="label label--quiet">Waiting for review</span>
-                <span className="stat__go">Review requests →</span>
-              </span>
-            </Link>
-            <div className="stat">
-              <span className="stat__num">{count('active')}</span>
-              <span className="label label--quiet">Active</span>
-            </div>
-            <div className="stat">
-              <span className="stat__num">{count('suspended')}</span>
-              <span className="label label--quiet">Suspended</span>
-            </div>
-          </section>
+      <div className={`ov${overviewBusy && overview ? ' is-loading' : ''}`} aria-busy={overviewBusy || undefined}>
+        <Kpis orgs={orgs} orgsFailed={!!orgsError} overview={overview} overviewFailed={!overview && !!overviewError} live={live.data} liveFailed={!live.data && !!live.error} />
 
-          <section className="ops-section" aria-labelledby="orgs-h">
-            <div className="ops-section__head">
-              <h2 id="orgs-h" className="ops-section__title">
-                Organisations
-              </h2>
-              <p className="ops-section__note">Needs attention first</p>
-            </div>
+        <Group id="ov-actions" title="Needs you">
+          <PendingActions
+            orgs={orgs}
+            orgsError={orgsError}
+            reloadOrgs={reloadOrgs}
+            overview={overview}
+            overviewError={overviewError}
+            reloadOverview={reloadOverview}
+            live={live.data}
+            liveError={live.error}
+            reloadLive={live.reload}
+            demo={demo}
+          />
+        </Group>
 
-            {notice && (
-              <Alert tone={notice.tone} className="ops-section__notice">
-                {notice.text}
-              </Alert>
-            )}
+        <Group id="ov-live" title="Live operations" note="Right now, every organisation">
+          <LiveOperations live={live.data} error={live.error} reload={live.reload} demo={demo} />
+        </Group>
 
-            <ul className="rows">
-              {list.map((o) => (
-                <li key={o.slug} className="row">
-                  <div className="row__main">
-                    <span className="org__mark" aria-hidden="true">
-                      {initials(o.name)}
-                    </span>
-                    <div className="row__text">
-                      <Link className="row__name row__link" to={`/ops/orgs/${o.slug}`}>
-                        {o.name}
-                      </Link>
-                      <span className="row__meta">
-                        {BUSINESS_LABEL[o.businessType]} <i aria-hidden="true">·</i> {o.city} <i aria-hidden="true">·</i>{' '}
-                        {o.ownerEmail}
-                      </span>
-                      {o.statusReason && <span className="row__reason">“{o.statusReason}”</span>}
-                    </div>
-                  </div>
-                  <div className="row__side">
-                    <span className={`status-chip status-chip--${o.status}`}>{STATUS_LABEL[o.status]}</span>
-                    <span className="row__date">Since {shortDate(o.createdAt)}</span>
-                    {isMaster && o.ownerId && open?.slug !== o.slug && (
-                      <Button variant="line" size="sm" onClick={() => setOpen({ slug: o.slug, kind: 'act' })} aria-label={`Act as the owner of ${o.name}`}>
-                        Act as owner
-                      </Button>
-                    )}
-                    {isMaster && o.status === 'active' && open?.slug !== o.slug && (
-                      <Button variant="line" size="sm" onClick={() => setOpen({ slug: o.slug, kind: 'suspend' })} aria-label={`Suspend ${o.name}`}>
-                        Suspend
-                      </Button>
-                    )}
-                    {isMaster && o.status === 'suspended' && (
-                      <Button
-                        variant="line"
-                        size="sm"
-                        busy={busy === o.slug}
-                        busyLabel="Restoring…"
-                        onClick={() => void act(o, false)}
-                        aria-label={`Restore ${o.name}`}
-                      >
-                        Restore
-                      </Button>
-                    )}
-                    {o.status === 'pending_review' && (
-                      <Link className="btn btn--line btn--sm" to="/ops/requests">
-                        <span>Review</span>
-                      </Link>
-                    )}
-                  </div>
-                  {open?.slug === o.slug && open.kind === 'act' && (
-                    <div className="row__extra">
-                      <ReasonForm
-                        label={`Why act as the owner of ${o.name}?`}
-                        hint={`You'll see AICA exactly as ${o.ownerEmail} does for 30 minutes. The reason goes in the audit log; they aren't emailed.`}
-                        confirmLabel="Act as owner"
-                        busyLabel="Starting…"
-                        busy={busy === o.slug}
-                        tooShort="Write at least a short sentence. It goes in the audit log."
-                        onConfirm={(reason) => void actAsOwner(o, reason)}
-                        onCancel={() => setOpen(null)}
-                      />
-                    </div>
-                  )}
-                  {open?.slug === o.slug && open.kind === 'suspend' && (
-                    <div className="row__extra">
-                      <ReasonForm
-                        label={`Why suspend ${o.name}?`}
-                        hint="Their team sees this word for word when they try to sign in."
-                        confirmLabel="Suspend organisation"
-                        busyLabel="Suspending…"
-                        busy={busy === o.slug}
-                        onConfirm={(reason) => void act(o, true, reason)}
-                        onCancel={() => setOpen(null)}
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      )}
+        <Group id="ov-analytics" title="Analytics" note={PERIOD_LABEL[days]}>
+          <Analytics overview={overview} error={overviewError} reload={reloadOverview} demo={demo} />
+        </Group>
+
+        <Group id="ov-orgs" title="Organisations">
+          <OrgSummaries orgs={orgs} orgsError={orgsError} reloadOrgs={reloadOrgs} overview={overview} overviewError={overviewError} reloadOverview={reloadOverview} demo={demo} />
+          <Panel title="All organisations" wide className="ov-panel--flush">
+            {orgs ? <OrgList orgs={orgs} reload={reloadOrgs} /> : <PanelState error={orgsError} onRetry={reloadOrgs} />}
+          </Panel>
+        </Group>
+
+        <Group id="ov-agents" title="Agents" note="Every organisation">
+          <Agents overview={overview} error={overviewError} reload={reloadOverview} demo={demo} />
+        </Group>
+
+        <Group id="ov-activity" title="Recent activity">
+          <Activity orgs={orgs} overview={overview} error={overviewError} reload={reloadOverview} isMaster={isMaster} demo={demo} />
+        </Group>
+
+        <Group id="ov-health" title="Platform health" note="ASR, LLM, TTS and telephony">
+          <PlatformHealth live={live.data} error={live.error} reload={live.reload} demo={demo} />
+        </Group>
+      </div>
     </OpsLayout>
   )
 }

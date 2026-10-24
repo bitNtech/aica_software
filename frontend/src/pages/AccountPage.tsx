@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, Navigate } from 'react-router'
 import { homeFor, useAuth } from '../auth/AuthProvider'
 import { ROLE_LABEL, STATUS_LABEL } from '../auth/roles'
 import { asAuthError, type Device, type NotificationKey, type NotificationPrefs, type Role, type User } from '../auth/types'
@@ -20,7 +20,7 @@ const NOTIFICATIONS: { key: NotificationKey; label: string; hint: string; for: W
   { key: 'handoff_missed', label: 'A caller hung up waiting for a person', hint: 'So someone calls them back.', for: ['owner', 'admin', 'supervisor', 'front_desk'] },
   { key: 'callback_assigned', label: 'A callback is given to you', hint: 'With who to call and why.', for: ['owner', 'admin', 'supervisor', 'front_desk'] },
   { key: 'daily_summary', label: 'Each evening: the day’s calls', hint: 'Calls, handovers and anything left open.', for: ['owner', 'admin', 'supervisor', 'viewer'] },
-  { key: 'weekly_report', label: 'Monday morning: last week’s report', hint: 'The same numbers as the Reports page.', for: ['owner', 'admin', 'supervisor', 'viewer'] },
+  { key: 'weekly_report', label: 'Monday morning: last week’s report', hint: 'The same figures as Analytics and reports.', for: ['owner', 'admin', 'supervisor', 'viewer'] },
   { key: 'agent_published', label: 'An agent is published or rolled back', hint: 'Who did it, and their note.', for: ['owner', 'admin', 'supervisor'] },
   { key: 'team_changes', label: 'Someone joins, leaves or changes role', hint: 'For your organisation’s team.', for: ['owner', 'admin'] },
   { key: 'billing', label: 'Invoices and payment problems', hint: 'Sent to owners.', for: ['owner'] },
@@ -28,7 +28,7 @@ const NOTIFICATIONS: { key: NotificationKey; label: string; hint: string; for: W
   { key: 'service_alerts', label: 'A speech, voice or language service is slow or down', hint: 'And when it recovers.', for: ['staff'] },
 ]
 
-const rolesOf = (u: User): Who[] => [...new Set<Who>([...u.memberships.map((m) => m.role), ...(u.platformRole ? (['staff'] as const) : [])])]
+export const rolesOf = (u: User): Who[] => [...new Set<Who>([...u.memberships.map((m) => m.role), ...(u.platformRole ? (['staff'] as const) : [])])]
 
 /** /account: every signed-in person's own settings. */
 export default function AccountPage() {
@@ -42,6 +42,11 @@ export default function AccountPage() {
   }, [])
 
   if (!user) return null
+  // bitNtech staff keep their account inside Ops.
+  if (user.platformRole && !impersonator) return <Navigate to="/ops/profile" replace />
+  // Someone in one organisation keeps their account inside its console.
+  const active = user.memberships.filter((m) => m.orgStatus === 'active')
+  if (!user.platformRole && active.length === 1) return <Navigate to={`/o/${active[0].orgSlug}/profile`} replace />
   const home = homeFor(user)
   const back = user.platformRole ? 'Back to Ops' : user.memberships.filter((m) => m.orgStatus === 'active').length === 1 ? `Back to ${user.memberships.find((m) => m.orgStatus === 'active')!.orgName}` : 'Back'
 
@@ -97,7 +102,7 @@ function NotYet() {
   return <p className="row__meta">Not available yet: this needs the account API.</p>
 }
 
-function Profile({ user }: { user: User }) {
+export function Profile({ user }: { user: User }) {
   const { client, setSession } = useAuth()
   const id = useId()
   const [name, setName] = useState(user.name)
@@ -161,7 +166,7 @@ function Profile({ user }: { user: User }) {
   )
 }
 
-function Password({ email }: { email: string }) {
+export function Password({ email }: { email: string }) {
   const { client } = useAuth()
   const id = useId()
   const [state, setState] = useState<'idle' | 'busy' | 'sent'>('idle')
@@ -214,7 +219,7 @@ function Password({ email }: { email: string }) {
   )
 }
 
-function Devices() {
+export function Devices() {
   const { client } = useAuth()
   const id = useId()
   const load = useCallback(() => (client.listDevices ? client.listDevices() : Promise.resolve(null)), [client])
@@ -342,7 +347,7 @@ function Devices() {
   )
 }
 
-function Notifications({ who }: { who: Who[] }) {
+export function Notifications({ who }: { who: Who[] }) {
   const { client } = useAuth()
   const id = useId()
   const load = useCallback(() => (client.getNotificationPrefs ? client.getNotificationPrefs() : Promise.resolve(null)), [client])
@@ -407,7 +412,7 @@ function Notifications({ who }: { who: Who[] }) {
   )
 }
 
-function Organisations({ user }: { user: User }) {
+export function Organisations({ user }: { user: User }) {
   const id = useId()
   if (user.platformRole) {
     return (

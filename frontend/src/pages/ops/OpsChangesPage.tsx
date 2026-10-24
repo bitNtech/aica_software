@@ -19,7 +19,7 @@ type Row = ChangeRequest & { orgName: string }
 type Filter = 'open' | 'all'
 const URGENCY_ORDER = { urgent: 0, soon: 1, normal: 2 } as const
 
-/** /ops/changes: what every organisation has asked bitNtech for, most urgent
+/** /ops/support (was /ops/changes): what every organisation has asked bitNtech for, most urgent
  * first. Each opens in the organisation's Requests page to reply and act. */
 export default function OpsChangesPage() {
   const { client } = useAuth()
@@ -42,7 +42,7 @@ export default function OpsChangesPage() {
     .sort((a, b) => Number(open(b)) - Number(open(a)) || URGENCY_ORDER[a.urgency] - URGENCY_ORDER[b.urgency] || a.createdAt.localeCompare(b.createdAt))
 
   return (
-    <OpsLayout kicker="Change requests" docTitle="Change requests" title="Change requests" demoData lede={<p>New agents and flow changes organisations have asked for. Open one to reply, build it from the organisation’s Agents page, then mark it done.</p>}>
+    <OpsLayout kicker="Support" docTitle="Support requests" title="Support requests" demoData lede={<p>Everything organisations have asked bitNtech for: new agents, flow changes, integrations, numbers and anything else. Open one to reply, do the work, then mark it done.</p>}>
       {rows.state === 'loading' && (
         <div className="loading-row" role="status">
           <Spinner />

@@ -6,7 +6,7 @@ Calls are written by the voice pipeline once its contract is agreed
 - `calls.viewAll`: every call. Without it, `calls.take` holders see only the
   calls they handled, matched by their id (`handledById`), never by name.
 - Without `calls.personal`, callers' names, personal details and the
-  personal values in transcripts are removed here (app/redact.py).
+  personal values in transcripts are removed here (app/domain/redact.py).
 - Callers' numbers are always masked on calls.
 """
 from __future__ import annotations
@@ -15,13 +15,13 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 
-from ...accounts import iso
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member
+from ...auth.accounts import iso
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import CallDoc, CallFilter, IndexMissing, NoteDoc, new_id, now
+from ...domain.redact import details_out, mask_phone, query_tokens, redact_text, without_name
 from ...models import CallLogPageOut, CallNoteOut, CallOutcome, CallRecordOut, CallSummaryOut, CollectedDetailOut, NoteIn
-from ...orgs import OrgContext, org_member
-from ...ratelimit import limit_caller
-from ...redact import details_out, mask_phone, query_tokens, redact_text, without_name
-from ...store import CallDoc, CallFilter, IndexMissing, NoteDoc, new_id, now
 
 router = APIRouter(prefix="/api/orgs/{slug}/calls", tags=["org"])
 

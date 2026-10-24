@@ -21,7 +21,7 @@
   border: 0;
   background: none;
   font-size: inherit;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 0.95;
   color: transparent;
   -webkit-text-stroke: 1.5px rgba(247, 243, 237, 0.5);
@@ -52,16 +52,16 @@
   animation: langs-in 0.6s var(--out);
 }
 @keyframes langs-in { from { opacity: 0; transform: translateY(14px); } }
-.langs__who { display: inline-flex; align-items: center; gap: 0.45rem; font: 500 0.7rem var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange-2); }
+.langs__who { display: inline-flex; align-items: center; gap: 0.45rem; font: 500 var(--fs-xs) var(--sans); color: var(--orange-2); }
 .langs__who--aica { color: #a9bdff; }
 .langs__who--aica i { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 38% 34%, #eef2ff 0 8%, #5b84ff 30%, #1b3fd0 70%); box-shadow: 0 0 12px rgba(91, 132, 255, 0.7); }
-.langs__said { margin-top: 0.6rem; font: 700 clamp(1.9rem, 1.2rem + 2.6vw, 3.4rem)/1.25 var(--tamil); color: var(--ivory); }
-.langs__said:not([lang='ta']) { font-family: var(--display); letter-spacing: -0.03em; }
+.langs__said { margin-top: 0.6rem; font: 600 clamp(1.9rem, 1.2rem + 2.6vw, 3.4rem)/1.25 var(--tamil); color: var(--ivory); }
+.langs__said:not([lang='ta']) { font-family: var(--display); letter-spacing: -0.01em; }
 .langs__reply {
   margin-top: 0.75rem;
   padding: 1.1rem 1.25rem;
   border: 1px solid rgba(91, 132, 255, 0.45);
-  border-radius: 4px 20px 20px 20px;
+  border-radius: var(--r-xs) 20px 20px 20px;
   background: rgba(27, 63, 208, 0.32);
   font-size: clamp(1.1rem, 1rem + 0.5vw, 1.35rem);
   line-height: 1.55;
@@ -72,8 +72,8 @@
 .langs__caret.is-done { opacity: 0; animation: none; }
 @keyframes caret { 50% { opacity: 0; } }
 .langs__play { margin-top: 0.9rem; }
-.langs__gloss { grid-column: 1 / -1; color: var(--ivory-3); font-size: 0.95rem; }
-.langs__foot { margin-top: 2.5rem; max-width: 40rem; color: var(--ivory-3); font-size: 0.95rem; }
+.langs__gloss { grid-column: 1 / -1; color: var(--ivory-3); font-size: var(--fs-md); }
+.langs__foot { margin-top: 2.5rem; max-width: 40rem; color: var(--ivory-3); font-size: var(--fs-md); }
 .langs__foot span { color: rgba(247, 243, 237, 0.4); }
 
 @media (min-width: 900px) {

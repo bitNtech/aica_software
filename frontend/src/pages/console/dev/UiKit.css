@@ -1,0 +1,50 @@
+/* The development-only UI kit page: the foundation components with
+   realistic front-desk content. Not part of the production build. */
+
+.kit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.75rem; }
+.kit__section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; min-width: 0; }
+.kit__title { font: 600 var(--fs-lg)/1.3 var(--display); color: var(--ink); }
+.kit__note { max-width: 70ch; color: var(--muted); font-size: var(--fs-md); }
+.kit__cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: 1.5rem; align-items: start; }
+.kit__aside { display: grid; gap: 1.25rem; }
+.kit__card { display: grid; gap: 0.6rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface-1); }
+.kit__row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+@media (max-width: 1100px) {
+  .kit__cols { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The caller queue (list pane). */
+.queue { display: grid; margin: 0; padding: 0; list-style: none; }
+.queue__item { border-bottom: 1px solid var(--line); }
+.queue__btn {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: start;
+}
+.queue__btn:hover { background: var(--bg-2); }
+.queue__btn:focus-visible { outline: 2px solid var(--orange-text, var(--orange)); outline-offset: -2px; }
+.queue__btn[aria-current='true'] { background: color-mix(in srgb, var(--orange) 10%, var(--surface-1)); box-shadow: inset 3px 0 0 var(--orange-text); }
+.queue__top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.queue__name { font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.queue__phone { font-size: var(--fs-sm); color: var(--muted); }
+.queue__reason { font-size: var(--fs-sm); color: var(--text); }
+.queue__tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+@media (forced-colors: active) {
+  .queue__btn[aria-current='true'] { outline: 2px solid Highlight; outline-offset: -2px; box-shadow: none; }
+}
+
+/* The detail pane. */
+.who { display: grid; gap: 0.75rem; }
+.who__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
+.who__name { font: 600 var(--fs-xl)/1.25 var(--display); color: var(--ink); }
+.who__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.5rem 1.25rem; margin: 0; }
+.who__facts dt { font-size: var(--fs-xs); color: var(--muted); }
+.who__facts dd { margin: 0; color: var(--ink); }
+.who__summary { max-width: 70ch; color: var(--text); }
+.who__h { margin-top: 0.5rem; font: 600 var(--fs-md)/1.3 var(--sans); color: var(--ink); }
+.who__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }

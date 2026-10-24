@@ -117,7 +117,7 @@ describe('createHttpConsoleClient', () => {
       [() => client().handoffToCallback('arogya', 'ho_1'), '/api/orgs/arogya/handoffs/ho_1/to-callback', 'POST', undefined],
     ]
     for (const [call, url, method, body] of cases) {
-      const f = respond(200, {})
+      const f = respond(200, url.includes('/appointments?') ? [] : {})
       vi.stubGlobal('fetch', f)
       await call()
       expect(sent(f).slice(0, 3)).toEqual([url, method, body])

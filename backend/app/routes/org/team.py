@@ -17,15 +17,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Response
 
-from ...access import ROLE_LABEL, ROLES, beyond_own, can_manage_owners, default_permissions, permissions_for, stored_permissions
-from ...accounts import iso, sync_members
-from ...errors import ApiError, forbidden
+from ...access.orgs import OrgContext, org_member, org_permission
+from ...access.permissions import ROLE_LABEL, ROLES, beyond_own, can_manage_owners, default_permissions, permissions_for, stored_permissions
+from ...auth.accounts import iso, sync_members
+from ...auth.sessions import PLATFORM_CLAIM
+from ...core.errors import ApiError, forbidden
+from ...core.ratelimit import limit_caller
+from ...core.services import Services, get_services
+from ...data.store import MemberDoc, Tx, new_id, now
 from ...models import InviteMemberIn, MemberOut, MemberPermissionsIn, MemberRoleIn
-from ...orgs import OrgContext, org_member, org_permission
-from ...ratelimit import limit_caller
-from ...services import Services, get_services
-from ...sessions import PLATFORM_CLAIM
-from ...store import MemberDoc, Tx, new_id, now
 from ..invites import new_invite, send_invite
 from .callbacks import unassign_open
 

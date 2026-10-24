@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import App from '../App'
 import { AuthProvider } from '../auth/AuthProvider'
@@ -12,7 +13,11 @@ import { OpsDataProvider } from '../ops/OpsDataProvider'
 
 export function renderApp(
   path = '/login',
-  { idleMs, consoleClient = createDemoConsoleClient({ latency: 0 }) }: { idleMs?: number; consoleClient?: ConsoleClient } = {},
+  {
+    idleMs,
+    consoleClient = createDemoConsoleClient({ latency: 0 }),
+    probe,
+  }: { idleMs?: number; consoleClient?: ConsoleClient; /** Rendered beside the app, inside the router: e.g. something that shows the address. */ probe?: ReactNode } = {},
 ) {
   const client = createMockAuthClient({ latency: 0 })
   const user = userEvent.setup()
@@ -22,6 +27,7 @@ export function renderApp(
         <ConsoleProvider client={consoleClient}>
           <OpsDataProvider client={createDemoOpsClient({ latency: 0 })}>
             <App />
+            {probe}
           </OpsDataProvider>
         </ConsoleProvider>
       </AuthProvider>

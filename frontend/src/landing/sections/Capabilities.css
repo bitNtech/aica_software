@@ -4,16 +4,15 @@
 /* The film's title card, set as type: "Meet AICA." */
 .caps__meet {
   font-size: clamp(4.2rem, 1rem + 13vw, 15rem);
-  font-weight: 900;
-  font-stretch: 108%;
+  font-weight: 600;
   line-height: 0.82;
   letter-spacing: -0.06em;
   white-space: nowrap;
 }
-.caps__meet .ghost { --stroke-w: 2px; font-weight: 300; font-stretch: 90%; }
+.caps__meet .ghost { font-weight: 400; }
 .caps__intro { display: grid; gap: 1rem; max-width: 44rem; }
 .caps__title { font-size: clamp(2rem, 1rem + 3.4vw, 3.6rem); }
-.caps__lede { font-size: 1.1rem; }
+.caps__lede { font-size: var(--fs-lg); }
 
 .caps__body { display: grid; gap: 2rem; }
 
@@ -26,20 +25,20 @@
   border-top: 1px solid var(--line);
 }
 .caps__beat:last-child { border-bottom: 1px solid var(--line); }
-.caps__at { font: 500 0.75rem var(--mono); letter-spacing: 0.14em; color: var(--orange); }
+.caps__at { font: 500 var(--fs-xs) var(--mono); letter-spacing: 0; color: var(--orange); }
 .caps__beat h3 {
   display: flex;
   align-items: baseline;
   gap: 0.8rem;
-  font: 800 clamp(1.7rem, 1.1rem + 2vw, 2.8rem)/1.02 var(--display);
-  letter-spacing: -0.04em;
+  font: 600 clamp(1.7rem, 1.1rem + 2vw, 2.8rem)/1.2 var(--display);
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
-.caps__n { font: 500 0.8rem var(--mono); letter-spacing: 0.1em; color: var(--text); opacity: 0.7; }
-.caps__beat p { max-width: 30rem; font-size: 1.05rem; }
+.caps__n { font: 500 var(--fs-sm) var(--mono); letter-spacing: 0; color: var(--text); opacity: 0.7; }
+.caps__beat p { max-width: 30rem; font-size: var(--fs-lg); }
 .caps__inline { margin-top: 1rem; }
 .caps__screen { display: none; }
-.caps__note { margin-top: 0.9rem; font: 500 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--text); opacity: 0.8; }
+.caps__note { margin-top: 0.9rem; font: 500 var(--fs-xs) var(--sans); color: var(--text); opacity: 0.8; }
 
 @media (min-width: 980px) {
   /* The title card takes the full width; the real heading sits under it, split. */

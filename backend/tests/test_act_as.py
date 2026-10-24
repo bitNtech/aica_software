@@ -4,8 +4,8 @@ from datetime import timedelta
 
 from fastapi.testclient import TestClient
 
-from app.sessions import ACT_COOKIE
-from app.store import now
+from app.auth.sessions import ACT_COOKIE
+from app.data.store import now
 
 from .test_api import PW, env, login, post, seed_master, seed_org  # noqa: F401 — env is a fixture
 from .test_people import add_staff, as_master

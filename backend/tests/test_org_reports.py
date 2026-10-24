@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.reports import BUCKETS, RollupDoc, add_call, bucket, bucket_value, build_report, calls_this_week, rebuild, record_call
-from app.store import CallDoc, now
+from app.domain.rollups import BUCKETS, RollupDoc, add_call, bucket, bucket_value, build_report, calls_this_week, rebuild, record_call
+from app.data.store import CallDoc, now
 
 from .orgkit import SLUG, api, env, err, login, seed  # noqa: F401
 
@@ -155,7 +155,7 @@ def test_review_follow_ups_for_reports(env):
     r = build_report(rollups_of(call("a", AT, lang="hindi")), 7, AT)
     assert r["languages"] == [{"language": "mixed", "calls": 1}] and r["quality"]["analysed"] == 0
     # Rebuilding drops rollups for days whose calls are gone.
-    from app.reports import RollupDoc as R
+    from app.domain.rollups import RollupDoc as R
 
     store.save_record(SLUG, "rollup", R(id="ag_x_2026-10-01", agentId="ag_x", agentName="Old", day=(now() - timedelta(days=5)).date().isoformat()))
     rebuild(svc, SLUG)

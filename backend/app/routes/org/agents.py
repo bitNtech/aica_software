@@ -23,17 +23,17 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from pydantic import Field, ValidationError
 
-from ...access import Access
-from ...accounts import iso
-from ...agentspec import SpecField, locked
-from ...catalogue import AGENT_TYPES, VOICES, default_analysis, default_behaviour, default_context, default_guardrails, default_pipeline, default_speech, sub_type
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member
+from ...access.permissions import Access
+from ...auth.accounts import iso
+from ...auth.sessions import Caller, current_caller
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import AgentDoc, DraftDoc, ScenarioDoc, Tx, VersionDoc, new_id, now
+from ...domain.agentspec import SpecField, locked
+from ...domain.catalogue import AGENT_TYPES, VOICES, default_analysis, default_behaviour, default_context, default_guardrails, default_pipeline, default_speech, sub_type
+from ...domain.rollups import calls_this_week, window
 from ...models import Camel
-from ...orgs import OrgContext, org_member
-from ...ratelimit import limit_caller
-from ...reports import calls_this_week, window
-from ...sessions import Caller, current_caller
-from ...store import AgentDoc, DraftDoc, ScenarioDoc, Tx, VersionDoc, new_id, now
 
 router = APIRouter(prefix="/api/orgs/{slug}", tags=["org"])
 catalogue_router = APIRouter(prefix="/api/catalogue", tags=["catalogue"])

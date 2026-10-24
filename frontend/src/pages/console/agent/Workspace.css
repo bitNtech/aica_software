@@ -14,9 +14,9 @@
   justify-content: space-between;
   gap: 0.75rem 1.5rem;
   margin-bottom: 1.25rem;
-  padding: 0.85rem 1.1rem;
-  border: 1px solid var(--warn-ink);
-  border-radius: var(--r-card);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--warn-ink) 28%, transparent);
+  border-radius: var(--r-md);
   background: var(--warn-bg);
   color: var(--ink);
 }
@@ -33,25 +33,25 @@
   border-radius: var(--r-pill);
   background: var(--danger-bg);
   color: var(--danger-ink);
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--fs-xs);
+  font-weight: 500;
 }
 
-.ws__sections { display: grid; gap: 2.25rem; min-width: 0; }
+.ws__sections { display: grid; gap: 1.75rem; min-width: 0; }
 
 .ws__publish { display: grid; gap: 1rem; }
 
 /* What changed between two setups. */
 .changes { display: grid; margin: 0; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
-.changes__area { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 0.35rem 1.25rem; padding: 0.8rem 1.1rem; }
+.changes__area { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 0.35rem 1.25rem; padding: 0.6rem 0.9rem; }
 .changes__area + .changes__area { border-top: 1px solid var(--line); }
-.changes dt { font-weight: 700; color: var(--ink); }
+.changes dt { font-weight: 500; color: var(--ink); }
 .changes dd { margin: 0; }
 .changes ul { display: grid; gap: 0.25rem; padding-left: 1.1rem; list-style: disc; color: var(--text); overflow-wrap: anywhere; }
 
 /* Published versions. */
 .versions { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
-.versions__item { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1.5rem; padding: 0.9rem 1.1rem; }
+.versions__item { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem 1.5rem; padding: 0.65rem 0.9rem; }
 .versions__item + .versions__item { border-top: 1px solid var(--line); }
 .versions__main { display: grid; gap: 0.2rem; min-width: 0; }
 .versions__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink); }
@@ -61,23 +61,23 @@
 /* Read-only views. */
 .review__row--two { grid-template-columns: 11rem minmax(0, 1fr); }
 .ws__ro-list { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
-.ws__ro-list li { display: grid; gap: 0.15rem; padding: 0.8rem 1.1rem; color: var(--ink); }
+.ws__ro-list li { display: grid; gap: 0.15rem; padding: 0.6rem 0.9rem; color: var(--ink); }
 .ws__ro-list li + li { border-top: 1px solid var(--line); }
 .globals__ro-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; color: var(--ink); }
 .globals__ro { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
-.globals__ro dt { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.globals__ro dt { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); }
 .globals__ro dd { margin: 0.15rem 0 0; color: var(--text); overflow-wrap: anywhere; }
 
-.ws__unavailable { display: grid; justify-items: start; gap: 0.6rem; padding: 1.1rem; border: 1px dashed var(--line-strong); border-radius: var(--r-card); color: var(--text); }
+.ws__unavailable { display: grid; justify-items: start; gap: 0.6rem; padding: 0.9rem; border: 1px dashed var(--line-strong); border-radius: var(--r-card); color: var(--text); }
 
 /* A field with its button beside it. */
 .ws__inline-form { display: grid; grid-template-columns: minmax(0, 26rem) auto; align-items: start; gap: 0.75rem; }
 .ws__pron-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: start; gap: 0.75rem; }
 
-.ws__ro-note { margin-bottom: 1rem; font-size: 0.9rem; color: var(--muted); }
+.ws__ro-note { margin-bottom: 1rem; font-size: var(--fs-md); color: var(--muted); }
 .ws__apply-note { margin-top: 0; }
 
-.ws__danger { padding: 1.1rem; border: 1px solid var(--danger-ink); border-radius: var(--r-card); }
+.ws__danger { padding: 0.9rem 1rem; border: 1px solid var(--danger-ink); border-radius: var(--r-card); }
 
 @media (max-width: 640px) {
   /* Every section in view on a phone: the tabs wrap rather than scroll. */
@@ -92,23 +92,23 @@
 /* ---- test scenarios ---- */
 
 .scn__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.scn__score { font-weight: 600; color: var(--warn-ink); }
+.scn__score { font-weight: 500; color: var(--warn-ink); }
 .scn__score--ok { color: var(--ok-ink); }
 .scn__list { display: grid; gap: 0.75rem; padding: 0; margin: 0; list-style: none; }
-.scn__item { display: grid; gap: 0.35rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
+.scn__item { display: grid; gap: 0.35rem; padding: 0.7rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); min-width: 0; }
 .scn__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.scn__problems { margin: 0.2rem 0 0; padding-left: 1.1rem; color: var(--warn-ink); font-size: 0.9rem; }
-.scn__replies summary { cursor: pointer; font-size: 0.88rem; color: var(--muted); }
-.scn__replies ol { margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: 0.9rem; }
+.scn__problems { margin: 0.2rem 0 0; padding-left: 1.1rem; color: var(--warn-ink); font-size: var(--fs-md); }
+.scn__replies summary { cursor: pointer; font-size: var(--fs-md); color: var(--muted); }
+.scn__replies ol { margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: var(--fs-md); }
 .scn__row-actions { display: flex; gap: 1rem; }
 
 /* ---- after each call ---- */
 
 .analysis__fields { display: grid; gap: 0.9rem; padding: 0; margin: 0; list-style: none; }
-.analysis__field { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: 0.75rem 1rem; align-items: end; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); }
+.analysis__field { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: 0.75rem 1rem; align-items: end; padding: 0.7rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); }
 .analysis__field--ro { display: block; }
 
 /* ---- structural tabs, for a hospital ---- */
 
-.ws__ask { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 1rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg-2); }
-.ws__ask p { margin: 0; font-size: 0.92rem; }
+.ws__ask { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 1rem; padding: 0.6rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg-2); }
+.ws__ask p { margin: 0; font-size: var(--fs-md); }

@@ -1,7 +1,7 @@
 """The Team endpoints, invitations into an organisation, and the access guard."""
 from __future__ import annotations
 
-from app.store import MemberDoc, Membership, UserDoc
+from app.data.store import MemberDoc, Membership, UserDoc
 
 from .orgkit import PW, SLUG, add_member, api, env, err, login, make_org, master, post, seed, staff, token_of  # noqa: F401
 
@@ -151,7 +151,7 @@ def test_a_refused_change_writes_nothing(env):
 def test_admins_cant_hand_out_permissions_they_lack(env):
     client, fb, store, _ = env
     people = seed(fb, store)
-    from app.access import default_permissions
+    from app.access.permissions import default_permissions
 
     # An admin without "Replace system secrets".
     m = store.get_member(SLUG, people["admin"][0])
@@ -358,7 +358,7 @@ def test_permissions_are_trimmed_and_defaults_are_stored_as_none(env):
     r = post(client, api(f"/members/{viewer}/permissions"), {"permissions": ["reports.view", "calls.take"]})
     assert r.status_code == 200 and r.json()["permissions"] == ["reports.view"]
     assert activity_texts(store)[-1] == "Changed what Viewer can do"
-    from app.access import default_permissions
+    from app.access.permissions import default_permissions
 
     r = post(client, api(f"/members/{viewer}/permissions"), {"permissions": default_permissions("viewer")})
     assert r.json()["permissions"] is None
@@ -450,7 +450,7 @@ def test_a_member_record_is_what_counts_not_the_session(env):
 
 
 def test_member_doc_round_trip_ignores_unknown_fields():
-    from app.store import _member_from
+    from app.data.store import _member_from
 
     m = _member_from("u1", {"email": "a@b.in", "name": "A", "role": "viewer", "futureField": 1})
     assert m == MemberDoc(id="u1", email="a@b.in", name="A", role="viewer")
@@ -535,7 +535,7 @@ def test_accept_keeps_an_account_whose_join_committed(env):
         real(fn)  # the write lands...
         raise ApiError(410, "invalid_token", "retry saw it used")  # ...but the caller is told otherwise
 
-    from app.errors import ApiError
+    from app.core.errors import ApiError
 
     store.transact = commit_then_fail
     r = post(client, f"/api/invites/{token}/accept", {"name": "Dr. Ravi", "password": PW})

@@ -10,9 +10,9 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Response
 
-from ..accounts import iso, link, session_out
-from ..errors import ApiError, bad_input
-from ..identity import AuthUser
+from ..auth.accounts import iso, link, session_out
+from ..auth.identity import AuthUser
+from ..core.errors import ApiError, bad_input
 from ..models import (
     AuditEntryOut,
     AuditPageOut,
@@ -27,10 +27,10 @@ from ..models import (
     SignupRequestOut,
     StaffInviteIn,
 )
-from ..ratelimit import limit
-from ..services import Services, get_services
-from ..sessions import PLATFORM_CLAIM, PLATFORM_ROLES, Caller, Impersonator, master_caller, set_act_cookie, staff_caller
-from ..store import ImpersonationDoc, IndexMissing, OrgDoc, UserDoc, hash_key, now
+from ..auth.sessions import PLATFORM_CLAIM, PLATFORM_ROLES, Caller, Impersonator, master_caller, set_act_cookie, staff_caller
+from ..core.ratelimit import limit
+from ..core.services import Services, get_services
+from ..data.store import ImpersonationDoc, IndexMissing, OrgDoc, UserDoc, hash_key, now
 from .invites import issue_invite
 
 log = logging.getLogger("aica.ops")

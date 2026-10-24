@@ -1,6 +1,10 @@
 import type { Language } from '../../auth/types'
 import type {
   Appointment,
+  AppointmentChange,
+  AppointmentStatus,
+  AppointmentType,
+  BookingSource,
   Callback,
   CallOutcome,
   CallRecord,
@@ -41,7 +45,7 @@ export function rng(seed: number) {
 
 export const hash = (s: string) => [...s].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 7)
 
-function pick<T>(r: () => number, items: readonly T[], weights?: readonly number[]): T {
+export function pick<T>(r: () => number, items: readonly T[], weights?: readonly number[]): T {
   if (!weights) return items[Math.floor(r() * items.length)]
   const total = weights.reduce((a, b) => a + b, 0)
   let x = r() * total
@@ -78,13 +82,13 @@ export function seedMembers(orgSlug: string): Member[] {
 }
 
 /** Staff who pick up handed-over calls. */
-const DESK = [
+export const DESK = [
   { id: 'u_frontdesk', name: 'Meena S' },
   { id: 'u_frontdesk2', name: 'Suresh B' },
   { id: 'u_supervisor', name: 'Priya N' },
 ]
 
-const NAMES = ['Lakshmi Narayanan', 'Ramasamy K', 'Divya Prakash', 'Mohammed Irfan', 'Selvi Murugan', 'Anand Kumar', 'Fathima B', 'Gopal Krishnan', 'Priya Dharshini', 'Karthikeyan S', 'Meenakshi R', 'Joseph Antony', 'Revathi M', 'Senthil Kumar']
+export const NAMES = ['Lakshmi Narayanan', 'Ramasamy K', 'Divya Prakash', 'Mohammed Irfan', 'Selvi Murugan', 'Anand Kumar', 'Fathima B', 'Gopal Krishnan', 'Priya Dharshini', 'Karthikeyan S', 'Meenakshi R', 'Joseph Antony', 'Revathi M', 'Senthil Kumar']
 export const DEPARTMENTS: [string, string][] = [
   ['Cardiology', 'Dr. R. Ramachandran'],
   ['General medicine', 'Dr. S. Meenakshi'],
@@ -93,8 +97,8 @@ export const DEPARTMENTS: [string, string][] = [
   ['ENT', 'Dr. V. Senthil'],
 ]
 
-const phone = (r: () => number) => `9${Math.floor(r() * 9e8 + 1e8)}`.slice(0, 10)
-const formatPhone = (p: string) => `+91 ${p.slice(0, 5)} ${p.slice(5)}`
+export const phone = (r: () => number) => `9${Math.floor(r() * 9e8 + 1e8)}`.slice(0, 10)
+export const formatPhone = (p: string) => `+91 ${p.slice(0, 5)} ${p.slice(5)}`
 const maskPhone = (p: string) => `+91 ••••• ${p.slice(5)}`
 
 // ---------------------------------------------------------------- agents and what callers want
@@ -470,17 +474,17 @@ const LIVE_SCRIPTS: { agent: string; intent: string; flagged: boolean; language:
   },
   {
     agent: 'agt_reception',
-    intent: 'Bill and insurance',
+    intent: 'Billing question',
     flagged: true,
     language: 'english',
     turns: [
       { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
-      { speaker: 'caller', at: 4, text: 'I have called three times about my father’s insurance claim. Nobody tells me anything.' },
-      { speaker: 'agent', at: 13, text: 'I’m sorry about that. May I have the patient’s name and the policy number?' },
-      { speaker: 'caller', at: 22, text: '{{name:Ramasamy K}}, policy {{policy:SH-88213-02}}. Please just put me to someone.' },
-      { speaker: 'agent', at: 34, text: 'Of course. Let me connect you to our billing desk. Please stay on the line.' },
+      { speaker: 'caller', at: 4, text: 'My MRI was charged twice on the same bill. I told your billing desk last week and nothing happened.' },
+      { speaker: 'agent', at: 13, text: 'I’m sorry about that. May I have the patient’s name and the invoice number?' },
+      { speaker: 'caller', at: 22, text: '{{name:Farook M}}, invoice {{invoice:20418}}. This is the second time I am asking.' },
+      { speaker: 'agent', at: 34, text: 'I understand. Let me note this down and check what I can do for you.' },
     ],
-    steps: [[0, 'Greeting'], [13, 'Understand the question'], [34, 'Hand over to billing']],
+    steps: [[0, 'Greeting'], [13, 'Understand the billing question'], [34, 'Note the double charge']],
   },
   {
     agent: 'agt_reception',
@@ -543,6 +547,79 @@ export function liveCalls(orgSlug: string, taken: Record<string, string>, paused
   })
 }
 
+/**
+ * The calls behind the sample handovers: each waiting caller has a call that
+ * is still on the line (so it carries a transcript), joined to its handover
+ * by id. They stay on the list while the caller waits, and after someone
+ * takes the call; a caller who hung up (a "missed" handover) is gone.
+ */
+const HANDOFF_SCRIPTS: Record<string, { intent: string; step: string; flagged: boolean; secondsBefore: number; turns: TranscriptTurn[] }> = {
+  live_handoff_1: {
+    intent: 'Insurance claim',
+    step: 'Passed to a person',
+    flagged: true,
+    secondsBefore: 95,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
+      { speaker: 'caller', at: 6, text: 'I have called three times about my father’s insurance claim. Nobody tells me anything.' },
+      { speaker: 'agent', at: 15, text: 'I’m sorry about that. May I have the patient’s name and the policy number?' },
+      { speaker: 'caller', at: 24, text: '{{name:Ramasamy K}}, policy {{policy:SH-88213-02}}. Please just put me to someone.' },
+      { speaker: 'agent', at: 36, text: 'Of course. Let me connect you to a person at the front desk. Please stay on the line.' },
+    ],
+  },
+  live_handoff_2: {
+    intent: 'Reschedule a cardiology review',
+    step: 'Passed to a person',
+    flagged: false,
+    secondsBefore: 110,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! This is Kavya from Arogya Demo Hospital. How can I help you today?' },
+      { speaker: 'caller', at: 5, text: 'Cardiology review venum, this week. Dr. Ramachandran.' },
+      { speaker: 'agent', at: 13, text: 'I can offer Wednesday 10:00 or Friday 4:30. Which suits you?' },
+      { speaker: 'caller', at: 24, text: 'Both are my dialysis days. Saturday possible-aa?' },
+      { speaker: 'agent', at: 33, text: 'I can’t book a Saturday for Dr. Ramachandran myself. Let me pass you to the front desk.' },
+    ],
+  },
+  live_handoff_3: {
+    intent: 'Chest pain',
+    step: 'Passed to a person: emergency',
+    flagged: false,
+    secondsBefore: 40,
+    turns: [
+      { speaker: 'agent', at: 0, text: 'Vanakkam! Arogya Demo Hospital, Kavya pesuren. How can I help?' },
+      { speaker: 'caller', at: 4, text: 'My father has chest pain since twenty minutes, he is sweating a lot. Please help.' },
+      { speaker: 'agent', at: 11, text: 'I’m passing you to our emergency desk now. Please stay on the line, and keep him seated.' },
+    ],
+  },
+}
+
+/** The live calls that belong to `handoffs`, in progress as long as their caller waits (or has been taken). */
+export function handoffCalls(handoffs: Handoff[], taken: Record<string, string>, paused: Set<string>, extras: LiveExtras = { whispers: {}, transfers: {} }): LiveCall[] {
+  return handoffs.flatMap((h) => {
+    const s = HANDOFF_SCRIPTS[h.callId]
+    const agent = AGENTS.find((a) => a.name === h.agentName)
+    if (!s || !agent || h.status === 'missed' || paused.has(agent.id)) return []
+    return [
+      {
+        id: h.callId,
+        agentId: agent.id,
+        agentName: agent.name,
+        line: agent.line,
+        callerPhone: h.callerPhone,
+        startedAt: new Date(Date.parse(h.waitingSince) - s.secondsBefore * 1000).toISOString(),
+        language: h.language,
+        intent: s.intent,
+        step: s.step,
+        turns: s.turns,
+        flagged: s.flagged,
+        takenBy: h.takenBy ?? taken[h.callId] ?? null,
+        whispers: extras.whispers[h.callId] ?? [],
+        transferredTo: extras.transfers[h.callId] ?? null,
+      },
+    ]
+  })
+}
+
 // ---------------------------------------------------------------- handoffs, callbacks, appointments
 
 export function seedHandoffs(orgSlug: string): Handoff[] {
@@ -594,15 +671,18 @@ export function seedHandoffs(orgSlug: string): Handoff[] {
       agentName: 'Main reception',
       line: '+91 00000 01200',
       callerPhone: '+91 ••••• 77310',
-      reason: 'The agent couldn’t answer twice.',
-      summary: 'Asking whether the hospital does home sample collection in Saibaba Colony. Not in the knowledge base.',
-      details: [],
+      reason: 'The caller described chest pain: a possible emergency.',
+      summary: 'Says his father has had chest pain for twenty minutes and is sweating a lot. The agent asked him to keep his father seated and passed the call at once.',
+      details: [
+        { label: 'Caller’s relation to the patient', value: 'Son', personal: false },
+        { label: 'Patient name', value: 'Venkatesan R', personal: true },
+      ],
       language: 'tanglish',
-      waitingSince: min(0.7),
+      waitingSince: min(1.4),
       status: 'waiting',
       takenBy: null,
       takenAt: null,
-      emergency: false,
+      emergency: true,
     },
     {
       id: 'ho_4',
@@ -667,19 +747,61 @@ export function seedCallbacks(orgSlug: string): Callback[] {
 
 const dayFrom = (offset: number) => localDay(offset)
 
+const VISIT: Record<AppointmentType, string[]> = {
+  new_visit: ['Chest pain on climbing stairs', 'Fever for three days', 'Knee pain after a fall', 'Blurred vision', 'Child not eating well'],
+  follow_up: ['Review after starting BP tablets', 'Results of last week’s tests', 'Check the healing after surgery', 'Diabetes review'],
+  procedure: ['Dressing change', 'Joint injection', 'Endoscopy'],
+  test: ['Echo before the review', 'Thyroid blood test', 'X-ray of the knee', 'MRI preparation'],
+}
+const CANCEL_REASONS = ['The patient is travelling that week.', 'Feeling better; doesn’t need to come.', 'Booked twice by mistake.', 'The doctor is on leave that day.']
+const MOVE_REASONS = ['The patient asked for an evening slot.', 'The doctor’s clinic was moved.', 'Clashed with another test.', 'The patient couldn’t get leave from work.']
+
+/**
+ * Sample appointments, two weeks back to two weeks ahead: past days
+ * completed, missed or cancelled; today partly done; ahead pending,
+ * confirmed, moved or cancelled. Each has its history, as the API would keep it.
+ */
 export function seedAppointments(orgSlug: string): Appointment[] {
   if (orgSlug !== 'arogya-demo') return []
   const r = rng(hash(`${orgSlug}:appointments`))
   const times = ['09:00', '09:30', '10:00', '10:30', '11:15', '12:00', '15:00', '16:30', '17:15', '18:00']
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
   const out: Appointment[] = []
   let n = 0
-  for (let day = -2; day <= 6; day++) {
-    const count = day < 0 ? 2 : 3 + Math.floor(r() * 3)
+  for (let day = -14; day <= 13; day++) {
+    const count = day < 0 ? 2 + Math.floor(r() * 2) : 3 + Math.floor(r() * 3)
     for (let i = 0; i < count; i++) {
       const [department, doctor] = pick(r, DEPARTMENTS)
-      const byAgent = r() > 0.25
-      const check = byAgent && day >= 0 && r() > 0.8
+      const source: BookingSource = pick(r, ['ai_call', 'front_desk', 'manual'] as const, [7, 2, 1])
+      const type: AppointmentType = pick(r, ['new_visit', 'follow_up', 'procedure', 'test'] as const, [5, 4, 1, 2])
+      const time = pick(r, times)
+      const desk = pick(r, DESK).name
+      const created = Math.max(0.05, -day + 1 + r() * 3)
+      const past = day < 0 || (day === 0 && toMin(time) < nowMin - 30)
+      const x = r()
+      const status: AppointmentStatus = past
+        ? day < 0
+          ? x < 0.7 ? 'completed' : x < 0.82 ? 'no_show' : 'cancelled'
+          : x < 0.6 ? 'completed' : x < 0.75 ? 'no_show' : 'confirmed'
+        : x < 0.45 ? 'confirmed' : x < 0.8 ? 'pending' : x < 0.9 ? 'rescheduled' : 'cancelled'
+      const check = source === 'ai_call' && (status === 'pending' || status === 'rescheduled') && r() > 0.65
+      const by = source === 'ai_call' ? 'OPD appointments' : desk
       n++
+      const history: AppointmentChange[] = [{ at: ago(created), by, kind: 'created', text: source === 'ai_call' ? 'Booked on a call by the agent' : source === 'front_desk' ? 'Booked on a phone call by the front desk' : 'Entered by hand' }]
+      // Between the booking and the appointment (or now, for one still to come).
+      const lo = Math.max(0.02, -day)
+      const step = (kind: AppointmentChange['kind'], text: string, reason?: string) =>
+        history.unshift({ at: ago(lo + (created - lo) * (0.2 + r() * 0.6)), by: desk, kind, text, ...(reason ? { reason } : {}) })
+      let cancelReason: string | undefined
+      if (status === 'confirmed' || status === 'completed' || status === 'no_show') step('confirmed', 'Confirmed with the patient')
+      if (status === 'rescheduled') step('rescheduled', `Moved from ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][Math.floor(r() * 5)]}, ${pick(r, times)}`, pick(r, MOVE_REASONS))
+      if (status === 'cancelled') {
+        cancelReason = pick(r, CANCEL_REASONS)
+        step('cancelled', 'Cancelled', cancelReason)
+      }
+      if (status === 'completed') history.unshift({ at: ago(Math.max(0.01, -day)), by: desk, kind: 'completed', text: 'Marked completed' })
+      if (status === 'no_show') history.unshift({ at: ago(Math.max(0.01, -day)), by: desk, kind: 'no_show', text: 'Marked as a no-show' })
       out.push({
         id: `apt_${n}`,
         patientName: pick(r, NAMES),
@@ -687,13 +809,20 @@ export function seedAppointments(orgSlug: string): Appointment[] {
         department,
         doctor,
         date: dayFrom(day),
-        time: pick(r, times),
-        status: day < 0 ? 'confirmed' : check ? 'needs_check' : r() > 0.5 ? 'confirmed' : r() > 0.15 ? 'booked' : 'cancelled',
+        time,
+        status,
         checkReason: check ? pick(r, ['The caller wasn’t sure of the date.', 'The name was hard to hear; check the spelling.', 'Booked outside the doctor’s usual hours.']) : undefined,
-        bookedBy: byAgent ? 'agent' : 'staff',
-        agentName: byAgent ? 'OPD appointments' : null,
+        source,
+        bookedBy: source === 'ai_call' ? 'agent' : 'staff',
+        agentName: source === 'ai_call' ? 'OPD appointments' : null,
         callId: null,
-        createdAt: ago(Math.max(0.1, -day + 1 + r() * 3)),
+        type,
+        visitReason: pick(r, VISIT[type]),
+        ...(cancelReason ? { cancelReason } : {}),
+        createdAt: history[history.length - 1].at,
+        updatedAt: history[0].at,
+        updatedBy: history[0].by,
+        history,
       })
     }
   }

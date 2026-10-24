@@ -6,9 +6,9 @@ from datetime import timedelta
 
 import pytest
 
-from app.redact import search_tokens
+from app.domain.redact import search_tokens
 from app.routes.org.calls import since_days
-from app.store import CallbackDoc, CallDoc, now
+from app.data.store import CallbackDoc, CallDoc, now
 
 from .orgkit import SLUG, api, env, err, login, post, seed, seed_ops  # noqa: F401
 
@@ -259,7 +259,7 @@ class _Q:
 def test_call_count_and_list_use_the_same_ordered_query():
     """Composite indexes are direction-specific: the count must be ordered
     like the list, or every filtered call log needs indexes that don't exist."""
-    from app.store import CallFilter, FirestoreStore
+    from app.data.store import CallFilter, FirestoreStore
 
     log = []
     FirestoreStore(_Q(log)).list_calls("arogya", CallFilter(since=now(), handled_by_id="u1", tokens=["432"]), 50)

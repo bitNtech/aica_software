@@ -17,11 +17,11 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ..accounts import link
-from ..services import Services, build_services
-from ..sessions import PLATFORM_CLAIM
-from ..settings import get_settings
-from ..store import UserDoc
+from ..auth.accounts import link
+from ..auth.sessions import PLATFORM_CLAIM
+from ..core.config import get_settings
+from ..core.services import Services, build_services
+from ..data.store import UserDoc
 
 
 def seed(svc: Services, raw: str, send_email: bool = True) -> str:

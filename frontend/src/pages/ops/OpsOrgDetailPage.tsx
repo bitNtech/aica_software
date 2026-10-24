@@ -4,6 +4,7 @@ import { homeFor, useAuth } from '../../auth/AuthProvider'
 import { BUSINESS_LABEL, ROLE_LABEL, STATUS_LABEL } from '../../auth/roles'
 import { asAuthError, type OrgSummary } from '../../auth/types'
 import { OpsLayout } from '../../components/ops/OpsLayout'
+import { opsOrgPages } from '../../components/ops/OpsOrgShell'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { ReasonForm } from '../../components/ui/ReasonForm'
@@ -46,7 +47,7 @@ export default function OpsOrgDetailPage() {
 
   const name = data.state === 'ready' ? data.data.org.name : 'Organisation'
   return (
-    <OpsLayout kicker="Organisation" docTitle={name} title={name} demoData lede={<Link className="link" to="/ops">← Every organisation</Link>}>
+    <OpsLayout kicker="Organisation" docTitle={name} title={name} demoData lede={<Link className="link" to="/ops/orgs">← Every organisation</Link>}>
       {data.state === 'loading' && (
         <div className="loading-row" role="status">
           <Spinner />
@@ -60,6 +61,17 @@ export default function OpsOrgDetailPage() {
             Try again
           </button>
         </Alert>
+      )}
+      {data.state === 'ready' && user?.platformRole && (
+        <nav aria-label={`Manage ${name}`}>
+          <ul className="ops-manage">
+            {opsOrgPages(user.platformRole).map((p) => (
+              <li key={p.path}>
+                <Link to={`/ops/orgs/${slug}/${p.path}`}>{p.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       )}
       {data.state === 'ready' && <Detail org={data.data.org} detail={data.data.detail} isMaster={isMaster} onChanged={reload} />}
     </OpsLayout>
@@ -228,7 +240,7 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
           <h2 id={`${id}-use`} className="ops-section__title">
             Last 30 days
           </h2>
-          <Link className="link" to="/ops/usage">
+          <Link className="link" to="/ops/analytics">
             All usage
           </Link>
         </div>

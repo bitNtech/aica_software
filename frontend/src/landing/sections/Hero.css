@@ -104,7 +104,7 @@
   max-width: 360px;
   padding: 0.6rem 1rem 0.6rem 0.6rem;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: rgba(14, 16, 26, 0.66);
   -webkit-backdrop-filter: blur(16px) saturate(1.4);
   backdrop-filter: blur(16px) saturate(1.4);
@@ -117,7 +117,7 @@
   flex: none;
   display: grid; place-items: center;
   width: 34px; height: 34px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--orange);
   color: var(--orange-ink);
   transition: background-color 0.4s var(--ease);
@@ -128,8 +128,8 @@
 .notif--done .notif__icon { background: var(--ok); color: #05210f; }
 .notif--done .notif__icon svg { stroke-width: 3; }
 .notif__text { display: grid; min-width: 0; animation: notif-swap 0.5s var(--out); }
-.notif__text small { font: 500 0.62rem var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ivory-3); }
-.notif__text b { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif__text small { font: 500 var(--fs-xs) var(--sans); color: var(--ivory-3); }
+.notif__text b { font-weight: 600; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---- the words ---- */
 
@@ -137,26 +137,25 @@
   position: relative;
   z-index: 1;
   margin-top: calc(var(--orb) * -0.16);
-  font-size: clamp(3rem, 0.6rem + 6.8vw, 7.4rem);
-  line-height: 0.92;
-  letter-spacing: -0.052em;
+  font-size: clamp(2.6rem, 0.6rem + 5.6vw, 6rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
   text-wrap: nowrap;
 }
 .hero__line { display: inline-block; animation: hero-grow 1.5s var(--out) both; }
 .hero__line + .hero__line { animation-delay: 0.14s; }
 .hero__title em { color: var(--orange); }
 
-/* bitntech.in's home hero: Archivo grows from condensed-light to full-black. */
+/* The headline rises in once. */
 @keyframes hero-grow {
-  from { font-stretch: 62%; font-weight: 200; opacity: 0; }
-  35% { opacity: 1; }
-  to { font-stretch: 100%; font-weight: 800; opacity: 1; }
+  from { opacity: 0; transform: translateY(0.15em); }
+  to { opacity: 1; transform: none; }
 }
 
 .hero__in {
   margin-top: 0.55em;
   font: 400 clamp(1.5rem, 0.9rem + 2vw, 2.6rem)/1.2 var(--display);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.01em;
   color: var(--ivory-3);
   animation: hero-fade 1s var(--out) 0.45s both;
 }
@@ -179,7 +178,7 @@
   width: max-content;
   /* Room for the last letter: the line's negative tracking pulls it past the box. */
   padding-right: 0.05em;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--ivory);
   opacity: 0;
   transform: translateY(100%);
@@ -202,7 +201,7 @@
   max-width: 34rem;
   margin-top: 1.5rem;
   color: var(--ivory-3);
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   animation: hero-fade 1s var(--out) 0.6s both;
 }
 
@@ -224,7 +223,7 @@
 }
 .hero__play svg { width: 14px; height: 14px; margin-left: 2px; fill: currentColor; }
 .hero__watch:hover .hero__play { background: var(--orange); color: var(--orange-ink); }
-.hero__dur { font: 500 0.72rem var(--mono); font-style: normal; letter-spacing: 0.1em; color: var(--ivory-3); }
+.hero__dur { font: 500 var(--fs-xs) var(--mono); font-style: normal; letter-spacing: 0; color: var(--ivory-3); }
 
 /* ---- the corners: small print, as on bitntech.in's home hero ---- */
 
@@ -242,9 +241,7 @@
   gap: 0.15rem;
   padding-left: 0.75rem;
   border-left: 1px solid var(--line-d2);
-  font: 500 0.66rem/1.5 var(--mono);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font: 500 var(--fs-xs)/1.5 var(--sans);
   color: var(--ivory-3);
   text-align: left;
 }
@@ -276,11 +273,11 @@
   .hero__line { display: block; }
   /* The notification sits on the orb's shoulder, smaller. */
   .notif { left: 50%; top: -2%; max-width: calc(100vw - 2rem); padding: 0.45rem 0.85rem 0.45rem 0.45rem; gap: 0.55rem; transform: translateX(-50%); }
-  .notif__icon { width: 28px; height: 28px; border-radius: 8px; }
+  .notif__icon { width: 28px; height: 28px; border-radius: var(--r-md); }
   .notif__icon svg { width: 14px; height: 14px; }
-  .notif__text b { font-size: 0.8rem; }
-  .notif__text small { font-size: 0.56rem; }
-  .hero__lead { font-size: 1rem; }
+  .notif__text b { font-size: var(--fs-sm); }
+  .notif__text small { font-size: var(--fs-xs); }
+  .hero__lead { font-size: var(--fs-md); }
   .hero__ctas { width: 100%; }
   .hero__ctas .btn { flex: 1 1 100%; }
   .hero__corner--r { display: none; }

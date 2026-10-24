@@ -6,6 +6,7 @@ import {
   can,
   canGrant,
   defaultPermissions,
+  NAV,
   navFor,
   PAGE_KEYS,
   pageAccess,
@@ -39,8 +40,8 @@ const PAGES: Record<(typeof PAGE_KEYS)[number], string> = {
   integrations: 'EER--ER',
   numbers: 'EER--ER',
   desk: 'EEEE---',
-  live: 'EEEE-E-',
-  handoffs: 'EEEE-E-',
+  // Everyone who may see calls can watch; taking needs calls.take.
+  live: 'EEEERER',
   callbacks: 'EEEO-E-',
   appointments: 'EEEERER',
   calls: 'RRRORRR',
@@ -48,7 +49,12 @@ const PAGES: Record<(typeof PAGE_KEYS)[number], string> = {
   team: 'EE---E-',
   activity: 'RR---R-',
   settings: 'EE---E-',
-  billing: 'E------',
+  // Owners, and bitNtech's master admin (from Ops).
+  billing: 'E----E-',
+  owners: 'ER-----',
+  usage: 'E----E-',
+  notifications: 'EE-----',
+  profile: 'EEEEE--',
 }
 
 const TABS: Record<(typeof AGENT_TABS)[number], string> = {
@@ -84,6 +90,15 @@ describe('console access map', () => {
   it('keeps billing with owners, and owners with owners', () => {
     expect(row((a) => (can(a, 'billing') ? 'edit' : null))).toBe('E------')
     expect(row((a) => (can(a, 'team.manageOwners') ? 'edit' : null))).toBe('E----E-')
+  })
+
+  it('folds the handoff queue into Live calls: one entry, no Handoff queue in the sidebar', () => {
+    const items = navFor(accessFor({ role: 'front_desk' })).flatMap((s) => s.items)
+    expect(items.map((i) => i.label)).toContain('Live calls')
+    expect(items.map((i) => i.label)).not.toContain('Handoff queue')
+    expect(NAV.flatMap((s) => s.items).some((i) => i.path === 'handoffs')).toBe(false)
+    // A viewer can watch the queue, without any way to act on it.
+    expect(navFor(accessFor({ role: 'viewer' })).flatMap((s) => s.items).map((i) => i.label)).toContain('Live calls')
   })
 
   it('never lists a page in the sidebar that the person cannot open', () => {

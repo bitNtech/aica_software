@@ -8,7 +8,7 @@ sources stay "being read" until it exists, and search finds nothing.
 - Changing: `library.knowledge`. A source can't be deleted while any agent
   (any version) or draft uses it.
 - Documents and tables go straight from the browser to the private bucket
-  with a signed URL (app/blobs.py), then the browser says it's done.
+  with a signed URL (app/data/blobs.py), then the browser says it's done.
 """
 from __future__ import annotations
 
@@ -18,13 +18,13 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from pydantic import Field
 
-from ...accounts import iso
-from ...errors import ApiError, bad_input, forbidden
+from ...access.orgs import OrgContext, org_member, org_permission
+from ...auth.accounts import iso
+from ...core.errors import ApiError, bad_input, forbidden
+from ...core.ratelimit import limit_caller
+from ...data.store import KnowledgeDoc, Tx, new_id, now
+from ...domain.usage import knowledge_users, live_knowledge, usage_map
 from ...models import Camel
-from ...orgs import OrgContext, org_member, org_permission
-from ...ratelimit import limit_caller
-from ...store import KnowledgeDoc, Tx, new_id, now
-from ...usage import knowledge_users, live_knowledge, usage_map
 
 router = APIRouter(prefix="/api/orgs/{slug}/knowledge", tags=["org"])
 WRITE_LIMIT = Depends(limit_caller("org-knowledge", 30))

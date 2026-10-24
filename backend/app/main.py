@@ -9,11 +9,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import logs
-from .errors import ApiError, api_error_handler, validation_handler
+from .core import logs
+from .core.config import Settings, get_settings
+from .core.errors import ApiError, api_error_handler, validation_handler
+from .core.services import Services, build_services
 from .routes import auth, google, invites, leads, ops, org
-from .services import Services, build_services
-from .settings import Settings, get_settings
 
 log = logging.getLogger("aica")
 

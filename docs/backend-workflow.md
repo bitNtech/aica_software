@@ -19,7 +19,7 @@ Endpoint paths and collection names marked *proposed* don't exist yet. Agree on 
 | **Invites** | Live. Staff invitations, and organisation invitations from the Team page: revoked when resent or cancelled, accepted with a new account or, signed in, with an existing one (`POST /api/invites/{token}/join`). |
 | **Organisations** | Live for Phases 1–3: members, settings, activity, requests to bitNtech, calls and notes, callbacks, appointments and handoffs under `/api/orgs/{slug}/…`, behind `org_member` / `org_permission`. Calls and handoffs have no way in from the pipeline yet (§5); a seed script fills staging. |
 | **Leads** | Live. `POST /api/leads/demo` emails the request and stores nothing. |
-| **Storage** | Firestore through `firebase-admin`, behind a `Store` Protocol (`app/store.py`). Collections: `users`, `orgs`, `invites`, `login_attempts`, `audit`, `impersonations`. |
+| **Storage** | Firestore through `firebase-admin`, behind a `Store` Protocol (`app/data/store.py`). Collections: `users`, `orgs`, `invites`, `login_attempts`, `audit`, `impersonations`. |
 | **Security baseline** | A CSRF guard (same-origin check on writes), `no-store` and `nosniff` headers, CORS with exact origins, per-route rate limits shared across instances (Firestore), JSON request logs without personal data. |
 | **Tests** | 601 pytest tests (3 skipped by design) on in-memory fakes, so no credentials are needed; 328 frontend tests. (This audit first said 82; there were 90 before Phase 1.) |
 | **CI/CD** | GitHub Actions to Vercel. Pull requests run CI; `main` runs CI, deploys the backend, then the frontend, then a smoke test. |
@@ -72,13 +72,13 @@ The "Demo data" note is **per section**: `ConsoleClient.isLive(section)` says wh
 
 Every later phase depends on these.
 
-- [x] **Org access dependency.** Write `org_member(slug)` and `org_permission(slug, perm)` FastAPI dependencies. *Done: `backend/app/orgs.py`; `org_permission(*perms, what=…)` is a factory, the slug comes from the path (pattern-checked). Non-members and unknown orgs get the same 403. Members of a non-active org get a 403 saying why. bitNtech see orgs in any status (404 for an unknown one, since they can list orgs anyway).* They should:
+- [x] **Org access dependency.** Write `org_member(slug)` and `org_permission(slug, perm)` FastAPI dependencies. *Done: `backend/app/access/orgs.py`; `org_permission(*perms, what=…)` is a factory, the slug comes from the path (pattern-checked). Non-members and unknown orgs get the same 403. Members of a non-active org get a 403 saying why. bitNtech see orgs in any status (404 for an unknown one, since they can list orgs anyway).* They should:
   - load the caller's membership for `slug` (`403 forbidden` if there is none);
   - refuse the org unless its status is `active`, and say why when it is `suspended` or `pending_review`;
   - work out effective permissions the same way the frontend does (`permissionsFor(role, custom)`, trimmed by the `grantable` lists);
   - give platform callers their `platformAccess` (master admin: every permission; staff: `agents.view`, `agents.test`, `calls.viewAll`, `reports.view`);
   - respect act-as, so the effective caller is the person being acted as and the audit records the real actor.
-- [x] **One source of truth for permissions.** Port the role defaults, `grantable` lists and action rules from `frontend/src/console/access.ts` into `backend/app/access.py`. Add a test that loads both and fails when they drift, for example by exporting the frontend table as JSON in CI. *Done: the table is `backend/app/permissions.json` (deployed with the backend), loaded by `access.py`. `frontend/src/test/permissions-parity.test.ts` imports the same JSON and fails if `access.ts` differs, so CI's frontend job catches drift. Only the action rules Phase 1 needs are ported (`team.manageOwners`); port the rest with the phase that enforces them.*
+- [x] **One source of truth for permissions.** Port the role defaults, `grantable` lists and action rules from `frontend/src/console/access.ts` into `backend/app/access/permissions.py`. Add a test that loads both and fails when they drift, for example by exporting the frontend table as JSON in CI. *Done: the table is `backend/app/access/permissions.json` (deployed with the backend), loaded by `access/permissions.py`. `frontend/src/test/permissions-parity.test.ts` imports the same JSON and fails if `access.ts` differs, so CI's frontend job catches drift. Only the action rules Phase 1 needs are ported (`team.manageOwners`); port the rest with the phase that enforces them.*
 - [x] **Store layer.** Add org-scoped methods to the `Store` Protocol and matching in-memory fakes in `tests/fakes.py`, so tests stay credential-free. *Done, plus a `Tx` transaction protocol (`store.transact(fn)`). The fake buffers writes until commit and refuses reads after writes, as Firestore does. Every multi-document change (member + `users` index + invite + activity) is one transaction.*
 - [x] **Firestore layout:** subcollections under `orgs/{slug}/`. *Built for Phase 1: `members/{id}` (`id` is the uid once joined, `inv_…` while invited; an invitation becomes the uid's record on accept) and `activity/{auto}` (with `ownerOnly` for billing entries). **Changed:** settings live on the org document itself, not `settings/main`. Name, city and languages were already there and drive sessions and Ops, so a copy would drift. **Missing from the original plan:** accounts made before member records existed. `ensure_member` creates the record from `users/{uid}.memberships` the first time it's needed (and every Team route first calls `sync_members`, so the whole team is brought across, not just people who sign in), and `app/scripts/backfill_members.py` does them all at once. The rest of this table is for later phases.*
 
@@ -93,11 +93,11 @@ Every later phase depends on these.
   | `numbers/{id}`, `tools/{id}`, `knowledge/{id}` | metadata only (see Phase 5) |
   | `activity/{id}` | org-visible audit; keep platform `audit` separate |
 
-- [x] **Indexes** *(Phase 1's done: seven `activity` indexes for area / person / owner-only filters; later phases add theirs)*: add composite indexes in `firestore.indexes.json` for every list query (call log by `startedAt` and filters, callbacks by `status` and `dueBy`, appointments by `date`). Deploy them before the code that needs them; filtered audit queries already return 503 without theirs.
+- [x] **Indexes** *(Phase 1's done: seven `activity` indexes for area / person / owner-only filters; later phases add theirs)*: add composite indexes in `firestore/indexes.json` for every list query (call log by `startedAt` and filters, callbacks by `status` and `dueBy`, appointments by `date`). Deploy them before the code that needs them; filtered audit queries already return 503 without theirs.
 - [x] **CORS and methods.** CORS allows only GET and POST today. Either keep a **POST-only write convention** (`POST /…/update`, `/delete`), which matches the existing ops routes, or add PATCH and DELETE to the CORS config and to the `same_origin_writes` guard. Decide once and write it down. *Decided: **POST-only**. CORS and the origin guard are unchanged. Written down in `backend/README.md`.*
 - [x] **Pagination convention.** Use cursor-based `?before=<cursor>&limit=`, like `/ops/audit`. Return `{ items, next }`. *Done for activity: `{ entries, nextBefore }`, the shape `ActivityPage` already had. The cursor is opaque (the last entry's id), and paging uses `start_after` that document, so entries with the same timestamp are never skipped. `/ops/audit` still pages by timestamp alone and can skip ties; see Follow-ups.*
 - [x] **Shared rate limiter.** Move from in-process to a shared store (Firestore counters, Upstash Redis or similar) before org endpoints go live on several instances. *Done with Firestore: no new service or dependency. Counters are `ratelimits/{hash}` in one-minute fixed windows, using an atomic increment then a read, so concurrent hits can only over-count. Limits are per person on signed-in routes (per master admin while acting) and per IP otherwise (`X-Real-IP`, trusted only on Vercel). The limiter fails open, with a warning, if Firestore is unreachable. **Needs a TTL policy** on `ratelimits.expiresAt` (manual, see `backend/README.md`).*
-- [x] **Structured logging.** Use JSON logs with a request id, route, caller uid, org slug and outcome. **Never** log call content, transcripts, phone numbers, credentials or cookie values. *Done: `app/logs.py` and `LOG_FORMAT` (`json` by default on Vercel). Each line logs the route **template**, never the raw path, because invite tokens travel in paths. Responses carry `X-Request-Id`. **Found while building:** httpx logged every outgoing URL at INFO, and the Identity Toolkit URLs carry the Firebase web API key (`?key=…`). httpx and httpcore are now held at WARNING. Tests check that no email, name, token or password reaches the logs.*
+- [x] **Structured logging.** Use JSON logs with a request id, route, caller uid, org slug and outcome. **Never** log call content, transcripts, phone numbers, credentials or cookie values. *Done: `app/core/logs.py` and `LOG_FORMAT` (`json` by default on Vercel). Each line logs the route **template**, never the raw path, because invite tokens travel in paths. Responses carry `X-Request-Id`. **Found while building:** httpx logged every outgoing URL at INFO, and the Identity Toolkit URLs carry the Firebase web API key (`?key=…`). httpx and httpcore are now held at WARNING. Tests check that no email, name, token or password reaches the logs.*
 - [x] **Housekeeping:**
   - [x] align Python versions (`.python-version` says 3.14, the requirements say 3.12+). *`requirements.txt` now says 3.12+ (the code is syntax-checked on 3.12), with CI and local dev on 3.14. **Still unknown:** which version Vercel runs. Confirm it in the Vercel project settings.*
   - [x] fix the stale "until the Ops staff page exists" notes in `app/scripts/invite_staff.py` and `README.md`;
@@ -154,7 +154,7 @@ These unlock real multi-user orgs.
 **Status: built** (`backend/app/routes/org/requests.py`, `tests/test_org_requests.py`). Validation messages, rules and activity entries match the demo client. Reading needs `requests.create` or `agents.view`; bitNtech can always read. bitNtech never creates requests, and bitNtech staff who aren't the master admin read but don't reply.
 
 - [x] Add an Ops view across all orgs, for `OpsChangesPage` and `/ops/orgs/:slug/requests`. *`GET /api/ops/change-requests` (bitNtech): open requests and any updated in 90 days, in one collection-group query. `OpsChangesPage` uses it (`listAllChangeRequests`) instead of one call per org. `/ops/orgs/:slug/requests` already uses the org route.*
-- [x] Send email through `app/mailer.py` (Resend) when a request is created or replied to. *A new request or a hospital reply goes to `CHANGE_REQUESTS_TO` (default `support@bitntech.in`). A bitNtech reply or status change goes to the person who asked, if they're still in the team. Emails hold only the title and a link.*
+- [x] Send email through `app/integrations/mailer.py` (Resend) when a request is created or replied to. *A new request or a hospital reply goes to `CHANGE_REQUESTS_TO` (default `support@bitntech.in`). A bitNtech reply or status change goes to the person who asked, if they're still in the team. Emails hold only the title and a link.*
 - [x] **Agents aren't on the server yet** (Phase 6). The console sends the agent's name with `agentId`, and the server stores it for display without checking it.
 - [x] A request from a detected call pattern could go over the 2,000-character limit. `frontend/src/console/flowRequest.ts` cuts the call list short (`… and N more`).
 
@@ -169,12 +169,12 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `listCallLog(query)` | `GET /calls?days&agent&outcome&q&limit` | `calls.viewAll`; otherwise only calls the caller handled |
 | `getCallRecord` | `GET /calls/{id}` | as above; strip personal fields without `calls.personal` |
 | `addCallNote` | `POST /calls/{id}/notes` | any member who can see the call |
-| `listHandoffs` / `takeHandoff` / `handoffToCallback` | `GET /handoffs`, `POST /handoffs/{id}/take`, `/to-callback` | `calls.take` |
+| `listHandoffs` / `takeHandoff` / `handoffToCallback` | `GET /handoffs`, `POST /handoffs/{id}/take`, `/to-callback` | Read: `calls.viewAll` or `calls.take`; take and to-callback: `calls.take` |
 
 **Status: built** for storage, reading and updating (`backend/app/routes/org/{calls,callbacks,appointments,handoffs}.py`, `tests/test_org_operations.py`). There is **no way in for the pipeline yet**: call records and handoffs come from `app/scripts/seed_operations.py` on staging until §5's contracts are agreed. Live calls (`listLiveCalls`, take over, whisper, transfer) stay on sample data.
 
 - [x] **Front desk sees only calls they handled.** Enforce this server-side, not in the UI. *Matched by `handledById` (the demo matched by name). Taking a handoff marks its call as handled by that person.*
-- [x] **Mask phone numbers and names** without `calls.personal`, matching the UI rules. *`app/redact.py`. Callers' numbers on calls and handoffs are always masked (`+91 ••••• 43210`), as the console shows them. Without `calls.personal`, the server removes callers' names, personal details, personal values in transcripts and the summary, and analysis fields with a personal label. Callbacks carry the full number, because the person calling back needs it. Appointments show the phone only with `appointments.manage`, and the patient's name only with `calls.personal`.*
+- [x] **Mask phone numbers and names** without `calls.personal`, matching the UI rules. *`app/domain/redact.py`. Callers' numbers on calls and handoffs are always masked (`+91 ••••• 43210`), as the console shows them. Without `calls.personal`, the server removes callers' names, personal details, personal values in transcripts and the summary, and analysis fields with a personal label. Callbacks carry the full number, because the person calling back needs it. Appointments show the phone only with `appointments.manage`, and the patient's name only with `calls.personal`.*
 - [ ] **Recordings:** return signed, short-lived URLs only with `calls.recordings`. Never return a public bucket path. *Not built: no recording storage has been agreed (§5). The API returns `hasRecording` only.*
 - [x] **Search:** Firestore can't do free-text search. Store a normalized search field (last digits of the number, intent) or add a search service later. *`searchTokens` on each call: 3–5 digit runs of the number's last five digits, intent and agent words, and name words (prefixed, matched only for people with `calls.personal`). A search of several words uses its longest word. Totals use Firestore's count query.*
 - [x] **Phase 1's deferred hooks:** someone who is removed, made a viewer, or loses `calls.take` has their open callbacks unassigned in the same transaction.
@@ -190,7 +190,7 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 |---|---|
 | `getReport(query)` | `GET /reports?days&agent` (`reports.view`; export needs `reports.export`) |
 
-**Status: built** (`backend/app/reports.py`, `routes/org/reports.py`, `tests/test_org_reports.py`).
+**Status: built** (`backend/app/domain/rollups.py`, `routes/org/reports.py`, `tests/test_org_reports.py`).
 
 - [x] Keep rollups: per-day and per-hour counters, updated when a call record is written, so a report doesn't scan every call. *`orgs/{slug}/rollups/{agentId}_{day}` (India time), with per-hour counts by outcome, durations, languages, intents, drop-off steps and quality inputs.*
   - *`record_call` writes a call and its rollup in one transaction, and counts a retried delivery once. The seed script uses it, and pipeline ingestion will too.*
@@ -210,7 +210,7 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `listCredentials` / `setCredential` / `deleteCredential` | `GET /credentials`, `POST /credentials`, `POST /credentials/{name}/delete` | `library.secrets`; **values are write-only** |
 | `listKnowledge` / `updateKnowledge` / `deleteKnowledge` / `listPassages` | `GET` / `POST /knowledge…` | metadata and uploads only; indexing and search are AI work |
 
-**Status: built** (`routes/org/{numbers,tools,knowledge,uploads}.py`, `app/secrets.py`, `app/blobs.py`, `app/toolhttp.py`, `app/usage.py`, `tests/test_org_library.py`). Rules and messages follow the demo client.
+**Status: built** (`routes/org/{numbers,tools,knowledge,uploads}.py`, `app/data/vault.py`, `app/data/blobs.py`, `app/integrations/toolhttp.py`, `app/domain/usage.py`, `tests/test_org_library.py`). Rules and messages follow the demo client.
 
 - [x] **Credentials:** encrypt them at rest with a KMS or Secret Manager key, or store them only in Secret Manager and keep a reference in Firestore. Never return the value, never log it, and record every set and delete in the activity log.
   - *Decided: AES-256-GCM with `SECRETS_KEY`, a 32-byte key in the server's environment, using the `cryptography` package that was already installed. KMS was the alternative.*
@@ -222,7 +222,7 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
   - *The server checks that the object arrived with the right size. An upload never finished shows as failed after an hour.*
   - ***No virus scan yet.***
 - [x] Refuse `deleteKnowledge` while an agent uses the source. *The check covers every agent's working setup, all of its versions, and drafts. The same applies to tools; secrets are checked against the tools that use them.*
-- [x] **Tool tests** (`app/toolhttp.py`):
+- [x] **Tool tests** (`app/integrations/toolhttp.py`):
   - *HTTPS only, and redirects are never followed.*
   - *Every address the host resolves to must be public. Private, loopback, link-local, carrier-grade NAT, multicast and reserved ranges are refused, which also blocks the cloud metadata service.*
   - *The request goes to the checked address, with TLS SNI and the Host header set to the name, so a second DNS answer can't redirect it.*
@@ -247,7 +247,7 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 | `listScenarios` / `saveScenario` / `deleteScenario` | `/agents/{id}/scenarios…` | storage only; *running* them is AI work |
 | `listAgentTypes` / `listVoices` | `GET /catalogue/agent-types`, `/voices` | static or seeded data |
 
-**Status: built** (`routes/org/agents.py`, `app/agentspec.py`, `app/catalogue.py`, `tests/test_org_agents.py`).
+**Status: built** (`routes/org/agents.py`, `app/domain/agentspec.py`, `app/domain/catalogue.py`, `tests/test_org_agents.py`).
 
 - [x] **Store the spec as a versioned JSON document.** Validate it with Pydantic models that mirror `AgentSpec`, but treat the `pipeline`, `speech`, `guardrails` and `analysis` blocks as opaque until the pipeline contract is fixed.
   - *Agents live in `agents/{id}` (the working setup). Each published version is its own document, `agentVersions/{agentId}_{n}`, and is never changed.*
@@ -258,7 +258,7 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
   - *The server answers `409 conflict`. The HTTP client tracks revisions itself, so the pages are unchanged.*
   - *Autosave stops on a conflict and offers "Reload" instead of retrying forever.*
 - [x] `publishDraft`'s idempotency key is the draft itself: once published it remembers its agent, and a retry returns that agent.
-- [x] Agent types, voices, built-in tools and the default setups are in `backend/app/catalogue.json`, generated from the frontend demo. `frontend/src/test/catalogue-parity.test.ts` fails if the two drift.
+- [x] Agent types, voices, built-in tools and the default setups are in `backend/app/domain/catalogue.json`, generated from the frontend demo. `frontend/src/test/catalogue-parity.test.ts` fails if the two drift.
 - [x] Deleting an agent frees its numbers and removes its versions and scenarios.
 - [x] Reading a flow from calls (`extractFlow`) and running scenarios say "needs the AI pipeline" in live mode. The browser-only test chat still works.
 
@@ -293,6 +293,13 @@ The pipeline itself is out of scope, but the backend has to **receive** data fro
 - [ ] **Recordings:** where audio is stored, its retention, and how the backend signs URLs for it.
 - [ ] **Desk to agent:** how notices, doctor changes and line mode reach the running agent.
 - [ ] **Published spec to agent:** how the agent runtime fetches the published `AgentSpec` (pull by version, or push on publish).
+- [ ] **Appointment requests (frontend built in demo, 2026-10-24):** the flow the Appointments page shows. This is a description only: nothing is built on the server or pipeline yet.
+  1. *Request in:* when the agent books on a call, the pipeline sends a request event: patient, phone, doctor, department, date and time, type, the reason for the visit in the patient's words, the call id, and an optional `checkReason`. The backend stores it as an `Appointment` with `status: "pending"` and `source: "ai_call"`. Several requests may share one doctor and time.
+  2. *Ranking:* when a time has more than one pending request, an LLM ranks them from what the agent gathered. It writes `rank: {position, of, level: urgent|high|normal|routine, reasons, rankedAt}` on each, and ranks again whenever the set changes. We need to agree which model, the prompt and inputs, a timeout, and what happens if ranking fails (suggested: order by when they asked, with `level: "normal"`).
+  3. *Decision:* staff confirm or decline (`declined` with a `declineReason`). When one request is confirmed, the others for that time are offered another time (`rescheduled`) or declined. Undo must withdraw any update to the patient that hasn't gone yet.
+  4. *Automatic confirmation:* if `BookingSettings.confirm` is `"auto"`, a scheduled job runs each day at `autoAt` (organisation's local time). For each future time it confirms the top-ranked request and handles the rest per `others`. It skips urgent or flagged requests when the settings say so, and returns an `AutoConfirmResult`. It also runs on demand via `runAutoConfirm`.
+  5. *Telling the patient:* after a request is confirmed, declined or moved, the pipeline places an outbound callback in which the agent states the outcome, and/or sends a WhatsApp template, as the settings say. It reports the state of each one back as a `PatientUpdate` (`queued → in_progress → done | no_answer | failed` for calls, and `queued → sent → delivered → read | failed` for WhatsApp). An unanswered call is retried once after 30 minutes when `retryCallback` is on. `retryPatientUpdate` re-queues a failed update. Still needed: the WhatsApp Business provider, approved template text and its variables, the outbound-call trigger API, consent and opt-out rules, and quiet hours.
+  6. *API (proposed):* `GET/POST /orgs/:slug/booking-settings` (`settings.manage` to change); `POST /orgs/:slug/appointments/auto-confirm`; `POST /orgs/:slug/appointments/:id/updates/:updateId/retry`; and `status: "declined"` plus `changeReason` on the existing appointment update. Types are in `frontend/src/console/types.ts` (`AppointmentRank`, `PatientUpdate`, `BookingSettings`, `AutoConfirmResult`).
 
 For each, write down the protocol, endpoint, auth, payload, error handling, timeouts, ordering guarantees and network constraints, following `.claude/rules/external-services.md`. **Don't build against guessed payloads.**
 
@@ -301,7 +308,7 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 ## 6. Security and privacy checklist (every phase)
 
 - [ ] Check authorization on **every** org route with `org_permission`. Never trust a role or permission sent by the browser. *(Phase 1: done; `test_every_org_route_is_in_the_matrix` fails if a new org route skips the matrix.)*
-- [ ] Check that the org slug in the path matches a membership. Return `403`, not `404`, if you want to avoid leaking which orgs exist; pick one and use it everywhere. *(Decided: **403** for members and outsiders alike, in `orgs.py`.)*
+- [ ] Check that the org slug in the path matches a membership. Return `403`, not `404`, if you want to avoid leaking which orgs exist; pick one and use it everywhere. *(Decided: **403** for members and outsiders alike, in `access/orgs.py`.)*
 - [ ] Validate all input with Pydantic models: limit string lengths, use enums for statuses, and validate phone numbers and dates.
 - [ ] Rate-limit write endpoints and anything that sends email or calls out (tool test).
 - [ ] Record every write that matters (role changes, permissions, credentials, publish, delete, settings) in `activity`; record platform actions and act-as in `audit`.
@@ -314,7 +321,7 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 ## 7. Testing and verification
 
 - [ ] **Unit and route tests** for every endpoint, on `tests/fakes.py`. For each route, test: allowed role, denied role, wrong org, suspended org, act-as, invalid input.
-- [ ] **A permission matrix test** that runs every org route against every role and asserts allow or deny from `access.py`. *(Built for Phase 1 routes; add each new route to `ROUTES` in `backend/tests/test_permission_matrix.py`.)*
+- [ ] **A permission matrix test** that runs every org route against every role and asserts allow or deny from `access/permissions.py`. *(Built for Phase 1 routes; add each new route to `ROUTES` in `backend/tests/test_permission_matrix.py`.)*
 - [ ] **A Firestore emulator suite** (optional, in CI) for queries and indexes that the fakes can't model.
 - [ ] **Frontend:** contract tests for `httpConsoleClient`, mocking `fetch`, so request paths and error mapping match the backend. *(Built for Phase 1: `frontend/src/test/httpConsoleClient.test.ts`.)*
 - [ ] **Smoke test:** extend `.github/scripts/smoke.sh` with an authenticated org-route check once a test org exists.
@@ -425,7 +432,7 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 ## Follow-ups from Phases 2 and 3
 
 **Manual steps:**
-1. Create the new composite indexes and the two collection-group field overrides in `backend/firestore.indexes.json` (calls, callbacks, changeRequests).
+1. Create the new composite indexes and the two collection-group field overrides in `backend/firestore/indexes.json` (calls, callbacks, changeRequests).
 2. Optionally set `CHANGE_REQUESTS_TO` on the backend's Vercel project.
 3. On staging: `python -m app.scripts.seed_operations --org <test-org> --yes`, then set `VITE_CONSOLE_LIVE=team,settings,activity,requests,calls,callbacks,appointments,handoffs` and check those pages in a browser. Not yet done against real Firestore.
 
@@ -446,7 +453,7 @@ For each, write down the protocol, endpoint, auth, payload, error handling, time
 ## Follow-ups from Foundations and Phase 1
 
 **Manual steps before turning `VITE_CONSOLE_MODE=live` on in an environment:**
-1. Create the composite indexes in `backend/firestore.indexes.json` (the new `activity` ones). Until then, filtered activity answers 503.
+1. Create the composite indexes in `backend/firestore/indexes.json` (the new `activity` ones). Until then, filtered activity answers 503.
 2. Add a Firestore TTL policy on collection group `ratelimits`, field `expiresAt`.
 3. Optional: `python -m app.scripts.backfill_members`, then `--apply`, so every existing member shows on the Team page at once. The API also does this lazily.
 4. Add `LOG_FORMAT=` to `backend/.env.example` by hand (blocked in this session).
