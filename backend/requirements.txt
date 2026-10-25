@@ -7,5 +7,5 @@ email-validator>=2.2,<3
 firebase-admin>=7.1,<8
 httpx>=0.28,<1
 # Used directly (already installed with firebase-admin / google-auth): secrets encryption, file uploads.
-cryptography>=44,<51
+cryptography>=50.0.2,<51
 google-cloud-storage>=3,<4
