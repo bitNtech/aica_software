@@ -1,3 +1,5 @@
+import { indexFlow, joinTarget, type Placed } from './flowGraph'
+import { normaliseFlow } from './flowShape'
 import type { DetectedFlowPattern, FlowNode } from './types'
 /** The request bitNtech gets for a detected pattern. Requests hold up to
  * 2,000 characters, so long step lists and call lists are cut short. */
@@ -16,19 +18,46 @@ export function flowRequestDetail(pattern: DetectedFlowPattern, max = 2000): str
 
 const KIND_WORD = { intent: 'Intent', step: 'Step', branch: 'Branch' } as const
 
-/** A flow as an indented outline: numbered steps under their intent, a
- * branch with when it applies, and what the agent says on a step. */
-function outline(nodes: FlowNode[], depth = 0): string[] {
-  return nodes.flatMap((n, i) => {
-    const pad = '  '.repeat(depth)
-    const label = n.label.trim() || 'Unnamed'
-    const head =
-      n.kind === 'intent'
-        ? `${pad}${KIND_WORD.intent}: ${label}`
-        : `${pad}${i + 1}. ${KIND_WORD[n.kind]}: ${label}${n.kind === 'branch' && n.condition?.trim() ? ` (when ${n.condition.trim()})` : ''}`
-    const says = n.kind === 'step' && n.say?.trim() ? [`${pad}   The agent says: “${n.say.trim()}”`] : []
-    return [head, ...says, ...outline(n.children, depth + 1)]
-  })
+/**
+ * A flow as an indented outline: each intent, then its path numbered step
+ * by step; where the call can go more than one way, each way is a "-" line
+ * (a branch with when it applies, or "Otherwise") with its own path
+ * numbered under it. What the agent says is under each step, and where a
+ * path joins back up, a "Then carries on at" line says where.
+ */
+export function flowOutline(nodes: FlowNode[]): string[] {
+  const flow = normaliseFlow(nodes)
+  const index = indexFlow(flow)
+  return flow.flatMap((n) => [`${KIND_WORD.intent}: ${n.label.trim() || 'Unnamed'}`, ...path(index, n.children, 1, 1)])
+}
+
+/** Where `n` joins back up: after its step, or, under a fork of
+ * branches, the way on when none of them applies. `pad` is that of the
+ * lines under it. */
+function joinLine(index: Map<string, Placed>, n: FlowNode, pad: string): string[] {
+  const j = joinTarget(index, n)
+  if (!j) return []
+  const label = j.label.trim() || 'Unnamed'
+  return n.children.length ? [`${pad}- Otherwise, carries on at: ${label}`] : [`${pad}   Then carries on at: ${label}`]
+}
+
+function path(index: Map<string, Placed>, list: FlowNode[], depth: number, at: number): string[] {
+  const pad = '  '.repeat(depth)
+  if (!list.length) return []
+  if (list.length === 1 && list[0].kind !== 'branch') {
+    const s = list[0]
+    const says = s.say?.trim() ? [`${pad}   The agent says: “${s.say.trim()}”`] : []
+    return [`${pad}${at}. ${KIND_WORD[s.kind]}: ${s.label.trim() || 'Unnamed'}`, ...says, ...path(index, s.children, depth, at + 1), ...joinLine(index, s, pad)]
+  }
+  return list.flatMap((alt) =>
+    alt.kind === 'branch'
+      ? [
+          `${pad}- ${KIND_WORD.branch}: ${alt.label.trim() || 'Unnamed'}${alt.condition?.trim() ? ` (when ${alt.condition.trim()})` : ''}`,
+          ...path(index, alt.children, depth + 1, 1),
+          ...joinLine(index, alt, `${pad}  `),
+        ]
+      : [`${pad}- Otherwise:`, ...path(index, [alt], depth + 1, 1)],
+  )
 }
 
 /**
@@ -41,7 +70,7 @@ function outline(nodes: FlowNode[], depth = 0): string[] {
  */
 export function editedFlowRequestDetail(pattern: DetectedFlowPattern, edit: { flow: FlowNode[]; note?: string }, max = 2000): string {
   const head = `${pattern.occurrences} of the last ${pattern.windowSize} calls to ${pattern.agentName} followed a step sequence that isn't part of its current flow. We changed it, and would like this version built:`
-  const ours = outline(edit.flow).join('\n')
+  const ours = flowOutline(edit.flow).join('\n')
   const note = edit.note?.trim() ? `\n\nOur note: ${edit.note.trim()}` : ''
   const detected = (on: boolean) => (on ? `\n\nAs detected: ${pattern.steps.join(' > ')}` : '')
   const build = (withDetected: boolean, ids: string[], more: number) =>

@@ -12,6 +12,8 @@ import { useAsync, type Async } from '../../../../lib/useAsync'
 import { ListEditor } from '../ListEditor'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
 import { checkPipeline, PipelineEditor } from '../PipelineEditor'
+import { SpeechEditor } from '../../agent/tabs/BehaviourTab'
+import { defaultSpeech } from '../../../../console/specDefaults'
 
 const TONES: { value: Tone; label: string; hint: string }[] = [
   { value: 'warm', label: 'Warm', hint: '“Of course! Let me find a slot for you.”' },
@@ -47,7 +49,7 @@ export function checkBehaviour(b: BotBehaviour, voice: Voice | undefined): StepE
   return e
 }
 
-/** Step 2: how the agent speaks, and its voice pipeline. */
+/** Step 2: how the agent speaks, pronounces and listens, and its voice pipeline. */
 export function StepBehaviour({ draft, update, showErrors, attempt, validator }: StepProps) {
   const client = useConsole()
   const load = useCallback(() => client.listVoices(), [client])
@@ -71,6 +73,7 @@ export function StepBehaviour({ draft, update, showErrors, attempt, validator }:
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} />
       <BehaviourEditor behaviour={b} onChange={(behaviour) => update((d) => ({ ...d, behaviour }))} errors={errors} voices={voices} onReloadVoices={reload} />
+      <SpeechEditor speech={draft.speech ?? defaultSpeech()} onChange={(speech) => update((d) => ({ ...d, speech }))} />
       <details className="pipe__more" open={Object.keys(checkPipeline(pipeline)).length > 0 && showErrors ? true : undefined}>
         <summary id={pipeId}>Voice pipeline: models, turn-taking and interruptions</summary>
         <p className="step__sub step__sub--flat">Starts from settings that suit a busy hospital line. Change them only if test calls show a reason to.</p>

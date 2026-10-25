@@ -31,12 +31,7 @@ export function checkAnalysis(a: AnalysisSettings): StepErrors {
  * the fields are set up by bitNtech, since reports and integrations use them.
  */
 export function AnalysisTab({ access, spec, update, readOnly, errors }: TabProps) {
-  const id = useId()
   const a = spec.analysis
-  const set = (patch: Partial<AnalysisSettings>) => update((s) => ({ ...s, analysis: { ...s.analysis, ...patch } }))
-  const canFields = !readOnly && isMaster(access)
-  const setField = (i: number, patch: Partial<AnalysisField>) => set({ fields: a.fields.map((f, j) => (j === i ? { ...f, ...patch } : f)) })
-  const [added, setAdded] = useState('')
 
   if (readOnly) {
     return (
@@ -57,6 +52,21 @@ export function AnalysisTab({ access, spec, update, readOnly, errors }: TabProps
 
   return (
     <div className="step ws__sections">
+      <AnalysisEditor analysis={a} onChange={(analysis) => update((s) => ({ ...s, analysis }))} errors={errors} canFields={isMaster(access)} />
+    </div>
+  )
+}
+
+/** What counts as success, and what's noted after each call: shared by
+ * this tab and the builder. `canFields`: the fields can be changed (else
+ * they're listed, as bitNtech's). */
+export function AnalysisEditor({ analysis: a, onChange, errors, canFields }: { analysis: AnalysisSettings; onChange(next: AnalysisSettings): void; errors: StepErrors; canFields: boolean }) {
+  const id = useId()
+  const set = (patch: Partial<AnalysisSettings>) => onChange({ ...a, ...patch })
+  const setField = (i: number, patch: Partial<AnalysisField>) => set({ fields: a.fields.map((f, j) => (j === i ? { ...f, ...patch } : f)) })
+  const [added, setAdded] = useState('')
+  return (
+    <>
       <section className="step__section" aria-labelledby={`${id}-ok`}>
         <h2 id={`${id}-ok`} className="step__heading">
           What counts as a successful call
@@ -135,6 +145,6 @@ export function AnalysisTab({ access, spec, update, readOnly, errors }: TabProps
           </div>
         )}
       </section>
-    </div>
+    </>
   )
 }

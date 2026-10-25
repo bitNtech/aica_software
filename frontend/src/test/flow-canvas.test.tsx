@@ -17,13 +17,15 @@ const node = (kind: FlowNode['kind'], label: string, children: FlowNode[] = [], 
   ...extra,
 })
 
+/** Book: ask, then offer, which forks: the branch (then the next day), or
+ * otherwise confirm. */
 function sample() {
-  const ask = node('step', 'Ask for the doctor')
-  const offer = node('step', 'Offer two slots')
   const alt = node('step', 'Offer the next day')
   const branch = node('branch', 'No slot suits', [alt])
   const confirm = node('step', 'Confirm the booking')
-  const book = node('intent', 'Book an appointment', [ask, offer, branch, confirm])
+  const offer = node('step', 'Offer two slots', [branch, confirm])
+  const ask = node('step', 'Ask for the doctor', [offer])
+  const book = node('intent', 'Book an appointment', [ask])
   const find = node('step', 'Find the booking')
   const resched = node('intent', 'Reschedule an appointment', [find])
   return { flow: [book, resched], book, resched, ask, offer, alt, branch, confirm, find }
@@ -43,39 +45,42 @@ function show(props: Partial<FlowCanvasProps> = {}) {
 }
 
 describe('FlowCanvas drawing', () => {
-  it('draws every node as a named tree item, with its kind in words and a different shape', () => {
+  it('draws every node as a named, numbered card with its kind in words', () => {
     const s = show()
     expect(screen.getByRole('tree', { name: /conversation flow diagram/i })).toBeInTheDocument()
     expect(items()).toHaveLength(8)
     const book = item(/^Intent: Book an appointment/)
     const step = item(/^Step: Ask for the doctor/)
     const branch = item(/^Branch: No slot suits, when The caller can’t make either slot/)
-    // The caption is drawn on the node, not just spoken.
-    expect(book).toHaveTextContent('INTENT')
-    expect(step).toHaveTextContent('STEP')
-    expect(branch).toHaveTextContent('BRANCH')
+    // The kind is drawn on the card in a chip, not just spoken or coloured.
+    expect(book.querySelector('.flowc__chip--intent')).toHaveTextContent('Intent')
+    expect(step.querySelector('.flowc__chip--step')).toHaveTextContent('Step')
+    expect(branch.querySelector('.flowc__chip--branch')).toHaveTextContent('Branch')
     expect([book, step, branch].map((el) => el.getAttribute('data-kind'))).toEqual(['intent', 'step', 'branch'])
-    // Three outlines: round-ended, rectangular, notched (straight cuts, no arcs).
-    const shape = (el: Element) => el.querySelector('.flowc__body')!.getAttribute('d')!
-    expect(shape(branch)).not.toMatch(/A/)
-    expect(shape(step)).toMatch(/A/)
-    expect(new Set([shape(book), shape(step), shape(branch)]).size).toBe(3)
+    // An intent is where its conversation starts; the rest are numbered.
+    expect(book.querySelector('.flowc__chip--start')).toHaveTextContent('Start')
+    expect(book.querySelector('.flowc__num')).toBeNull()
+    expect(step.querySelector('.flowc__num')).toHaveTextContent('1')
+    expect(branch.querySelector('.flowc__num')).toHaveTextContent('2a')
+    expect(branch).toHaveAccessibleName(/numbered 2a/)
+    // A card says where the call ends.
+    expect(item(/^Step: Confirm the booking/)).toHaveTextContent('Ends the call')
     // Tree structure for screen readers.
     expect(book).toHaveAttribute('aria-level', '1')
     expect(step).toHaveAttribute('aria-level', '2')
-    expect(branch).toHaveAttribute('aria-posinset', '3')
-    expect(branch).toHaveAttribute('aria-setsize', '4')
+    expect(branch).toHaveAttribute('aria-posinset', '1')
+    expect(branch).toHaveAttribute('aria-setsize', '2')
     expect(book).toHaveAttribute('aria-expanded', 'true')
-    expect(step).not.toHaveAttribute('aria-expanded')
+    expect(item(/^Step: Offer the next day/)).not.toHaveAttribute('aria-expanded')
     // What a step says is its description.
     expect(step).toHaveAccessibleDescription(/the agent says: say ask for the doctor/i)
     expect(s.container.querySelectorAll('.flowc__node')).toHaveLength(8)
   })
 
-  it('writes a branch’s condition on its edge, from the step before it', () => {
+  it('writes a branch’s condition on its edge, from the step before it, and “Otherwise” on the plain way on', () => {
     const { container, offer, branch } = show()
     const labels = [...container.querySelectorAll('.flowc__label')].map((l) => l.textContent)
-    expect(labels).toEqual([expect.stringContaining('The caller')])
+    expect(labels).toEqual([expect.stringContaining('The caller'), 'Otherwise'])
     const edge = container.querySelector(`[data-edge="${offer.id}>${branch.id}"]`)!
     expect(edge).toHaveClass('flowc__edge--branch')
     expect(edge.querySelector('.flowc__label')).toHaveTextContent(/The caller can’t\s*make either slot/)
@@ -113,17 +118,17 @@ describe('FlowCanvas keyboard', () => {
     expect(item(/^Step: Ask for the doctor/)).toHaveFocus()
     await user.keyboard('{ArrowDown}')
     expect(item(/^Step: Offer two slots/)).toHaveFocus()
-    // Down from "Offer two slots" is the main path, the confirmation; Right is the branch beside it.
+    // Down from "Offer two slots" is the first way out of its fork, the branch; Right is the other way.
     await user.keyboard('{ArrowDown}')
-    expect(item(/^Step: Confirm the booking/)).toHaveFocus()
-    await user.keyboard('{ArrowRight}')
     expect(item(/^Branch: No slot suits/)).toHaveFocus()
-    await user.keyboard('{ArrowLeft}')
+    await user.keyboard('{ArrowRight}')
     expect(item(/^Step: Confirm the booking/)).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(item(/^Branch: No slot suits/)).toHaveFocus()
     // Up is the step before; into the branch and back.
     await user.keyboard('{ArrowUp}')
     expect(item(/^Step: Offer two slots/)).toHaveFocus()
-    await user.keyboard('{ArrowDown}{ArrowRight}{ArrowDown}')
+    await user.keyboard('{ArrowDown}{ArrowDown}')
     expect(item(/^Step: Offer the next day/)).toHaveFocus()
     await user.keyboard('{ArrowUp}')
     expect(item(/^Branch: No slot suits/)).toHaveFocus()
@@ -145,9 +150,11 @@ describe('FlowCanvas keyboard', () => {
     expect(item(/^Step: Ask for the doctor/)).toHaveFocus()
     await user.keyboard('{ArrowRight}')
     expect(item(/^Step: Offer two slots/)).toHaveFocus()
-    // The next step is on along the row; the alternative beside that is above or below now.
-    await user.keyboard('{ArrowRight}{ArrowDown}')
+    // What follows is on along the row; the other way out of the fork is below it now.
+    await user.keyboard('{ArrowRight}')
     expect(item(/^Branch: No slot suits/)).toHaveFocus()
+    await user.keyboard('{ArrowDown}')
+    expect(item(/^Step: Confirm the booking/)).toHaveFocus()
     await user.keyboard('{ArrowLeft}')
     expect(item(/^Step: Offer two slots/)).toHaveFocus()
   })
@@ -193,8 +200,8 @@ describe('FlowCanvas folding', () => {
     expect(items()).toHaveLength(3)
     await user.keyboard(' ')
     expect(items()).toHaveLength(8)
-    // Steps with nothing inside can't fold.
-    focus(item(/^Step: Ask for the doctor/))
+    // Steps with nothing after them can't fold.
+    focus(item(/^Step: Offer the next day/))
     await user.keyboard('-')
     expect(items()).toHaveLength(8)
   })
@@ -331,37 +338,46 @@ describe('FlowCanvas editing', () => {
     expect(screen.queryByRole('group', { name: /^edit /i })).not.toBeInTheDocument()
     focus(item(/^Intent: Book/))
     const bar = await screen.findByRole('group', { name: 'Edit Book an appointment' })
-    await user.click(within(bar).getByRole('button', { name: /add a step under book an appointment/i }))
+    await user.click(within(bar).getByRole('button', { name: /add a step after book an appointment/i }))
     expect(onAddChild).toHaveBeenLastCalledWith(book.id, 'step')
     focus(item(/^Intent: Book/))
-    await user.click(within(await screen.findByRole('group', { name: /^edit book/i })).getByRole('button', { name: /add a branch under/i }))
+    await user.click(within(await screen.findByRole('group', { name: /^edit book/i })).getByRole('button', { name: /add a branch after/i }))
     expect(onAddChild).toHaveBeenLastCalledWith(book.id, 'branch')
     await user.click(screen.getByRole('button', { name: /add an intent/i }))
     expect(onAddChild).toHaveBeenLastCalledWith(null, 'intent')
 
-    // A step: no add buttons, but move, edit and delete.
+    // A step: a step or a branch can follow it too; it carries the call on, so it doesn't move.
     focus(item(/^Step: Offer two slots/))
     const stepBar = await screen.findByRole('group', { name: 'Edit Offer two slots' })
-    expect(within(stepBar).queryByRole('button', { name: /add a/i })).not.toBeInTheDocument()
-    await user.click(within(stepBar).getByRole('button', { name: /edit details of offer two slots/i }))
+    await user.click(within(stepBar).getByRole('button', { name: /add a branch after offer two slots/i }))
+    expect(onAddChild).toHaveBeenLastCalledWith(offer.id, 'branch')
+    focus(item(/^Step: Offer two slots/))
+    expect(within(await screen.findByRole('group', { name: 'Edit Offer two slots' })).queryByRole('button', { name: /move/i })).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('group', { name: 'Edit Offer two slots' })).getByRole('button', { name: /edit details of offer two slots/i }))
     expect(onRename).toHaveBeenCalledWith(offer.id)
-    focus(item(/^Step: Offer two slots/))
-    await user.click(within(await screen.findByRole('group', { name: 'Edit Offer two slots' })).getByRole('button', { name: /move offer two slots later/i }))
-    expect(onMove).toHaveBeenCalledWith(offer.id, 1)
-    focus(item(/^Step: Offer two slots/))
-    await user.click(within(await screen.findByRole('group', { name: 'Edit Offer two slots' })).getByRole('button', { name: /move offer two slots earlier/i }))
-    expect(onMove).toHaveBeenCalledWith(offer.id, -1)
     focus(item(/^Step: Offer two slots/))
     await user.click(within(await screen.findByRole('group', { name: 'Edit Offer two slots' })).getByRole('button', { name: /delete offer two slots/i }))
     expect(onDelete).toHaveBeenCalledWith(offer.id)
   })
 
-  it('stops the first and last from moving past the ends', async () => {
-    show({ editable: true })
-    focus(item(/^Step: Ask for the doctor/))
-    const bar = await screen.findByRole('group', { name: 'Edit Ask for the doctor' })
+  it('moves branches among the ways out of a fork, never past the ends or the plain step', async () => {
+    const onMove = vi.fn()
+    const a = node('branch', 'Way A', [node('step', 'A1')])
+    const b = node('branch', 'Way B', [node('step', 'B1')])
+    const rest = node('step', 'Otherwise go on')
+    const fork = node('step', 'Fork here', [a, b, rest])
+    const user = userEvent.setup()
+    render(<FlowCanvas nodes={[node('intent', 'Forks', [fork])]} editable onMove={onMove} />)
+    focus(item(/^Branch: Way A/))
+    const bar = await screen.findByRole('group', { name: 'Edit Way A' })
     expect(within(bar).getByRole('button', { name: /earlier/i })).toBeDisabled()
-    expect(within(bar).getByRole('button', { name: /later/i })).toBeEnabled()
+    await user.click(within(bar).getByRole('button', { name: /move way a later/i }))
+    expect(onMove).toHaveBeenLastCalledWith(a.id, 1)
+    focus(item(/^Branch: Way B/))
+    const barB = await screen.findByRole('group', { name: 'Edit Way B' })
+    expect(within(barB).getByRole('button', { name: /later/i })).toBeDisabled()
+    await user.click(within(barB).getByRole('button', { name: /move way b earlier/i }))
+    expect(onMove).toHaveBeenLastCalledWith(b.id, -1)
   })
 
   it('has F2 and Delete as keys, only when editable', async () => {
@@ -378,6 +394,35 @@ describe('FlowCanvas editing', () => {
     focus(item(/^Step: Ask for the doctor/))
     await again.user.keyboard('{F2}{Delete}')
     expect(quiet).not.toHaveBeenCalled()
+  })
+
+  it('puts Edit and × on every card when editable, for the mouse', async () => {
+    const onRename = vi.fn()
+    const onDelete = vi.fn()
+    const { user, offer, confirm, container, unmount } = show({ editable: true, onRename, onDelete })
+    expect(container.querySelectorAll('.flowc__editbtn')).toHaveLength(items().length)
+    await user.click(item(/^Step: Offer two slots/).querySelector('.flowc__editbtn')!)
+    expect(onRename).toHaveBeenCalledWith(offer.id)
+    await user.click(item(/^Step: Confirm the booking/).querySelector('.flowc__x')!)
+    expect(onDelete).toHaveBeenCalledWith(confirm.id)
+    unmount()
+    const quiet = show()
+    expect(quiet.container.querySelector('.flowc__editbtn, .flowc__x')).toBeNull()
+  })
+
+  it('draws where a branch joins back up, once, and says so on the card', () => {
+    const confirm = node('step', 'Confirm the booking')
+    const takes = node('branch', 'Takes the next day', [], { joinsAt: confirm.id })
+    const nextDay = node('step', 'Offer the next day', [takes])
+    const noSlot = node('branch', 'No slot suits', [nextDay])
+    const offer = node('step', 'Offer two slots', [noSlot, confirm])
+    const { container } = render(<FlowCanvas nodes={[node('intent', 'Book', [offer])]} />)
+    expect(screen.getAllByRole('treeitem', { name: /^Step: Confirm the booking/ })).toHaveLength(1)
+    const edge = container.querySelector(`[data-edge="${takes.id}>${confirm.id}"]`)!
+    expect(edge).toHaveClass('flowc__edge--join')
+    const card = item(/^Branch: Takes the next day/)
+    expect(card).toHaveTextContent('Carries on at 2')
+    expect(card).toHaveAccessibleDescription(/then the call carries on at 2, confirm the booking/i)
   })
 
   it('shows no edit buttons when read-only, whatever is focused', async () => {

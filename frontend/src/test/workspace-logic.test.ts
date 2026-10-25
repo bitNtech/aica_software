@@ -41,14 +41,15 @@ describe('diffSpecs: the easy-to-miss changes', () => {
     const { working: before } = await c.getAgent(ORG, 'agt_appointments')
     const after = structuredClone(before)
     after.behaviour.followCaller = !before.behaviour.followCaller
-    after.flow[0].children.reverse()
+    // The ways on out of the first fork, the other way round.
+    after.flow[0].children[0].children.reverse()
     after.attributes.reverse()
     after.speech.pronunciations[0].sayAs = 'Raama'
     const all = diffSpecs(before, after, names).flatMap((a) => a.changes)
     expect(all).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/follows the caller’s language/i),
-        'Changed the order of steps in “Book an appointment”.',
+        'Changed the order of steps in “Ask for the doctor or department”.',
         'Changed the order they’re asked in.',
         'Says “Dr. Ramachandran” as “Raama” (was “Doctor Raa-ma-chan-dran”).',
       ]),
@@ -63,7 +64,8 @@ describe('diffSpecs: the easy-to-miss changes', () => {
     const [, resched, cancel] = after.flow
     resched.children.push(...cancel.children)
     after.flow = after.flow.filter((n) => n !== cancel)
-    after.flow[0].children.splice(0, 2)
+    // A branch and the step in it go from "Book an appointment".
+    after.flow[0].children[0].children.shift()
     const flow = diffSpecs(before, after, names).find((a) => a.area === 'Conversation flow')!.changes
     expect(flow).toContain('Removed intents: “Cancel an appointment”.')
     expect(flow).toContain('Removed 2 steps.')

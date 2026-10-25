@@ -22,7 +22,8 @@ describe('the agent’s structure belongs to bitNtech', () => {
     await screen.findByRole('list', { name: /conversation flow/i })
     expect(screen.queryByRole('button', { name: /add intent/i })).not.toBeInTheDocument()
     expect(screen.getByText(/bitntech sets up the conversation flow/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: /ask for a change/i }))
+    expect(screen.getByRole('button', { name: /change it in the agent builder/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: /or describe it in a request/i }))
 
     // The request form opens filled in for this agent.
     const form = await screen.findByRole('region', { name: /new request to bitntech/i })

@@ -16,15 +16,19 @@ const meena = (permissions?: Permission[]) => as('u_frontdesk', 'Meena S', 'fron
 const master = () => as('u_master', 'Vikram S', null, { platformRole: 'master_admin' })
 
 describe('who builds agents', () => {
-  it('lets only bitNtech’s master admin create, publish new and delete agents', async () => {
+  it('lets only bitNtech’s master admin publish and delete agents; the organisation drafts its own to send', async () => {
     const a = admin()
-    await expect(a.createDraft(ORG, 'Arogya')).rejects.toThrow(/only bitntech can create agents/i)
+    const mine = await a.createDraft(ORG, 'Arogya')
+    expect(mine.requestedBy).toEqual({ id: 'u_admin', name: 'Karthik R' })
+    await expect(a.publishDraft(ORG, mine.id, null)).rejects.toThrow(/only bitntech/i)
+    await expect(meena().createDraft(ORG, 'Arogya')).rejects.toThrow(/permission/i)
     await expect(a.deleteAgent(ORG, 'agt_reports')).rejects.toThrow(/only bitntech/i)
     await expect(a.saveTool(ORG, { id: '', name: 'x', kind: 'http', description: '', acts: false, params: [], enabled: true })).rejects.toThrow(/only bitntech/i)
 
     const m = master()
     const draft = await m.createDraft(ORG, 'Arogya Demo Hospital')
     expect(draft.pipeline.turnDetection).toBe('semantic')
+    expect(draft.requestedBy).toBeNull()
     await m.deleteAgent(ORG, 'agt_reports')
     expect((await m.listAgents(ORG)).some((x) => x.id === 'agt_reports')).toBe(false)
     // Logged as bitNtech's, in the organisation's activity.

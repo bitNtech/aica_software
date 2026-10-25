@@ -1,7 +1,9 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { DetectedFlowChart } from '../components/console/DetectedFlowChart'
+import { FlowEditor } from '../pages/console/builder/FlowEditor'
 import { createDemoConsoleClient } from '../console/demoClient'
 import type { DetectedFlowPattern, FlowNode } from '../console/types'
 import { renderApp, signIn } from './renderApp'
@@ -75,9 +77,9 @@ describe('the agent’s Flow tab: outline, diagram, side by side', () => {
     expect(label.closest('.flow__row')).toHaveClass('is-selected')
 
     // And back: an outline row selects the node in the diagram.
-    const other = within(outline()).getByText('Confirm the booking', { selector: '.flow__label' })
+    const other = within(outline()).getByText('Ask if it’s a first visit or a review', { selector: '.flow__label' })
     await user.click(other)
-    expect(treeitem(/^Step: Confirm the booking/)).toHaveAttribute('aria-selected', 'true')
+    expect(treeitem(/^Step: Ask if it’s a first visit or a review/)).toHaveAttribute('aria-selected', 'true')
     expect(treeitem(/^Step: Offer two slots/)).toHaveAttribute('aria-selected', 'false')
   })
 
@@ -86,7 +88,7 @@ describe('the agent’s Flow tab: outline, diagram, side by side', () => {
     await user.click(view('Side by side'))
     focus(treeitem(/^Intent: Reschedule an appointment/))
     await user.keyboard('-')
-    expect(within(outline()).getByRole('button', { name: /steps in reschedule an appointment/i })).toHaveAttribute('aria-expanded', 'false')
+    expect(within(outline()).getByRole('button', { name: /what follows reschedule an appointment/i })).toHaveAttribute('aria-expanded', 'false')
     // And the other way: "Collapse all" in the outline folds the diagram.
     await user.click(screen.getByRole('button', { name: /^collapse all$/i }))
     expect(within(tree()).queryByRole('treeitem', { name: /^Step:/ })).not.toBeInTheDocument()
@@ -108,35 +110,37 @@ describe('the agent’s Flow tab: outline, diagram, side by side', () => {
     expect(treeitem(/^Intent: Book an OPD visit/)).toBeInTheDocument()
     await waitFor(() => expect(treeitem(/^Intent: Book an OPD visit/)).toHaveFocus())
 
-    // Add a step under it: the form opens, and an empty one cancelled disappears again.
-    await user.click(await screen.findByRole('button', { name: /add a step under book an opd visit/i }))
+    // Add a step after it: the form opens, and an empty one cancelled disappears again.
+    await user.click(await screen.findByRole('button', { name: /add a step after book an opd visit/i }))
     expect(screen.getByLabelText(/^name/i)).toHaveFocus()
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(screen.queryByRole('treeitem', { name: /Unnamed/ })).not.toBeInTheDocument()
     focus(treeitem(/^Intent: Book an OPD visit/))
-    await user.click(await screen.findByRole('button', { name: /add a step under book an opd visit/i }))
+    await user.click(await screen.findByRole('button', { name: /add a step after book an opd visit/i }))
     await user.type(screen.getByLabelText(/^name/i), 'Ask about insurance{Enter}')
     expect(treeitem(/^Step: Ask about insurance/)).toBeInTheDocument()
 
-    // Move it earlier among its siblings: it was last.
-    focus(treeitem(/^Step: Ask about insurance/))
-    await user.click(await screen.findByRole('button', { name: /move ask about insurance earlier/i }))
+    // It goes in between, so what followed the intent now follows it.
     await user.click(view('Outline'))
-    const labels = () => [...within(outline()).getByText('Book an OPD visit', { selector: '.flow__label' }).closest('li')!.querySelectorAll(':scope > .flow__kids > li > .flow__row .flow__label')].map((l) => l.textContent)
-    expect(labels().at(-2)).toBe('Ask about insurance')
+    const path = () => [...within(outline()).getByText('Book an OPD visit', { selector: '.flow__label' }).closest('li')!.querySelectorAll(':scope > .flow__path > li > .flow__row .flow__label')].map((l) => l.textContent)
+    expect(path().slice(0, 2)).toEqual(['Ask about insurance', 'Ask for the doctor or department'])
     await user.click(view('Diagram'))
 
-    // Delete a step: gone at once, with undo; an intent with steps asks first.
+    // Delete a step that has others after it: it can go alone, the rest
+    // moving up, with undo; an intent asks first, and takes all with it.
     focus(treeitem(/^Step: Ask about insurance/))
     await user.click(await screen.findByRole('button', { name: /delete ask about insurance/i }))
+    await user.click(within(screen.getByRole('dialog', { name: /delete “ask about insurance”/i })).getByRole('button', { name: /delete only this step, keep what follows/i }))
     expect(screen.queryByRole('treeitem', { name: /Ask about insurance/ })).not.toBeInTheDocument()
+    expect(treeitem(/^Step: Ask for the doctor or department/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^undo$/i }))
     expect(treeitem(/^Step: Ask about insurance/)).toBeInTheDocument()
 
     focus(treeitem(/^Intent: Cancel an appointment/))
     await user.click(await screen.findByRole('button', { name: /delete cancel an appointment/i }))
     const dialog = screen.getByRole('dialog', { name: /delete “cancel an appointment”/i })
-    await user.click(within(dialog).getByRole('button', { name: /delete intent/i }))
+    expect(within(dialog).queryByRole('button', { name: /delete only this/i })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: /delete it and what follows/i }))
     expect(screen.queryByRole('treeitem', { name: /Cancel an appointment/ })).not.toBeInTheDocument()
   })
 })
@@ -192,7 +196,7 @@ describe('builder flow step: diagram', () => {
     expect(treeitem(/^Intent: Book a visit/)).toBeInTheDocument()
 
     // And an add from the outline shows up in the diagram.
-    await user.click(screen.getByRole('button', { name: /add step to cancel an appointment/i }))
+    await user.click(screen.getByRole('button', { name: /add a step after cancel an appointment/i }))
     await user.type(screen.getByLabelText(/^name/i), 'Say goodbye{Enter}')
     expect(treeitem(/^Step: Say goodbye/)).toBeInTheDocument()
 
@@ -218,8 +222,56 @@ const pattern: DetectedFlowPattern = {
   summary: '4 of the last 5 calls asked about parking.',
 }
 
+describe('joining branches back up in the outline', () => {
+  const mk = (id: string, kind: FlowNode['kind'], children: FlowNode[] = [], extra: Partial<FlowNode> = {}): FlowNode => ({
+    id,
+    kind,
+    label: id,
+    say: kind === 'step' ? `Say ${id}` : undefined,
+    condition: kind === 'branch' ? `When ${id}` : undefined,
+    sourceCallIds: [],
+    children,
+    ...extra,
+  })
+  function Editor({ start, seen }: { start: FlowNode[]; seen(f: FlowNode[]): void }) {
+    const [flow, setFlow] = useState(start)
+    return (
+      <FlowEditor
+        flow={flow}
+        initialView="outline"
+        onChange={(f) => {
+          setFlow(f)
+          seen(f)
+        }}
+      />
+    )
+  }
+
+  it('numbers rows as the diagram does, and carries a branch on at a step chosen from the list', async () => {
+    const user = userEvent.setup()
+    const seen = vi.fn()
+    const start = [mk('Book', 'intent', [mk('Offer two slots', 'step', [mk('No slot suits', 'branch', [mk('Offer the next day', 'step')]), mk('Confirm the booking', 'step')])])]
+    render(<Editor start={start} seen={seen} />)
+    const row = (label: string) => within(outline()).getByText(label, { selector: '.flow__label' }).closest('.flow__row') as HTMLElement
+    expect(within(row('Offer two slots')).getByText('1', { selector: '.flow__num' })).toBeInTheDocument()
+    expect(within(row('No slot suits')).getByText('1a', { selector: '.flow__num' })).toBeInTheDocument()
+    expect(within(row('Confirm the booking')).getByText('2', { selector: '.flow__num' })).toBeInTheDocument()
+
+    await user.click(within(row('Offer the next day')).getByRole('button', { name: /^edit offer the next day/i }))
+    const pick = screen.getByLabelText(/then carry on at/i)
+    // Only steps further on: not "Offer two slots", which leads here.
+    expect(within(pick).getAllByRole('option').map((o) => o.textContent)).toEqual(['Nowhere: the call ends here', '2 · Confirm the booking'])
+    await user.selectOptions(pick, '2 · Confirm the booking')
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+    expect(seen.mock.lastCall![0][0].children[0].children[0].children[0].joinsAt).toBe('Confirm the booking')
+    const says = within(row('Offer the next day')).getByText(/then carries on at/i)
+    await user.click(within(says).getByRole('button', { name: '2 · Confirm the booking' }))
+    await waitFor(() => expect(within(row('Confirm the booking')).getByText('Confirm the booking')).toHaveFocus())
+  })
+})
+
 describe('DetectedFlowChart', () => {
-  it('keeps its summary, count and request button, and draws the steps as a chain', async () => {
+  it('keeps its summary, count and request button, and draws the steps as a path when there’s no design', async () => {
     const onRequestFlow = vi.fn()
     const user = userEvent.setup()
     render(<DetectedFlowChart pattern={pattern} onRequestFlow={onRequestFlow} />)
@@ -255,17 +307,30 @@ describe('DetectedFlowChart', () => {
     expect(items[2]).toHaveAttribute('aria-label', expect.stringContaining('the call left here'))
   })
 
-  it('marks which steps are in the designed flow when it has the flow', () => {
+  it('draws the pattern on the designed flow: the steps it shares, then a new branch where calls went their own way', () => {
     const designed: FlowNode[] = [
-      { id: 'a', kind: 'intent', label: 'Book', sourceCallIds: [], children: [{ id: 'b', kind: 'step', label: 'Offer two slots', sourceCallIds: [], children: [] }] },
+      {
+        id: 'a',
+        kind: 'intent',
+        label: 'Book',
+        sourceCallIds: [],
+        children: [{ id: 'b', kind: 'step', label: 'Greet the caller', sourceCallIds: [], children: [{ id: 'c', kind: 'step', label: 'Offer two slots', sourceCallIds: [], children: [] }] }],
+      },
       { id: 'g', kind: 'intent', label: 'Other', sourceCallIds: [], children: [{ id: 'h', kind: 'step', label: 'Say goodbye', sourceCallIds: [], children: [] }] },
     ]
-    render(<DetectedFlowChart pattern={pattern} onRequestFlow={() => undefined} designed={designed} />)
-    const items = within(screen.getByRole('tree')).getAllByRole('treeitem')
-    expect(items[0]).toHaveTextContent('Not in the designed flow')
-    expect(items[1]).toHaveTextContent('Not in the designed flow')
-    expect(items[2]).toHaveTextContent('In the designed flow')
-    expect(items[3]).toHaveTextContent('Under another intent')
+    render(<DetectedFlowChart pattern={{ ...pattern, steps: ['Book', ...pattern.steps] }} onRequestFlow={() => undefined} designed={designed} />)
+    const tree = screen.getByRole('tree')
+    const item = (name: RegExp) => within(tree).getByRole('treeitem', { name })
+    // Followed down the design as far as the calls agree with it...
+    expect(item(/^Step: Greet the caller/)).toHaveTextContent('In the designed flow')
+    expect(item(/^Step: Greet the caller/)).toHaveAttribute('data-on-path', 'true')
+    // ...then a new branch, with what the calls did next.
+    expect(item(/^Branch: New in these calls, when 4 of the last 5 calls went this way/)).toBeInTheDocument()
+    expect(item(/^Step: Ask about parking/)).toHaveTextContent('Not in the designed flow')
+    expect(within(tree).getAllByRole('treeitem', { name: /^Step: Offer two slots/ }).find((el) => el.getAttribute('data-on-path') === 'true')).toHaveTextContent('Elsewhere in the design')
+    expect(item(/^Step: Say goodbye/)).toHaveTextContent('Elsewhere in the design')
+    // The design's own way on is still there, off the path.
+    expect(within(tree).getAllByRole('treeitem', { name: /^Step: Offer two slots/ })).toHaveLength(2)
   })
 
   it('says so when there are no steps', () => {

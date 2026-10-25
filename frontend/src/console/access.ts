@@ -147,8 +147,9 @@ const PAGE_RULE: Record<PageKey, (a: Access) => AccessLevel | null> = {
   home: (a) => (a.platform ? null : 'read'),
   // Build
   agents: (a) => (isMaster(a) || has(a, 'agents.configure') ? 'edit' : has(a, 'agents.view') ? 'read' : null),
-  // Only the master admin creates agents.
-  agentBuilder: (a) => (isMaster(a) ? 'edit' : null),
+  // The master admin builds and publishes agents. The organisation builds
+  // its own drafts in it too, and sends them to bitNtech as requests.
+  agentBuilder: (a) => (isMaster(a) || (!a.platform && has(a, 'requests.create')) ? 'edit' : null),
   agentWorkspace: (a) => (isMaster(a) || has(a, 'agents.configure') ? 'edit' : has(a, 'agents.view') || has(a, 'agents.test') ? 'read' : null),
   requests: (a) => (a.platform ? null : has(a, 'requests.create') ? 'edit' : has(a, 'agents.view') ? 'read' : null),
   // Recordings hold personal details.

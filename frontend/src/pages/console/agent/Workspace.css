@@ -112,3 +112,4 @@
 
 .ws__ask { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 1rem; padding: 0.6rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--bg-2); }
 .ws__ask p { margin: 0; font-size: var(--fs-md); }
+.ws__ask-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }

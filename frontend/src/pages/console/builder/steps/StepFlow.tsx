@@ -7,6 +7,7 @@ import { Button } from '../../../../components/ui/Button'
 import { ConfirmDialog } from '../../../../components/ui/Dialog'
 import { Spinner } from '../../../../components/ui/Spinner'
 import { FlowEditor } from '../FlowEditor'
+import { FlowGroups } from '../FlowGroups'
 import { SeenInDialog } from '../SeenInDialog'
 import { checkFlow } from '../flowTree'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
@@ -20,6 +21,8 @@ export const extracted = (x: AgentDraft) => (d: AgentDraft): AgentDraft => ({
   globalFlows: x.globalFlows,
   context: x.context,
   extraction: x.extraction,
+  flowGroups: x.flowGroups,
+  flowGroupId: x.flowGroupId,
 })
 
 /** Reads in progress, by draft: coming back to the step mid-read waits for
@@ -48,9 +51,12 @@ export function checkFlowStep(flow: FlowNode[]): StepErrors {
   return checkFlow(flow)
 }
 
-/** Step 3: the conversations found in the calls, as an editable outline. */
-export function StepFlow({ draft, org, update, showErrors, attempt, validator }: StepProps) {
+/** Step 3: the conversations found in the calls, as an editable tree. For
+ * changes to an agent, its own flow, with what new calls found beside it. */
+export function StepFlow({ draft, org, update, showErrors, attempt, validator, locked }: StepProps) {
   const client = useConsole()
+  const change = !!draft.baseAgentId
+  const [said, setSaid] = useState('')
   const [phase, setPhase] = useState<'idle' | 'busy' | 'error'>('idle')
   const [error, setError] = useState<unknown>(null)
   const [confirmAgain, setConfirmAgain] = useState(false)
@@ -72,18 +78,20 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
     setDone('')
     try {
       const x = await readCalls(() => client.extractFlow(org.orgSlug, draft.id), draft.id)
-      // Left the step meanwhile: the builder still takes the result.
-      update(extracted(x))
+      // Left the step meanwhile: the builder still takes the result. Changes
+      // to an agent keep their flow: only what the calls found comes back.
+      update(change ? (d) => ({ ...d, extraction: x.extraction, flowGroups: x.flowGroups }) : extracted(x))
       if (!mounted.current) return
       setPhase('idle')
       setReads((n) => n + 1)
-      setDone(`Flow updated: ${x.flow.length} ${x.flow.length === 1 ? 'intent' : 'intents'}.`)
+      const found = x.flowGroups?.length ?? 0
+      setDone(change ? `Read the calls: ${found} ${found === 1 ? 'group' : 'groups'} of conversations found.` : `Flow updated: ${x.flow.length} ${x.flow.length === 1 ? 'intent' : 'intents'}.`)
     } catch (err) {
       if (!mounted.current) return
       setError(err)
       setPhase('error')
     }
-  }, [client, org.orgSlug, draft.id, update])
+  }, [client, org.orgSlug, draft.id, update, change])
 
   useEffect(() => {
     if (phase === 'busy' || !focusSummary.current) return
@@ -101,10 +109,10 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
   // First visit: read the calls straight away. Once read, reading again is
   // only on request, even if every intent has been deleted since.
   useEffect(() => {
-    if (started.current || draft.extraction || draft.flow.length > 0) return
+    if (started.current || draft.extraction || draft.flow.length > 0 || change || locked) return
     started.current = true
     void extract()
-  }, [draft.extraction, draft.flow.length, extract])
+  }, [draft.extraction, draft.flow.length, extract, change, locked])
 
   const check = () => (phase === 'busy' ? { flow: 'Wait for AICA to finish reading your calls.' } : checkFlowStep(draft.flow))
   validator.current = check
@@ -147,26 +155,45 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
     )
   }
 
+  const calls = draft.sourceCallIds.length
+  // Changes to an agent: calls chosen but not read yet (or changed since).
+  const unread = change && calls > 0 && (!draft.extraction || flowIsStale(draft))
+
   return (
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} hrefFor={(key) => (key === 'flow' ? undefined : `#node-${key}`)} />
 
       <div className="step__head-row">
         <p className="step__sub step__sub--flat">
-          Confidence shows how sure AICA is that it read a conversation right. Check anything below 70% against the calls it came from.
+          {change
+            ? `${draft.name.trim()}’s flow as it is now. Add a step or a branch after any step, so a call can go more than one way; change or delete what’s there.`
+            : 'Confidence shows how sure AICA is that it read a conversation right. Check anything below 70% against the calls it came from. Each step can lead more than one way: add a branch after it.'}
         </p>
         {/* aria-disabled, not disabled: a disabled button drops keyboard focus. */}
-        <Button variant="line" size="sm" aria-disabled={phase === 'busy' || undefined} onClick={() => phase !== 'busy' && setConfirmAgain(true)}>
-          {phase === 'busy' ? 'Reading…' : 'Read the calls again'}
-        </Button>
+        {!locked && (!change || (calls > 0 && !unread)) && (
+          <Button variant="line" size="sm" aria-disabled={phase === 'busy' || undefined} onClick={() => phase !== 'busy' && setConfirmAgain(true)}>
+            {phase === 'busy' ? 'Reading…' : 'Read the calls again'}
+          </Button>
+        )}
       </div>
 
       {/* Always present, so the change is announced. */}
       <p className="sr-only" role="status">
-        {phase === 'busy' ? `Reading your ${draft.sourceCallIds.length} calls…` : done}
+        {phase === 'busy' ? `Reading your ${calls} calls…` : said || done}
       </p>
 
-      {flowIsStale(draft) && phase !== 'busy' && (
+      {unread && !locked && (
+        <Alert tone="info" title={`${calls} ${calls === 1 ? 'call' : 'calls'} to read`}>
+          <p>AICA reads them and shows the conversations it finds, for you to add to the flow. The flow doesn’t change until you do.</p>
+          <p className="builder__alert-actions">
+            <Button variant="orange" size="sm" busy={phase === 'busy'} busyLabel="Reading…" onClick={() => void extract()}>
+              Read the calls
+            </Button>
+          </p>
+        </Alert>
+      )}
+
+      {flowIsStale(draft) && phase !== 'busy' && !change && (
         <Alert tone="warn" title="Your calls or the agent’s job changed">
           <p>This flow was read before you changed them. Read the calls again to update it, or keep it as it is.</p>
         </Alert>
@@ -178,6 +205,11 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
         </Alert>
       )}
 
+      <FlowGroups draft={draft} update={update} readOnly={locked} onSaid={setSaid} />
+
+      {(draft.flowGroups?.length ?? 0) > 0 && (
+        <h2 className="step__heading">{change ? `${draft.name.trim()}’s flow` : 'The flow'}</h2>
+      )}
       <FlowEditor
         key={reads}
         summaryId="flow-summary"
@@ -185,13 +217,14 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
         onChange={(flow) => update((d) => ({ ...d, flow }))}
         errors={showErrors ? errors : {}}
         onShowCalls={setSeenIn}
+        readOnly={locked}
       />
 
       <ConfirmDialog
         open={confirmAgain}
         title="Read the calls again?"
         confirmLabel="Read again"
-        danger
+        danger={!change}
         onConfirm={() => {
           setConfirmAgain(false)
           focusSummary.current = true
@@ -199,7 +232,11 @@ export function StepFlow({ draft, org, update, showErrors, attempt, validator }:
         }}
         onCancel={() => setConfirmAgain(false)}
       >
-        <p>AICA starts the flow, details to collect and global flows afresh from your calls. Changes you made to them here are lost.</p>
+        <p>
+          {change
+            ? 'AICA reads the chosen calls again and shows what it finds. The agent’s flow stays as it is: you choose what to add.'
+            : 'AICA starts the flow, details to collect and global flows afresh from your calls. Changes you made to them here are lost.'}
+        </p>
       </ConfirmDialog>
 
       <SeenInDialog orgSlug={org.orgSlug} node={seenIn} redact={draft.redact} onClose={() => setSeenIn(null)} />

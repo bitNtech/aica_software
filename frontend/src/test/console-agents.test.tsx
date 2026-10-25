@@ -113,10 +113,10 @@ describe('/o/:slug/agents', () => {
     expect(within(nav()).getByRole('link', { name: /agents/i })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('lets admins ask bitNtech for a new agent, but not build one', async () => {
+  it('lets admins ask bitNtech for a new agent in the builder, but not publish one', async () => {
     const { user } = renderApp('/o/arogya-demo/agents')
     await signIn(user, 'admin@example.com')
-    expect(await screen.findByRole('link', { name: /ask for a new agent/i })).toHaveAttribute('href', '/o/arogya-demo/requests?new=new_agent')
+    expect(await screen.findByRole('link', { name: /ask for a new agent/i })).toHaveAttribute('href', '/o/arogya-demo/agents/new')
     expect(screen.queryByRole('link', { name: /^new agent$/i })).not.toBeInTheDocument()
     // The half-built sample agent is bitNtech's work in progress.
     const list = await screen.findByRole('list', { name: /agents/i })
@@ -180,7 +180,7 @@ describe('/o/:slug/agents', () => {
     const { user } = renderApp('/o/nila-eye-demo/agents')
     await signIn(user, 'admin@example.com')
     expect(await screen.findByRole('heading', { name: /no agents yet/i })).toBeInTheDocument()
-    expect(screen.getByText(/upload some, then ask for it/i)).toBeInTheDocument()
+    expect(screen.getByText(/set it up in the agent builder from recordings of your past calls/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ask bitntech for your first agent/i })).toBeInTheDocument()
     expect(screen.queryByLabelText(/search agents/i)).not.toBeInTheDocument()
   })

@@ -8,7 +8,8 @@ import { Alert } from '../../../components/ui/Alert'
 import { Spinner } from '../../../components/ui/Spinner'
 
 /** /ops/orgs/:slug/agents/new — starts a draft and opens the builder on it.
- * Only bitNtech's master admin creates agents. */
+ * bitNtech's master admin builds and publishes the agent; at
+ * /o/:slug/agents/new the organisation drafts one to send as a request. */
 export default function NewAgentPage() {
   const { org, base } = useOrg()
   const client = useConsole()

@@ -1,3 +1,6 @@
+import { defaultGuardrails } from '../../../../console/specDefaults'
+import { checkGuardrails } from '../../agent/checks'
+import { GuardrailsEditor } from '../../agent/tabs/RulesTab'
 import { useId } from 'react'
 import type { GlobalFlow, GlobalFlowKind } from '../../../../console/types'
 import { TextAreaField } from '../../../../components/ui/Field'
@@ -106,15 +109,25 @@ export function GlobalFlowsEditor({
   )
 }
 
-/** Step 5: behaviour that applies anywhere in a call. */
+/** Step 5: behaviour that applies anywhere in a call, and where it hands
+ * over, what it won't discuss and how long a call may run. */
 export function StepGlobal({ draft, update, showErrors, attempt, validator }: StepProps) {
-  const check = () => checkGlobalFlows(draft.globalFlows)
+  const guardrails = draft.guardrails ?? defaultGuardrails()
+  const check = () => ({ ...checkGlobalFlows(draft.globalFlows), ...checkGuardrails(guardrails) })
   validator.current = check
   const errors = showErrors ? check() : {}
   return (
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} />
       <GlobalFlowsEditor flows={draft.globalFlows} errors={errors} onChange={(globalFlows) => update((d) => ({ ...d, globalFlows }))} />
+      <GuardrailsEditor
+        guardrails={guardrails}
+        onChange={(g) => update((d) => ({ ...d, guardrails: g }))}
+        errors={errors}
+        redact={draft.redact}
+        onRedact={(redact) => update((d) => ({ ...d, redact }))}
+        handoffNote="What it says when handing over is set above, under “Hand over to a person”."
+      />
     </div>
   )
 }

@@ -62,7 +62,8 @@ export function PatternEditor({ pattern, flow, onFlow, note, onNote, designed, b
         out[detectedId(s.index)] = s.status === 'in' ? { tone: 'info', text: 'In the designed flow' } : { tone: 'warn', text: s.status === 'elsewhere' ? 'Under another intent' : 'Not in the designed flow' }
       }
     }
-    for (const n of [...original, ...original.flatMap((o) => o.children)]) {
+    const every = (nodes: FlowNode[]): FlowNode[] => nodes.flatMap((n) => [n, ...every(n.children)])
+    for (const n of every(original)) {
       if (!kept.has(n.id)) out[n.id] = { tone: 'danger', text: 'Removed in your version' }
     }
     return out
@@ -84,7 +85,7 @@ export function PatternEditor({ pattern, flow, onFlow, note, onNote, designed, b
   return (
     <div className="pt-edit">
       <p className="pt-edit__lede">
-        Change the steps the way you want the agent to handle this call, then ask bitNtech to build your version. Nothing is sent until you do. The first item is the intent; add steps or a branch under it.
+        Change the steps the way you want the agent to handle this call, then ask bitNtech to build your version. Nothing is sent until you do. The first item is the intent; add a step or a branch after any item, so the call can go more than one way.
       </p>
       <SegFilter<View>
         legend="Show"

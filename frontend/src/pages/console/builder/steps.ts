@@ -15,12 +15,12 @@ export const STEP_META: Record<BuilderStep, { label: string; title: string; lede
   behaviour: {
     label: 'Behaviour',
     title: 'How it speaks',
-    lede: 'Its name, tone, languages and voice, and the rules it must always follow.',
+    lede: 'Its name, tone, languages and voice, the rules it must always follow, and how it pronounces names and listens.',
   },
   flow: {
     label: 'Conversation flow',
     title: 'Conversation flow',
-    lede: 'The conversations AICA found in your calls. Check them, fix what’s wrong, and add what’s missing.',
+    lede: 'The conversations AICA found in your calls, as a tree: each step can go more than one way. Check them, fix what’s wrong, and add what’s missing.',
   },
   attributes: {
     label: 'Attributes',
@@ -30,7 +30,7 @@ export const STEP_META: Record<BuilderStep, { label: string; title: string; lede
   global: {
     label: 'Global flows',
     title: 'Anywhere in a call',
-    lede: 'What the agent does whenever these happen, whatever it was in the middle of.',
+    lede: 'What the agent does whenever these happen, whatever it was in the middle of; where it hands over, and what it won’t discuss.',
   },
   context: {
     label: 'Knowledge and tools',
@@ -40,7 +40,7 @@ export const STEP_META: Record<BuilderStep, { label: string; title: string; lede
   review: {
     label: 'Review',
     title: 'Review and confirm',
-    lede: 'Check everything, try it out, then save it as a draft or publish it.',
+    lede: 'Check everything, say what counts as a successful call, try it out, then publish it or send it to bitNtech.',
   },
 }
 

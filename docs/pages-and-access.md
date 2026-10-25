@@ -83,7 +83,7 @@ Overview, Sign-up requests, People and Audit log are *Built*. Organisation detai
 
 | Page | Route | What it's for | Owner | Admin | Supervisor | Front desk | Viewer |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|
-| Agents | `/o/:slug/agents` | Every agent; drafts show as "being set up by bitNtech"; "Ask for a new agent". *Built (demo)* | E | E | R | – | R |
+| Agents | `/o/:slug/agents` | Every agent as a card beside the chosen agent's profile (who it speaks as, voice, greeting, what it handles, its flow tree); "Agent builder" on an agent drafts changes to it; drafts show as "being set up by bitNtech" or as the organisation's own request; "Ask for a new agent" opens the builder. *Built (demo)* | E | E | R | – | R |
 | Requests to bitNtech | `/o/:slug/requests` | New agents, flow changes, integrations, numbers; a thread with bitNtech; withdraw. *Built (demo)* | E | E | R | – | R |
 | Agent workspace | `/o/:slug/agents/:agentId` | Everyday settings in tabs (below); structural tabs read-only with "Ask for a change". *Built (demo)* | E | E | R + test | – | R |
 | Call uploads | `/o/:slug/uploads` | Upload past calls for bitNtech to build from. *Built (demo)* | E | E | R | – | – |
@@ -91,20 +91,20 @@ Overview, Sign-up requests, People and Audit log are *Built*. Organisation detai
 | Tools and integrations | `/o/:slug/integrations` | Set up by bitNtech; the hospital reads them and replaces its own secrets. *Built (demo)* | E (secrets) | E (secrets) | R | – | – |
 | Phone numbers | `/o/:slug/numbers` | Which agent answers, hours, after hours; ask for a number (a request). *Built (demo)* | E | E | R | – | – |
 
-The builder at `/o/:slug/agents/new` and drafts only explain that bitNtech builds agents.
+The builder at `/o/:slug/agents/new` and `/o/:slug/agents/drafts/:id/:step` is open to anyone who can send requests (owner, admin). Their drafts (a new agent, or changes to a published one) end in **Send to bitNtech** instead of Publish; a sent draft is look-only until the request is withdrawn or declined. The master admin opens it from the request, finishes it and publishes it, which marks the request done.
 
-#### Builder steps (`/ops/orgs/:slug/agents/new`, master admin)
+#### Builder steps (master admin from Ops; the organisation for requests)
 
 | Step | What it covers |
 |---|---|
-| 0. Source calls | Pick or upload past calls, confirm consent, wait for processing, check transcripts and speakers |
+| 0. Source calls | Upload calls or pick them from Call uploads, confirm consent, wait for processing, check transcripts. Optional for changes to an agent |
 | 1. Type and sub-type | Industry and use case; picks a starting template |
-| 2. Bot behaviour | Persona, tone, languages and switching between Tamil, English and Tanglish, greeting, closing, voice, rules it must follow; **voice pipeline** (models, turn-taking, interruptions, noise, keypad, fillers) |
-| 3. Conversation flow | The extracted tree of intents, steps and branches, each with its confidence and the calls it came from; edit, merge, reorder |
+| 2. Bot behaviour | Persona, tone, languages and switching between Tamil, English and Tanglish, greeting, closing, voice, rules it must follow; pronunciations, words to listen for, interruptions, silence; **voice pipeline** (models, turn-taking, interruptions, noise, keypad, fillers) |
+| 3. Conversation flow | What reading the calls found: one flow per group of related calls (unrelated calls stay separate; choose one, or for changes add conversations to the agent's flow). The flow is a conditional branching flowchart: numbered cards (1, 1a, 2), any step followed by a step and by branches (forks), each with its condition, and branches can join back up at a later step ("Then carry on at"); add, edit, delete (alone or with what follows), reorder branches, merge intents |
 | 4. Attributes | Details to collect (name, phone, patient ID, date, doctor): type, validation, required, how to confirm, personal data or not |
-| 5. Global flows | Behaviour anywhere in a call: hand to a person, emergency script, repeat, out of scope, silence, end call |
+| 5. Global flows | Behaviour anywhere in a call: hand to a person, emergency script, repeat, out of scope, silence, end call; handoff and guardrails (where handovers and emergencies go, refused topics, recording notice, longest call) |
 | 6. Additional context | **Knowledge** (which sources, retrieval settings, answer only from knowledge) and **Tools** (which tools, confirm before acting) |
-| 7. Review and confirm | Summary, warnings (unreachable branches, missing attributes, unused tools), a test, then save as draft or publish |
+| 7. Review and confirm | Summary, what changes (for changes to an agent), warnings, success criteria and fields noted after each call, a test, then publish (master admin) or send to bitNtech (organisation) |
 
 #### Agent workspace tabs (`/o/:slug/agents/:agentId/...`)
 
@@ -112,7 +112,7 @@ Master admin (from Ops): every tab editable, plus delete. Staff: read, and test.
 
 | Tab | Route | Owner | Admin | Supervisor | Viewer |
 |---|---|:-:|:-:|:-:|:-:|
-| Flow (steps 3 to 5): bitNtech's | `/flow` | R + ask | R + ask | R | R |
+| Flow (steps 3 to 5): bitNtech's | `/flow` | R + builder/ask | R + builder/ask | R | R |
 | Behaviour and voice (step 2, pronunciations, speech hints, interruption on/off, silence) | `/behaviour` | E | E | R | R |
 | Voice pipeline (models, turn detection, endpointing, interruption thresholds, backchannel, fillers, noise, ambience, keypad, temperature): bitNtech's | `/pipeline` | R | R | R | – |
 | Knowledge | `/knowledge` | E | E | R | R |

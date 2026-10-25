@@ -1,6 +1,10 @@
 # Project Handoff
 
 ## Status
+- Latest (2026-10-25, `main`, **uncommitted**): the conversation flow is drawn as a conditional branching flowchart, and branches can join back up (see "Flowchart and joins" below). Approved "proceed". Verified: `tsc -b` clean, vitest 881/881 (65 files), `npm run build` ok, headless screenshots reviewed (Flow tab diagram light and dark at 1440, outline, 390).
+- Next recommended action: look at the diagram in a real browser (edit a branch, pick "Then carry on at"), then add `joinsAt` to the backend's flow schema when the builder contract is agreed.
+- Latest (2026-10-25, `main`, **uncommitted**): branching conversation trees everywhere, agent requests built in the agent builder, agents shown as agents, and call uploads inside each agent's builder (see "Branching flows and builder requests" below). Approved "proceed" with these answers: frontend and demo first; as many settings as possible; related calls grouped, unrelated kept apart; the master admin keeps building and publishing to the organisation; existing flows converted. Verified: `tsc -b` clean, vitest 863/863 (64 files), `npm run build` ok, headless screenshots reviewed (Agents at 1440 and 390, Flow tab outline and diagram, builder flow step with groups, a change draft's calls and flow steps).
+- Next recommended action: try it in a real browser (owner/admin asking, master admin publishing), then agree the backend contract for `startAgentChange`, `submitDraft`, draft ownership fields and flow grouping (`docs/backend-workflow.md` §5) before building it.
 - Latest (2026-10-25, `main`, **uncommitted**): calendars now pile up the agent's requests for one time instead of merging them into one block (see "Appointment requests" → "Calendar piles"). Approved "proceed". Verified: `tsc -b` clean, vitest 846/846, `npm run build` ok, screenshots reviewed (Day and Week at 1440, the list view at 390).
 - Latest (2026-10-24, `main`, **uncommitted**): appointment **requests** flow (see "Appointment requests" below). Approved "proceed" on the revised plan. Frontend and demo only. Verified: `tsc -b` clean, vitest 846/846 (62 files), `npm run build` ok, screenshots reviewed (1440 and 390).
 - Next recommended action: agree the pipeline contract in `docs/backend-workflow.md` §5 "Appointment requests" (request event, LLM ranking, outbound callback, WhatsApp provider and templates), then plan the backend.
@@ -44,6 +48,22 @@
 
 
 
+
+## Flowchart and joins (2026-10-25, approved "proceed"; frontend and demo only)
+
+The user asked for the flow to look like a "Conditional Branching Flowchart" (a survey-style reference: numbered cards 1, 1a, 2; Start chip; type chips; Edit and ×; teal condition labels on curved lines; "Otherwise" grey; branches joining into the next question; "Ends the survey"; dotted grid).
+
+- **Data:** `FlowNode.joinsAt?: string` (`console/types.ts`): a node with no plain step of its own may carry on at a step in the same intent. The tree still owns each node once. Old flows are unchanged (optional field, nothing to migrate).
+- **`console/flowGraph.ts`** (new): `indexFlow`, `canJoin`, `joinTarget`, `successors`, `joinOptions` (steps in the intent that don't lead back), `joinProblems` (missing, wrong kind, both a step and a join, circular), `numberFlow` (1, 1a, 1a.1, 2), `tidyJoins`.
+- **Edits keep joins valid** (`builder/flowTree.ts`): delete ends joins at what goes; delete-alone moves them to the step that followed; adding a step after a joining node hands the join to the new step; `checkFlow` reports join problems and lets a branch with no steps of its own carry on where it joins. Counts: a join is a way on, not an end.
+- **Followed everywhere:** simulator (`simulate.ts`), request outline (`flowRequest.ts`: "Then carries on at" / "Otherwise, carries on at"), call matching and pattern grafting (`compare.ts`), demo known paths (`demo/flowPatterns.ts`).
+- **Layout** (`flow/layout.ts`, rewritten): rows by longest path (a card sits one row below the lowest card leading to it); long lines keep a gap open in each row they cross; order by barycentre with the outline order breaking ties; positions by least-squares packing (pool-adjacent-violators) with alternating down/up sweeps, so a join sits centred under its branches. Curved (cubic) lines from card foot to card head; labels sit above the target, below the source, in the first gap of a long line, or mid-curve. Cards are one width and top-aligned in a row. Edge kinds `next | branch | join`.
+- **Cards** (`FlowSvg.tsx`, still SVG so the tree a11y and zoom are unchanged): number badge, Start chip on intents, kind chip with icon, coloured left edge, say text, "↳ Ends the call" / "↳ Carries on at 2", handles top and bottom (the fold toggle is the bottom handle), and when editable Edit and × on every card (mouse only, `aria-hidden`; the keyboard keeps F2, Delete and the focused-node edit bar). Arrowheads only on a call's highlighted path. Colours in `FlowCanvas.css` as `--flow-*` tokens with dark values.
+- **Accessible names** keep "Step: label" first, then "when …", then "numbered 1a"; the description says where it carries on or that the call ends. On-path highlighting picks the line from the latest card on the path, so joins don't light up the wrong line.
+- **Outline** (`FlowEditor.tsx`): number badges; "Then carries on at 2 · …" (a button that goes to that row); a fork whose node joins shows an extra "Otherwise → carries on at" way; the edit form has "Then carry on at" (or "If none of its branches applies, carry on at") with only valid steps; delete warns how many paths carry on at what goes.
+- **Demo:** templates join where it's natural (the away-doctor branch rejoins at the first-visit question; "Takes the next day" joins at the one "Confirm the booking"; "No booking found" rejoins at "Offer new slots"). Store key bumped to `aica.demo.console.v11`.
+- **Tests:** new `flow-joins.test.ts` (numbers, options, problems, counts, edits, simulator, outline, matching, layout in TB and LR); canvas tests for cards, on-card buttons and drawn joins; an outline test choosing a join; layout tests moved to cards (top-aligned, one width) and the edge check samples curves.
+- **Limits:** a join can only go to a step in the same intent and never back up (no loops, so "ask again" loops aren't drawable); a long flow is tall (cards are bigger than the old boxes); steps can't be dragged; the backend schema doesn't know `joinsAt` yet.
 
 ## Appointment requests (2026-10-24, approved "proceed"; frontend and demo only)
 - **Flow:** the agent books on a call → the request appears in Appointments (in-page alert and toast for new ones; sidebar and Home count "to review") → the LLM ranks requests that share a doctor and time → staff confirm or decline → the agent calls back and/or WhatsApp tells the patient. Settings allow automatic confirmation at a chosen time each day.
@@ -520,3 +540,64 @@ Develop production-ready software in this repository. Most work is expected to i
 0. Deployment: the user does the one-time setup in `docs/cicd.md`: two Vercel projects (frontend, backend) with custom domains that share a site, env vars per environment, the preview Firebase project, GitHub secrets, variables and environments, and branch protection. Register `<API_URL>/api/auth/google/callback` on the Google client, and add the new keys to `backend/.env.example`. Then open a test PR to see the first preview deploys.
 1. The user completes "Needed from the user", then run both servers and do one real end-to-end pass: sign up, verify, approve as master admin, sign in, Google sign-in, reset.
 2. Then plan the Ops staff page or the portal shell.
+
+## Branching flows and builder requests (2026-10-25, approved "proceed"; frontend and demo only)
+- **Flow model:** a `FlowNode`'s children are what can happen next. One child carries the call on; several make a fork, where each is a branch with a condition, except at most one plain step, last ("Otherwise"). Branches can fork again. `console/flowShape.ts` `normaliseFlow` turns the old shape (siblings in sequence, a branch forking off the step before it) into this one. It's idempotent and keeps ids. It runs in `layoutFlow`, `FlowCanvas`, `flowOutline` and the http client (`seen`/`seenDraft`). The demo store key is bumped to `v10`.
+- **Editing** (`builder/flowTree.ts`):
+  - `addNode`: a branch joins the fork before the plain step; a step goes in between, keeping what followed.
+  - `removeOnly`/`canRemoveOnly`: delete a node alone, its followers moving up.
+  - `moveNode`: branches only.
+  - `mergeIntents`: the merged intent's plain path becomes a branch.
+  - `checkFlow`: flags a fork with two plain steps.
+  - `countForks`/`countPaths` live in `console/flowCounts.ts`.
+- **Drawing:**
+  - `layout.ts` fans the tree out: forks are centred, edges are elbows that turn below the row, and the plain way out is labelled "Otherwise". The `sequence` option is gone.
+  - The outline (`FlowEditor`) reads a path top to bottom and indents only at forks ("2 ways on"). Add step / Add branch work on every row. Delete offers "only this, keep what follows".
+  - Cancelling a fresh step that was put in between gives its followers back.
+- **Everywhere else:**
+  - Detected patterns are grafted onto the designed intent as a "New in these calls" branch (`compare.ts` `graftPattern`, `DetectedFlowChart`). The pattern editor starts from a chain.
+  - `compareSteps` prefers the matching node below the last match, since labels repeat down branches.
+  - The simulator walks the tree, picking the branch whose condition matches the caller.
+  - `flowOutline` (`flowRequest.ts`) writes the tree for requests.
+  - The demo's known paths end where only branches follow.
+- **Demo extraction** (`demo/extraction.ts`):
+  - The templates are branching trees: appointments, reports, and a new billing template.
+  - `extractFlowGroups` groups calls by topic family: visits = booking + directions; reports; billing; and general for anything else. The group that fits the job is suggested first.
+- **Builder for the organisation:** `agentBuilder` page access is now the master admin, or someone with `requests.create` who isn't bitNtech (owner and admin).
+  - New `AgentDraft` fields:
+    - `requestedBy`, `requestId`, `submittedAt`;
+    - `baseAgentId`, `baseVersion` (changes to a published agent);
+    - `flowGroups`, `flowGroupId`;
+    - `speech`, `guardrails`, `analysis`.
+  - New optional client methods `startAgentChange` and `submitDraft`, plus `ChangeRequest.draftId`.
+  - The demo enforces:
+    - the organisation edits only its own unsent drafts;
+    - bitNtech's drafts are hidden from it;
+    - a sent draft is locked until it's withdrawn or declined;
+    - publishing marks the request done, with a reply.
+  - Steps:
+    - **Calls:** "Upload calls" and "From your call uploads". Calls are optional for changes.
+    - **Behaviour:** adds pronunciations, words to listen for, interruptions and silence (`SpeechEditor`, shared with the Behaviour tab).
+    - **Global:** adds handoff and guardrails (`GuardrailsEditor`, shared with the Rules tab).
+    - **Flow:** the `FlowGroups` panel. For a new agent, choose a group (it asks first if you edited the flow). For changes, Add or "Use this version" per conversation.
+    - **Review:** "After each call" (`AnalysisEditor`, shared with the Analysis tab). Changes to an agent also get "What changes" (`diffSpecs` against the live version).
+    - **Finish:** the organisation gets "Send to bitNtech" (title, note, how soon); the master admin gets "Publish agent" or "Publish the changes".
+  - A sent draft shows look-only (a disabled fieldset).
+- **Agents page:** each agent is a card with an avatar (first letter of the persona, its status as a ring), next to a profile of the chosen one (`?agent=`):
+  - who it speaks as and in what voice, its languages and greeting;
+  - its version, calls this week and notes;
+  - what it handles, and its flow tree, drawn when opened;
+  - Open workspace, **Agent builder** (opens a change draft on the calls step) and Call history.
+
+  Everything the old rows showed is kept. `AgentSummary` gains `persona`, `voiceName`, `greeting`, `intents`, `request` and `change`. The demo lab agent now speaks as Arun.
+- **Requests:**
+  - "New agent" in the request form points to the builder.
+  - "Change to a flow" offers the builder for the chosen agent; describing it in words still works.
+  - Cards for builder drafts say "Made in the agent builder", link to the draft, and put the full outline under "Everything that was sent".
+  - The workspace's read-only Flow, Tools and Pipeline tabs offer "Change it in the agent builder".
+- **Tests:** new `agent-requests-logic.test.ts` and `agent-requests.test.tsx`; the flow, layout, canvas, pattern, builder and access tests are updated to the new shape. `test/setup.ts` sets `asyncUtilTimeout` to 3s, because the full parallel run was timing out.
+- **Limitations:**
+  - No backend. Live mode rejects `startAgentChange`/`submitDraft` with a "needs the AICA server to be updated" message. The backend's draft model (`extra="allow"`) should keep the new fields, but that isn't tested.
+  - Grouping is by demo topic labels, standing in for the LLM.
+  - ~~A tree can't join back up~~: solved by joins (see "Flowchart and joins").
+  - Moving steps along a path isn't supported (delete and add instead).

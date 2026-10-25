@@ -32,7 +32,7 @@ const row = (f: (a: Access) => keyof typeof CODE | null) => WHO.map((a) => (f(a)
 const PAGES: Record<(typeof PAGE_KEYS)[number], string> = {
   home: 'RRRRR--',
   agents: 'EER-RER',
-  agentBuilder: '-----E-',
+  agentBuilder: 'EE---E-',
   agentWorkspace: 'EER-RER',
   requests: 'EER-R--',
   uploads: 'EER--E-',

@@ -32,6 +32,17 @@ export interface AgentSummary {
   hasChanges?: boolean
   /** Who set it up, e.g. "bitNtech (Vikram S)". */
   builtBy?: string
+  /** How it comes across on a call, for showing the agent itself. Absent
+   * when the server doesn't send them. */
+  persona?: string
+  voiceName?: string
+  greeting?: string
+  /** What it handles: its intents, in order. */
+  intents?: string[]
+  /** Drafts only: the organisation's own, being written or sent to bitNtech. */
+  request?: { state: 'drafting' | 'sent'; by: string; requestId: string | null }
+  /** Published agents: changes drafted in the builder, not published yet. */
+  change?: { draftId: string; state: 'drafting' | 'sent'; by: string; requestId: string | null; step: BuilderStep }
 }
 
 /** The parts of the console that move from demo data to the API one at a
@@ -68,15 +79,25 @@ export interface ConsoleClient {
   getDraft(orgSlug: string, draftId: string): Promise<AgentDraft>
   saveDraft(orgSlug: string, draft: AgentDraft): Promise<AgentDraft>
   discardDraft(orgSlug: string, draftId: string): Promise<void>
-  /** Builder step 3: reads the draft's calls and fills in its flow,
-   * attributes and global flows (replacing what's there).
+  /** Builder step 3: reads the draft's calls into `flowGroups`, one flow per
+   * group of related calls. A new agent also takes the suggested group's
+   * flow, attributes and global flows (replacing what's there); changes to
+   * a published agent keep their flow, and the person adds from a group.
    * Real API: a job (start, then poll or stream progress, cancellable),
    * with a draft revision so autosave can't overwrite its result. */
   extractFlow(orgSlug: string, draftId: string): Promise<AgentDraft>
   /** Builder step 7: turns the draft into a live agent on `numberId`, or a
-   * paused one with no number. Safe to retry: a draft that's already been
+   * paused one with no number; a draft of changes becomes the agent's next
+   * version instead (`numberId` is ignored). Either way a request it was
+   * sent with is marked done. Safe to retry: a draft that's already been
    * published returns the agent it became (real API: an idempotency key). */
   publishDraft(orgSlug: string, draftId: string, numberId: string | null): Promise<AgentSummary>
+  /** A builder draft of changes to a published agent, starting from its
+   * current setup; an open one is returned instead of making another. */
+  startAgentChange?(orgSlug: string, agentId: string): Promise<AgentDraft>
+  /** Sends the organisation's draft to bitNtech as a request. The draft is
+   * locked until the request is withdrawn or declined. */
+  submitDraft?(orgSlug: string, draftId: string, input: DraftSubmission): Promise<ChangeRequest>
 
   // ---- library
   listKnowledge(orgSlug: string): Promise<KnowledgeSource[]>
@@ -354,8 +375,20 @@ export interface BotBehaviour {
   rules: string[]
 }
 
-/** A node in the conversation flow. Intents are the top level; steps and
- * branches nest under them. */
+/**
+ * A node in the conversation flow, which is a tree. Intents are the top
+ * level. A node's children are what can happen next: one child carries the
+ * call on; several are a fork, and each is a branch that says when it
+ * applies, except at most one plain step, last, for "otherwise". Every
+ * branch then runs on with children of its own, and can fork again.
+ * normaliseFlow (builder/flowTree.ts) turns the older shape, where siblings
+ * followed one another, into this one.
+ *
+ * Branches can join back up: a node with no plain step after it can name,
+ * in `joinsAt`, a step elsewhere in the same intent where the call carries
+ * on (the step after a fork that every branch comes back to). The tree
+ * still owns each node once; console/flowGraph.ts reads the joins.
+ */
 export type FlowNodeKind = 'intent' | 'step' | 'branch'
 
 export interface FlowNode {
@@ -371,6 +404,10 @@ export interface FlowNode {
   /** Calls this node was seen in. */
   sourceCallIds: string[]
   children: FlowNode[]
+  /** Where the call carries on after this node: the id of a step in the
+   * same intent. Only on a node with no plain step among its children; with
+   * branches there, it is the way on when none of them applies. */
+  joinsAt?: string
 }
 
 export type AttributeType = 'text' | 'name' | 'phone' | 'date' | 'time' | 'number' | 'choice' | 'patient_id'
@@ -440,8 +477,54 @@ export interface AgentDraft {
   context: AgentContext
   /** How it listens and replies (set in step 3, with its voice). */
   pipeline: PipelineSettings
+  /** How it sounds and listens (behaviour step); absent: the defaults. */
+  speech?: SpeechSettings
+  /** Handing over and what it won't do (global step); absent: the defaults. */
+  guardrails?: Guardrails
+  /** What AICA notes after each call (review step); absent: the defaults. */
+  analysis?: AnalysisSettings
+  /** What reading the calls found: one flow per group of related calls.
+   * Unrelated calls make separate groups, and one is chosen. */
+  flowGroups?: FlowGroup[]
+  /** The group the flow was taken from or added from, if any. */
+  flowGroupId?: string | null
+  /** Set when the draft changes a published agent instead of making a new
+   * one: that agent, and the version the changes started from. */
+  baseAgentId?: string | null
+  baseVersion?: number | null
+  /** The organisation's own draft: sent to bitNtech as a request, not
+   * published. Absent or null: bitNtech's own draft. */
+  requestedBy?: { id: string; name: string } | null
+  /** Once sent: the request it became and when. The organisation can't
+   * change it then, unless the request is withdrawn or declined. */
+  requestId?: string | null
+  submittedAt?: string | null
   /** ISO timestamp of the last save. */
   updatedAt: string
+}
+
+/** A conversation found in a group of related calls. */
+export interface FlowGroup {
+  id: string
+  title: string
+  /** In words, e.g. "8 calls about booking and directions". */
+  summary: string
+  /** The call topics it covers. */
+  topics: string[]
+  callIds: string[]
+  flow: FlowNode[]
+  /** Fits the job chosen for the agent, so it's the one suggested. */
+  matchesJob: boolean
+}
+
+/** What the organisation sends with a draft it asks bitNtech to build. */
+export interface DraftSubmission {
+  title: string
+  /** Anything bitNtech should know, in their words. */
+  note: string
+  urgency: 'normal' | 'soon' | 'urgent'
+  /** Changes to an agent: what differs from the version callers get, in words. */
+  changes?: string[]
 }
 
 export interface NewRecording {
@@ -1184,6 +1267,8 @@ export interface ChangeRequest {
   title: string
   detail: string
   urgency: 'normal' | 'soon' | 'urgent'
+  /** The builder draft it was sent with: a new agent, or changes to one. */
+  draftId?: string | null
   status: ChangeStatus
   createdAt: string
   createdBy: string

@@ -1,4 +1,6 @@
-import type { AgentContext, AgentDraft, AgentSpec, AgentSummary, AgentVersion, Guardrails, SpeechSettings, SourceCall } from '../types'
+import type { AgentContext, AgentDraft, AgentSpec, AgentSummary, AgentVersion, SourceCall } from '../types'
+import { defaultGuardrails, defaultSpeech } from '../specDefaults'
+export { defaultGuardrails, defaultSpeech } from '../specDefaults'
 import { defaultGlobalFlows, extractAttributes, extractFlow } from './extraction'
 import { ago } from './runtime'
 import { defaultBehaviour } from './templates'
@@ -9,23 +11,6 @@ import { defaultAnalysis, defaultPipeline } from './agentConfig'
 
 const ORG_NAME: Record<string, string> = { 'arogya-demo': 'Arogya Demo Hospital' }
 
-export const defaultSpeech = (): SpeechSettings => ({
-  pronunciations: [],
-  hints: [],
-  allowInterruptions: true,
-  silenceSec: 8,
-})
-
-export const defaultGuardrails = (): Guardrails => ({
-  handoffAfterFailures: 2,
-  transferTo: 'Front desk',
-  emergencyTo: 'Emergency desk, extension 108',
-  refuseTopics: ['Diagnosis or medical advice', 'Medicine doses'],
-  recordingNotice: true,
-  recordingNoticeText: 'This call may be recorded to improve our service.',
-  maxCallMinutes: 10,
-})
-
 /** A builder draft's setup, as version 1. */
 export function specFromDraft(d: AgentDraft): AgentSpec {
   return {
@@ -33,14 +18,14 @@ export function specFromDraft(d: AgentDraft): AgentSpec {
     subTypeId: d.subTypeId,
     redact: d.redact,
     behaviour: d.behaviour,
-    speech: defaultSpeech(),
+    speech: d.speech ?? defaultSpeech(),
     flow: d.flow,
     attributes: d.attributes,
     globalFlows: d.globalFlows,
     context: d.context,
-    guardrails: defaultGuardrails(),
+    guardrails: d.guardrails ?? defaultGuardrails(),
     pipeline: d.pipeline,
-    analysis: defaultAnalysis(d.subTypeId),
+    analysis: d.analysis ?? defaultAnalysis(d.subTypeId),
   }
 }
 
@@ -51,6 +36,8 @@ interface Seed {
   /** Matches which agents seedKnowledge() says use each source. */
   context: Partial<AgentContext>
   transferTo: string
+  /** Who it speaks as, when not the default. */
+  voice?: { persona: string; voiceId: string }
 }
 
 const SEEDS: Record<string, Seed> = {
@@ -71,6 +58,7 @@ const SEEDS: Record<string, Seed> = {
     publishedBy: ['Karthik R', 'Lakshmi K'],
     context: { knowledgeSourceIds: ['kb_faq'], toolIds: ['tool_transfer', 'tool_end', 'tool_report'] },
     transferTo: 'Lab counter',
+    voice: { persona: 'Arun', voiceId: 'arun' },
   },
 }
 
@@ -82,7 +70,8 @@ export function seedDetail(orgSlug: string, agent: AgentSummary, calls: SourceCa
   if (!seed) return null
   const orgName = ORG_NAME[orgSlug] ?? 'our hospital'
   const ready = calls.filter((c) => c.status === 'ready')
-  const behaviour = defaultBehaviour(orgName)
+  const base = defaultBehaviour(orgName)
+  const behaviour = seed.voice ? { ...base, persona: seed.voice.persona, voiceId: seed.voice.voiceId, greeting: base.greeting.replace(base.persona, seed.voice.persona) } : base
   const latest: AgentSpec = {
     typeId: 'hospital',
     subTypeId: seed.subTypeId,

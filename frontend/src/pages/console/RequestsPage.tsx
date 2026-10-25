@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { asAuthError } from '../../auth/types'
 import { can, isMaster } from '../../console/access'
 import { useConsole } from '../../console/ConsoleProvider'
@@ -86,7 +86,10 @@ export default function RequestsPage() {
         platform ? (
           <p>What {org.orgName} has asked for. Reply, build it, then mark it done: they see every reply.</p>
         ) : (
-          <p>bitNtech builds new agents and changes their flows, tools and integrations, so every change is tested before callers hear it. Ask here, and follow the conversation.</p>
+          <p>
+            bitNtech builds new agents and changes their flows, tools and integrations, so every change is tested before callers hear it. Set up a new agent, or changes to one, in
+            the agent builder and send it here; ask for anything else in words. Follow the conversation on each.
+          </p>
         )
       }
       actions={
@@ -174,8 +177,11 @@ export default function RequestsPage() {
 }
 
 function NewRequestForm({ initial, agents, onCancel, onCreated }: { initial: NewChangeRequest; agents: AgentSummary[]; onCancel(): void; onCreated(r: ChangeRequest): void }) {
-  const { org } = useOrg()
+  const { org, base } = useOrg()
   const client = useConsole()
+  const navigate = useNavigate()
+  const [opening, setOpening] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
   const id = useId()
   const [v, setV] = useState<NewChangeRequest>(() => ({ ...initial, agentId: initial.agentId && agents.some((a) => a.id === initial.agentId) ? initial.agentId : null }))
   const [errors, setErrors] = useState<{ title?: string; detail?: string; agent?: string; form?: string }>({})
@@ -190,8 +196,28 @@ function NewRequestForm({ initial, agents, onCancel, onCreated }: { initial: New
   }, [])
 
   const needsAgent = v.kind === 'flow_change'
+  const chosen = agents.find((a) => a.id === v.agentId)
+
+  /** Changes to the chosen agent, in the agent builder. */
+  async function openBuilder() {
+    if (!chosen) return
+    setOpenError(null)
+    if (chosen.change) return navigate(`${base}/agents/drafts/${chosen.change.draftId}/${chosen.change.state === 'sent' ? 'review' : 'calls'}`)
+    if (!client.startAgentChange) return setOpenError('Changing an agent in the builder needs the AICA server to be updated first. Describe the change below instead.')
+    setOpening(true)
+    try {
+      const d = await client.startAgentChange(org.orgSlug, chosen.id)
+      navigate(`${base}/agents/drafts/${d.id}/calls`)
+    } catch (err) {
+      setOpenError(asAuthError(err).message)
+      setOpening(false)
+    }
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
+    // New agents go through the builder, not a message.
+    if (v.kind === 'new_agent') return
     const next: typeof errors = {}
     if (needsAgent && !v.agentId) next.agent = 'Choose the agent whose flow should change.'
     if (v.title.trim().length < 5) next.title = 'Give it a short title, at least 5 characters.'
@@ -221,6 +247,22 @@ function NewRequestForm({ initial, agents, onCancel, onCreated }: { initial: New
           options={(Object.keys(KIND_LABEL) as ChangeKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] }))}
           onChange={(e) => setV({ ...v, kind: e.target.value as ChangeKind })}
         />
+        {v.kind === 'new_agent' && (
+          <div className="req__builder">
+            <p>
+              New agents are set up step by step in the agent builder: upload calls or choose them from Call uploads, check the conversations AICA finds as a tree, set how it
+              speaks, what it collects and what it can do, then send it here. bitNtech builds, tests and publishes it.
+            </p>
+            <div className="dialog__actions">
+              <Link className="btn btn--orange btn--sm" to={`${base}/agents/new`}>
+                <span>Start in the agent builder</span>
+              </Link>
+              <Button variant="line" size="sm" onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
         {v.kind !== 'new_agent' && (
           <SelectField
             ref={agentRef}
@@ -231,44 +273,59 @@ function NewRequestForm({ initial, agents, onCancel, onCreated }: { initial: New
             onChange={(e) => setV({ ...v, agentId: e.target.value || null })}
           />
         )}
-        <TextField
-          ref={titleRef}
-          label="Title"
-          placeholder={v.kind === 'new_agent' ? 'e.g. An agent for health check-up packages' : 'e.g. Let callers cancel an appointment'}
-          maxLength={120}
-          value={v.title}
-          error={errors.title}
-          onChange={(e) => setV({ ...v, title: e.target.value })}
-        />
-        <TextAreaField
-          ref={detailRef}
-          label="Details"
-          hint={v.kind === 'new_agent' ? 'What callers ask, roughly how many calls a week, and which recordings in Call uploads show it.' : 'What callers say, what the agent does now, and what it should do instead.'}
-          rows={5}
-          maxLength={2000}
-          value={v.detail}
-          error={errors.detail}
-          onChange={(e) => setV({ ...v, detail: e.target.value })}
-        />
-        <SelectField
-          label="How soon"
-          value={v.urgency}
-          options={(Object.keys(URGENCY_LABEL) as ChangeRequest['urgency'][]).map((u) => ({ value: u, label: URGENCY_LABEL[u] }))}
-          onChange={(e) => setV({ ...v, urgency: e.target.value as ChangeRequest['urgency'] })}
-        />
-        {errors.form && (
-          <p className="field__error" role="alert">
-            {errors.form}
-          </p>
+        {v.kind === 'flow_change' && chosen && (
+          <div className="req__builder">
+            <p>Change {chosen.name}’s flow yourself in the agent builder: upload calls it should handle the same way, add or change branches, then send it. Or describe it below.</p>
+            <div>
+              <Button variant="line" size="sm" busy={opening} busyLabel="Opening…" onClick={() => void openBuilder()}>
+                {chosen.change ? `Continue changing ${chosen.name} in the builder` : `Change ${chosen.name} in the agent builder`}
+              </Button>
+            </div>
+            {openError && <p className="field__error">{openError}</p>}
+          </div>
         )}
-        <div className="dialog__actions">
-          <Button type="submit" variant="orange" size="sm" busy={busy} busyLabel="Sending…">
-            Send to bitNtech
-          </Button>
-          <Button variant="line" size="sm" disabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
+        {v.kind !== 'new_agent' && (
+          <>
+            <TextField
+              ref={titleRef}
+              label="Title"
+              placeholder="e.g. Let callers cancel an appointment"
+              maxLength={120}
+              value={v.title}
+              error={errors.title}
+              onChange={(e) => setV({ ...v, title: e.target.value })}
+            />
+            <TextAreaField
+              ref={detailRef}
+              label="Details"
+              hint="What callers say, what the agent does now, and what it should do instead."
+              rows={5}
+              maxLength={2000}
+              value={v.detail}
+              error={errors.detail}
+              onChange={(e) => setV({ ...v, detail: e.target.value })}
+            />
+            <SelectField
+              label="How soon"
+              value={v.urgency}
+              options={(Object.keys(URGENCY_LABEL) as ChangeRequest['urgency'][]).map((u) => ({ value: u, label: URGENCY_LABEL[u] }))}
+              onChange={(e) => setV({ ...v, urgency: e.target.value as ChangeRequest['urgency'] })}
+            />
+            {errors.form && (
+              <p className="field__error" role="alert">
+                {errors.form}
+              </p>
+            )}
+            <div className="dialog__actions">
+              <Button type="submit" variant="orange" size="sm" busy={busy} busyLabel="Sending…">
+                Send to bitNtech
+              </Button>
+              <Button variant="line" size="sm" disabled={busy} onClick={onCancel}>
+                Cancel
+              </Button>
+            </div>
+          </>
+        )}
       </form>
     </section>
   )
@@ -289,7 +346,7 @@ function RequestCard({
   onChanged(r: ChangeRequest): void
   say(t: string): void
 }) {
-  const { org } = useOrg()
+  const { org, base } = useOrg()
   const client = useConsole()
   const id = useId()
   const [reply, setReply] = useState('')
@@ -349,7 +406,27 @@ function RequestCard({
         {KIND_LABEL[r.kind]}
         {r.agentName && <> · {r.agentName}</>} · {URGENCY_LABEL[r.urgency]} · asked by {r.createdBy}, {timeAgo(r.createdAt)}
       </p>
-      <p className="req__detail">{r.detail}</p>
+      {r.draftId ? (
+        <>
+          <p className="req__detail">{r.detail.split('\n\n')[0]}</p>
+          <div className="req__draft">
+            <span className="req__tag req__tag--builder">Made in the agent builder</span>
+            {open || master ? (
+              <Link className="link" to={`${base}/agents/drafts/${r.draftId}/review`}>
+                {master ? (r.kind === 'new_agent' ? 'Build and publish it in the builder' : 'Build and publish the changes in the builder') : 'See what was sent'}
+              </Link>
+            ) : null}
+          </div>
+          {r.detail.includes('\n\n') && (
+            <details className="req__more">
+              <summary>Everything that was sent</summary>
+              <p className="req__detail">{r.detail.split('\n\n').slice(1).join('\n\n')}</p>
+            </details>
+          )}
+        </>
+      ) : (
+        <p className="req__detail">{r.detail}</p>
+      )}
       {r.replies.length > 0 && (
         <ol className="req__thread" aria-label={`Replies about ${r.title}`}>
           {r.replies.map((x) => (

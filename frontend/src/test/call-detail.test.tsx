@@ -122,7 +122,8 @@ describe('Call detail: the path on the designed flow', () => {
     await waitFor(() => diagram())
     const step = record.path.length - 1
     const label = record.path[step]
-    await user.click(within(diagram()).getByRole('treeitem', { name: new RegExp(label) }))
+    // The label can repeat down another branch: the one on the call's path.
+    await user.click(within(diagram()).getAllByRole('treeitem', { name: new RegExp(label) }).find((el) => el.getAttribute('data-on-path') === 'true')!)
     const expected = turnForStep(step, record.path.length, record.transcript)!
     await waitFor(() => expect(turns()[expected]).toHaveFocus())
     expect(turns()[expected]).toHaveClass('is-target')
