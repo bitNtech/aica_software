@@ -1,0 +1,65 @@
+/* ---- Agents: the list of agents beside the chosen agent's profile ---- */
+
+.agents-split { display: grid; gap: 1rem 1.25rem; align-items: start; max-width: 76rem; }
+@media (min-width: 1080px) {
+  .agents-split { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+  .agents-split .agent-profile { position: sticky; top: 1rem; }
+}
+
+/* In the narrower list column, each agent is a card: face, who it is, status; its numbers below. */
+.agent-cards { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); overflow: hidden; }
+.agent-card.agent-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; cursor: pointer; }
+.agent-card .agent-row__facts { grid-column: 2 / -1; grid-row: 2; }
+.agent-card.agent-row > .status-chip { grid-column: 3; grid-row: 1; }
+.agent-card:hover { background: var(--bg-2); }
+.agent-card.is-selected { background: var(--bg-2); box-shadow: inset 3px 0 0 var(--ink); }
+.agent-card__pick { grid-row: 1 / span 2; align-self: start; padding: 0; border: 0; border-radius: var(--r-pill); background: none; }
+.agent-card__pick:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; }
+
+/* The agent's face: its first letter, a sound mark, and its status as a ring. */
+.agent-avatar { position: relative; display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--ink); color: var(--bg); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--line-strong); }
+.agent-avatar--lg { width: 3.75rem; height: 3.75rem; }
+.agent-avatar__letter { font: 600 1.05rem/1 var(--display); }
+.agent-avatar--lg .agent-avatar__letter { font-size: 1.5rem; }
+.agent-avatar__wave { position: absolute; right: -0.2rem; bottom: -0.15rem; padding: 0.12rem; border-radius: var(--r-pill); background: var(--card); color: var(--ink); box-sizing: content-box; }
+.agent-avatar--live { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ok); }
+.agent-avatar--paused { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--warn); }
+.agent-avatar--draft { background: var(--bg-2); color: var(--ink); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--line-strong); }
+
+/* The chosen agent, as callers meet it. */
+.agent-profile { display: grid; gap: 1rem; padding: 1.1rem 1.2rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.agent-profile__top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.25rem 1rem; align-items: start; }
+.agent-profile__who { display: grid; gap: 0.25rem; min-width: 0; }
+.agent-profile__name { font: 600 var(--fs-xl)/1.3 var(--display); color: var(--ink); overflow-wrap: anywhere; }
+.agent-profile__name:focus { outline: none; }
+.agent-profile__name:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; }
+.agent-profile__line { color: var(--text); }
+.agent-profile__line strong { color: var(--ink); font-weight: 600; }
+.agent-profile__langs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.agent-profile__greeting { margin: 0; padding: 0.75rem 0.9rem; border-left: 3px solid var(--orange); border-radius: 0 var(--r-md) var(--r-md) 0; background: var(--bg); }
+.agent-profile__greeting figcaption { font: 500 var(--fs-xs)/1.5 var(--sans); color: var(--muted); }
+.agent-profile__greeting blockquote { margin: 0.2rem 0 0; font-size: var(--fs-lg); line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.agent-profile__facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.6rem 1rem; margin: 0; }
+.agent-profile__facts dt { font: 500 var(--fs-xs)/1.6 var(--sans); color: var(--muted); }
+.agent-profile__facts dd { margin: 0; font-size: var(--fs-md); color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.agent-profile__notes { display: grid; gap: 0.35rem; margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--r-md); background: var(--info-bg); color: var(--ink); list-style: none; font-size: var(--fs-md); }
+.agent-profile__handles { display: grid; gap: 0.5rem; }
+.agent-profile__sub { font: 600 var(--fs-md)/1.4 var(--sans); color: var(--ink); }
+.agent-profile__intents { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.agent-profile__intents li { padding: 0.25rem 0.6rem; border: 1px solid var(--line-strong); border-radius: var(--r-pill); font-size: var(--fs-sm); color: var(--ink); }
+.agent-profile__tree > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 500; color: var(--ink); }
+.agent-profile__tree[open] > summary { margin-bottom: 0.5rem; }
+.agent-profile__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.agent-profile__error { margin: 0; }
+
+@media (max-width: 520px) {
+  .agent-profile { padding: 0.9rem; }
+  .agent-profile__top { grid-template-columns: auto minmax(0, 1fr); }
+  .agent-profile__top > .status-chip { grid-column: 2; justify-self: start; }
+  .agent-card .agent-row__facts { grid-column: 1 / -1; grid-row: 3; }
+}
+
+@media (forced-colors: active) {
+  .agent-card.is-selected { box-shadow: none; outline: 3px solid Highlight; outline-offset: -3px; }
+  .agent-avatar { border: 2px solid CanvasText; }
+}

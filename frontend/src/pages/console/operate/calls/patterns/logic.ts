@@ -9,13 +9,17 @@ export const detectedId = (i: number) => `detected-${i}`
 
 /**
  * The pattern as a flow the hospital can edit: the first step is the intent
- * (a call's path starts with it) and the rest are its steps, in order.
+ * (a call's path starts with it) and the rest follow it, one after another,
+ * ready to have branches added anywhere along the way.
  */
 export function patternToFlow(pattern: Pick<DetectedFlowPattern, 'steps'>): FlowNode[] {
-  const [first, ...rest] = pattern.steps
+  const [first] = pattern.steps
   if (first === undefined) return []
-  const node = (label: string, i: number, kind: FlowNode['kind']): FlowNode => ({ id: detectedId(i), kind, label, say: kind === 'step' ? '' : undefined, sourceCallIds: [], children: [] })
-  return [{ ...node(first, 0, 'intent'), children: rest.map((s, i) => node(s, i + 1, 'step')) }]
+  const node = (i: number): FlowNode => {
+    const kind = i === 0 ? 'intent' : 'step'
+    return { id: detectedId(i), kind, label: pattern.steps[i], say: kind === 'step' ? '' : undefined, sourceCallIds: [], children: i + 1 < pattern.steps.length ? [node(i + 1)] : [] }
+  }
+  return [node(0)]
 }
 
 export interface StepStatus {

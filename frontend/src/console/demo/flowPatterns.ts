@@ -1,16 +1,23 @@
+import { indexFlow, joinTarget } from '../flowGraph'
 import type { DetectedFlowPattern, FlowNode } from '../types'
 
-/** Every root-to-leaf label path through the flow tree. */
+/** Every label path a call can take through the flow, to a leaf or to a
+ * node whose ways on are all conditional (so the call can end there),
+ * following branches where they join back up. Branches aren't named: a
+ * call's path lists what was said, not the fork it took. */
 export function flattenKnownSequences(flow: FlowNode[]): string[][] {
+  const index = indexFlow(flow)
   const out: string[][] = []
-  const walk = (nodes: FlowNode[], prefix: string[]) => {
-    for (const n of nodes) {
-      const path = [...prefix, n.label]
-      if (n.children.length === 0) out.push(path)
-      else walk(n.children, path)
-    }
+  const visit = (n: FlowNode, prefix: string[], onPath: ReadonlySet<string>) => {
+    if (onPath.has(n.id)) return
+    const path = n.kind === 'branch' ? prefix : [...prefix, n.label]
+    const joins = joinTarget(index, n)
+    if (n.kind !== 'branch' && !joins && n.children.every((c) => c.kind === 'branch')) out.push(path)
+    const next = new Set(onPath).add(n.id)
+    for (const c of n.children) visit(c, path, next)
+    if (joins) visit(joins, path, next)
   }
-  walk(flow, [])
+  for (const n of flow) visit(n, [], new Set())
   return out
 }
 

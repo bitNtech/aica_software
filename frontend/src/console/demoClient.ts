@@ -39,11 +39,14 @@ import type {
 } from './types'
 import { seedAgents } from './demo/agents'
 import { seedCalls, topicFor, transcriptFor } from './demo/calls'
-import { defaultGlobalFlows, extractAttributes, extractFlow } from './demo/extraction'
+import { defaultGlobalFlows, extractAttributes, extractFlowGroups } from './demo/extraction'
 import { detectFlowPatterns } from './demo/flowPatterns'
 import { seedKnowledge, seedNumbers, seedTools } from './demo/library'
 import { copy, DAY, makeWait, newId } from './demo/runtime'
 import { seedDetail, specFromDraft } from './demo/specs'
+import { defaultAnalysisSettings, defaultGuardrails, defaultSpeech } from './specDefaults'
+import { flowOutline } from './flowRequest'
+import { countForks, countPaths } from './flowCounts'
 import { passagesOf, search, seedCredentials } from './demo/passages'
 import { advanceUpdates, queueUpdates, refreshRanks, runAuto, seedBookingSettings, seedRequests, withdrawQueued } from './demo/bookingRequests'
 import { callLog, callRecord, DEPARTMENTS, handoffCalls, liveCalls, report, seedAppointments, seedCallbacks, seedHandoffs, seedMembers, type LiveExtras, type LogContext, type Pauses } from './demo/operations'
@@ -70,7 +73,7 @@ import { currentPlans, enabledVoices, findSubType, MODEL_OPTIONS, platform, publ
  */
 
 /** Bump when the stored shape changes, so old tabs start from fresh seeds. */
-const STORE_KEY = 'aica.demo.console.v9'
+const STORE_KEY = 'aica.demo.console.v11'
 
 /** Versions kept per agent in the demo. */
 const KEEP_VERSIONS = 6
@@ -294,6 +297,16 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
   const subTypeOf = (dr: AgentDraft) => findSubType(dr.typeId, dr.subTypeId)
 
+  const voiceName = (id: string) => enabledVoices().find((v) => v.id === id)?.name
+  /** How an agent or draft comes across on a call, for showing it. */
+  const profile = (s: Pick<AgentSpec, 'behaviour' | 'flow'>): Pick<AgentSummary, 'persona' | 'voiceName' | 'greeting' | 'intents'> => ({
+    persona: s.behaviour.persona,
+    voiceName: voiceName(s.behaviour.voiceId),
+    greeting: s.behaviour.greeting,
+    intents: s.flow.map((n) => n.label),
+  })
+  const requestState = (dr: AgentDraft) => ({ state: dr.submittedAt ? ('sent' as const) : ('drafting' as const), by: dr.requestedBy?.name ?? 'bitNtech', requestId: dr.requestId ?? null })
+
   const draftSummary = (dr: AgentDraft): AgentSummary => ({
     id: dr.id,
     name: dr.name.trim() || 'Untitled agent',
@@ -306,6 +319,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
     updatedAt: dr.updatedAt,
     callsThisWeek: 0,
     setupStep: dr.reached,
+    ...profile(dr),
+    ...(dr.requestedBy ? { request: requestState(dr) } : {}),
   })
 
   const findAgent = (o: string, id: string) => {
@@ -339,7 +354,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
   const detail = (o: string, id: string): AgentDetail => {
     const r = recordOf(o, id)
-    return copy({ agent: { ...findAgent(o, id), hasChanges: r.changed }, working: r.working, versions: r.versions })
+    const dr = org(o).drafts.find((x) => x.baseAgentId === id)
+    const change = dr ? { draftId: dr.id, ...requestState(dr), step: dr.reached } : undefined
+    return copy({ agent: { ...findAgent(o, id), hasChanges: r.changed, change }, working: r.working, versions: r.versions })
   }
 
   /** Knowledge sources list the agents whose live version uses them. */
@@ -441,6 +458,36 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
   /** Agents are created and restructured by bitNtech's master admin only. */
   const allowMaster = (what: string) => {
     if (viewer && !master()) throw new AuthError('forbidden', `Only bitNtech can ${what}. Send them a request instead.`)
+  }
+  /** The builder: bitNtech's master admin works on any draft. The
+   * organisation writes its own drafts, to send as requests, until one is
+   * sent; bitNtech's own drafts are theirs. */
+  const allowDraft = (o: string, dr: AgentDraft | null, what: string) => {
+    if (!viewer || master()) return
+    if (viewer.platformRole) throw new AuthError('forbidden', `Only bitNtech’s master admin can ${what}.`)
+    allowPerm(o, 'requests.create', what)
+    if (!dr) return
+    if (!dr.requestedBy) throw new AuthError('forbidden', 'bitNtech is building this agent. Send them a request instead.')
+    if (dr.submittedAt) throw new AuthError('invalid_input', 'This was sent to bitNtech. Withdraw the request first to change it.')
+  }
+  /** A request's draft can be changed again once it's withdrawn or declined. */
+  const unlockDraft = (o: string, r: ChangeRequest) => {
+    const dr = r.draftId ? org(o).drafts.find((x) => x.id === r.draftId) : undefined
+    if (!dr) return
+    dr.submittedAt = null
+    dr.requestId = null
+  }
+  /** What bitNtech gets with a draft, after the organisation's note. */
+  const draftBrief = (dr: AgentDraft): string => {
+    const sub = subTypeOf(dr)
+    const lines = [
+      dr.baseAgentId ? `Changes to ${dr.name.trim()}, made in the agent builder.` : `A new agent, “${dr.name.trim() || 'Untitled'}”, made in the agent builder.`,
+      `Job: ${sub?.label ?? 'not chosen'}. Speaks ${dr.behaviour.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')} as ${dr.behaviour.persona}.`,
+      `Flow: ${dr.flow.length} intents, ${countForks(dr.flow)} decision points, ${countPaths(dr.flow)} ways a call can end. From ${dr.sourceCallIds.length} recorded calls.`,
+      '',
+      ...flowOutline(dr.flow),
+    ]
+    return lines.join('\n')
   }
 
   /** Refuses roles not in `roles`, as the server will. (No viewer set, as in
@@ -686,7 +733,21 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       // This week's calls, from the same call log the Operate pages show.
       const week = callLog(logContext(o), 7)
       const calls = (id: string) => week.filter((c) => c.agentId === id).length
-      return copy([...d.agents.map((a) => ({ ...a, callsThisWeek: calls(a.id), hasChanges: !!d.details[a.id]?.changed })), ...d.drafts.map(draftSummary)])
+      const look = (id: string) => {
+        try {
+          return profile(recordOf(o, id).working)
+        } catch {
+          return {}
+        }
+      }
+      const changeOf = (id: string): AgentSummary['change'] => {
+        const dr = d.drafts.find((x) => x.baseAgentId === id)
+        return dr ? { draftId: dr.id, ...requestState(dr), step: dr.reached } : undefined
+      }
+      return copy([
+        ...d.agents.map((a) => ({ ...a, callsThisWeek: calls(a.id), hasChanges: !!d.details[a.id]?.changed, ...look(a.id), change: changeOf(a.id) })),
+        ...d.drafts.filter((dr) => !dr.baseAgentId).map(draftSummary),
+      ])
     },
 
     async listCalls(o) {
@@ -762,8 +823,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async createDraft(o, orgName) {
       await wait()
-      allowMaster('create agents')
+      allowDraft(o, null, 'ask for new agents')
       const dr: AgentDraft = {
+        requestedBy: viewer && !viewer.platformRole ? { id: viewer.id, name: viewer.name } : null,
         id: newId('draft'),
         reached: 'calls',
         sourceCallIds: [],
@@ -778,6 +840,9 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
         globalFlows: [],
         context: { knowledgeSourceIds: [], answerOnlyFromKnowledge: true, topK: 4, minScore: 0.6, toolIds: [], confirmBeforeActions: true },
         pipeline: defaultPipeline(),
+        speech: defaultSpeech(),
+        guardrails: defaultGuardrails(),
+        analysis: defaultAnalysisSettings(),
         updatedAt: new Date().toISOString(),
       }
       org(o).drafts.push(dr)
@@ -787,24 +852,36 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
 
     async getDraft(o, id) {
       await wait()
-      return copy(findDraft(o, id))
+      const dr = findDraft(o, id)
+      if (viewer && !viewer.platformRole && !dr.requestedBy) throw new AuthError('forbidden', 'bitNtech is building this agent. It appears in Agents once it’s published.')
+      return copy(dr)
     },
 
     async saveDraft(o, draft) {
       await wait()
-      allowMaster('build agents')
       const d = org(o)
       const i = d.drafts.findIndex((x) => x.id === draft.id)
       if (i < 0) throw notFound('draft')
-      d.drafts[i] = { ...copy(draft), updatedAt: new Date().toISOString() }
+      const was = d.drafts[i]
+      allowDraft(o, was, 'build agents')
+      // Who it's for, what it changes and whether it's been sent are the server's to say.
+      d.drafts[i] = {
+        ...copy(draft),
+        requestedBy: was.requestedBy ?? null,
+        baseAgentId: was.baseAgentId ?? null,
+        baseVersion: was.baseVersion ?? null,
+        requestId: was.requestId ?? null,
+        submittedAt: was.submittedAt ?? null,
+        flowGroups: was.flowGroups,
+        updatedAt: new Date().toISOString(),
+      }
       keep()
       return copy(d.drafts[i])
     },
 
     async discardDraft(o, id) {
       await wait()
-      allowMaster('discard drafts')
-      findDraft(o, id)
+      allowDraft(o, findDraft(o, id), 'discard drafts')
       const d = org(o)
       d.drafts = d.drafts.filter((x) => x.id !== id)
       keep()
@@ -814,15 +891,24 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       // Reading calls takes a moment, even in the demo.
       await wait()
       await wait()
-      allowMaster('read calls into a flow')
       const d = org(o)
       const dr = findDraft(o, id)
+      allowDraft(o, dr, 'read calls into a flow')
       const calls = d.calls.filter((c) => dr.sourceCallIds.includes(c.id) && c.status === 'ready')
       if (!calls.length) throw new AuthError('invalid_input', 'None of the chosen calls is ready. Go back to step 1 and choose ready calls.')
-      dr.flow = extractFlow(dr.subTypeId, dr.typeId, calls)
+      dr.flowGroups = extractFlowGroups(dr.subTypeId, dr.typeId, calls)
+      dr.extraction = { at: new Date().toISOString(), callIds: calls.map((c) => c.id), subTypeId: dr.subTypeId }
+      // Changes to an agent keep its flow and setup: the person adds from the groups.
+      if (dr.baseAgentId) {
+        dr.updatedAt = new Date().toISOString()
+        keep()
+        return copy(dr)
+      }
+      const [pick] = dr.flowGroups
+      dr.flow = pick.flow
+      dr.flowGroupId = pick.id
       dr.attributes = extractAttributes(dr.subTypeId)
       dr.globalFlows = defaultGlobalFlows()
-      dr.extraction = { at: new Date().toISOString(), callIds: calls.map((c) => c.id), subTypeId: dr.subTypeId }
       // Start from the knowledge and tools that suit the job.
       dr.context = {
         ...dr.context,
@@ -841,6 +927,25 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       const done = d.published[id] && d.agents.find((a) => a.id === d.published[id])
       if (done) return copy(done)
       const dr = findDraft(o, id)
+      /** The request it was sent with is done, and says so. */
+      const finish = (text: string) => {
+        const r = dr.requestId ? d.requests.find((x) => x.id === dr.requestId) : undefined
+        if (!r) return
+        const at = new Date().toISOString()
+        r.status = 'done'
+        r.replies.push({ id: newId('crr'), by: by(), byKind: 'bitntech', at, text })
+        r.updatedAt = at
+      }
+      if (dr.baseAgentId) {
+        const target = findAgent(o, dr.baseAgentId)
+        release(o, target.id, specFromDraft(copy(dr)), dr.requestId ? `Changes asked for by ${dr.requestedBy?.name ?? 'the organisation'}, from the builder.` : 'Changes from the builder.')
+        finish(`Built and published as version ${target.version}. Callers get it now${target.status === 'live' ? '' : ', once the agent is turned on'}.`)
+        d.drafts = d.drafts.filter((x) => x.id !== id)
+        d.published[id] = target.id
+        log(o, 'agents', `Published ${target.name}, version ${target.version}`, 'Changes from the agent builder.')
+        keep()
+        return copy(target)
+      }
       const number = numberId ? d.numbers.find((n) => n.id === numberId) : null
       if (numberId && !number) throw notFound('phone number')
       if (number?.agentId) throw new AuthError('invalid_input', `${number.number} already has an agent. Choose a free number.`)
@@ -866,9 +971,73 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       d.published[id] = agentId
       if (number) number.agentId = agentId
       syncUsage(d, agentId, spec)
+      finish(number ? `Built and published as ${agent.name}. It’s answering ${number.number} now.` : `Built and published as ${agent.name}, paused for now: it starts answering once it has a number.`)
       log(o, 'agents', `Published ${agent.name}, version 1`, number ? `Answering ${number.number}.` : 'Paused: no number yet.')
       keep()
       return copy(agent)
+    },
+
+    async startAgentChange(o, agentId) {
+      await wait()
+      allowDraft(o, null, 'change agents')
+      const d = org(o)
+      const a = findAgent(o, agentId)
+      const open = d.drafts.find((x) => x.baseAgentId === agentId)
+      if (open) {
+        // One set of changes at a time: the organisation's, or bitNtech's.
+        if (viewer && !master() && !open.requestedBy) throw new AuthError('invalid_input', `bitNtech is already changing ${a.name}. Ask them in Requests.`)
+        return copy(open)
+      }
+      const w = recordOf(o, agentId).working
+      const dr: AgentDraft = {
+        id: newId('draft'),
+        reached: 'review',
+        sourceCallIds: [],
+        consent: false,
+        redact: w.redact,
+        typeId: w.typeId,
+        subTypeId: w.subTypeId,
+        name: a.name,
+        behaviour: copy(w.behaviour),
+        flow: copy(w.flow),
+        attributes: copy(w.attributes),
+        globalFlows: copy(w.globalFlows),
+        context: copy(w.context),
+        pipeline: copy(w.pipeline),
+        speech: copy(w.speech),
+        guardrails: copy(w.guardrails),
+        analysis: copy(w.analysis),
+        baseAgentId: agentId,
+        baseVersion: a.version,
+        requestedBy: viewer && !viewer.platformRole ? { id: viewer.id, name: viewer.name } : null,
+        updatedAt: new Date().toISOString(),
+      }
+      d.drafts.push(dr)
+      keep()
+      return copy(dr)
+    },
+
+    async submitDraft(o, id, input) {
+      await wait()
+      if (viewer?.platformRole) throw new AuthError('forbidden', 'Requests come from the organisation. bitNtech builds them.')
+      const dr = findDraft(o, id)
+      allowDraft(o, dr, 'ask bitNtech for agents')
+      if (!dr.requestedBy) throw new AuthError('invalid_input', 'Only the organisation’s own drafts are sent as requests.')
+      const title = input.title.trim()
+      const note = input.note.trim()
+      if (title.length < 5 || title.length > 120) throw new AuthError('invalid_input', 'Give the request a title of 5 to 120 characters.')
+      if (note.length > 800) throw new AuthError('invalid_input', 'Keep the note under 800 characters.')
+      if (!['normal', 'soon', 'urgent'].includes(input.urgency)) throw new AuthError('invalid_input', 'Choose how soon you need it.')
+      if (!dr.name.trim() || dr.flow.length === 0) throw new AuthError('invalid_input', 'Name the agent and give it a conversation flow first.')
+      const changed = (input.changes ?? []).slice(0, 30).map((c) => `- ${c.trim().slice(0, 200)}`)
+      const brief = draftBrief(dr)
+      const detail = [note, changed.length ? `What changed:\n${changed.join('\n')}` : '', brief].filter(Boolean).join('\n\n').slice(0, 2000)
+      const r = addRequest(o, { kind: dr.baseAgentId ? 'flow_change' : 'new_agent', agentId: dr.baseAgentId ?? null, title, detail, urgency: input.urgency })
+      r.draftId = dr.id
+      dr.submittedAt = r.createdAt
+      dr.requestId = r.id
+      keep()
+      return copy(r)
     },
 
     async listKnowledge(o) {
@@ -1890,6 +2059,7 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (r.status !== 'open' && r.status !== 'in_progress') throw new AuthError('invalid_input', 'Only open requests can be withdrawn.')
       r.status = 'withdrawn'
       r.updatedAt = new Date().toISOString()
+      unlockDraft(o, r)
       log(o, 'agents', `Withdrew the request “${r.title}”`)
       keep()
       return copy(r)
@@ -1907,6 +2077,8 @@ export function createDemoConsoleClient({ latency = 600, processingMs = 9000, pe
       if (reply) r.replies.push({ id: newId('crr'), by: by(), byKind: 'bitntech', at: now, text: reply })
       if (patch.status && patch.status !== r.status) {
         r.status = patch.status
+        // Declined: the organisation can change its draft and send it again.
+        if (patch.status === 'declined') unlockDraft(o, r)
         const word = { open: 'reopened', in_progress: 'started on', done: 'finished', declined: 'declined' }[patch.status]
         log(o, 'agents', `bitNtech ${word} the request “${r.title}”`, reply)
       }

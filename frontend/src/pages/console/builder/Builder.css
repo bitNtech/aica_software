@@ -146,6 +146,17 @@ a.builder-steps__link:hover { background: var(--bg-2); }
 .flow__tree { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); overflow: hidden; }
 .flow__tree > .flow__item + .flow__item { border-top: 1px solid var(--line); }
 .flow__kids { margin-left: 1.6rem; padding-left: 0.85rem; border-left: 2px solid var(--line); }
+/* A path reads down one line; each fork splits it into indented ways on. */
+.flow__path { display: grid; margin: 0 0 0.35rem 1.6rem; padding: 0 0 0 0.85rem; border-left: 2px solid var(--line); list-style: none; }
+.flow__path .flow__item { position: relative; }
+.flow__path > .flow__item::before { content: ''; position: absolute; left: -0.85rem; top: 1.15rem; width: 0.6rem; border-top: 2px solid var(--line); }
+.flow__fork { display: grid; gap: 0.15rem; padding: 0.25rem 0 0.35rem; }
+.flow__fork-head { padding-left: 0.4rem; font: 500 var(--fs-xs)/1.4 var(--sans); letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
+.flow__alts { display: grid; gap: 0.35rem; list-style: none; margin: 0; padding: 0; }
+.flow__alt { border: 1px dashed var(--line-strong); border-radius: var(--r-md); padding: 0.2rem 0 0.1rem; }
+.flow__alt > .flow__path { margin: 0 0 0 0.9rem; }
+.flow__alt--branch { border-style: solid; border-color: var(--line); }
+.flow__otherwise { padding: 0.15rem 0.85rem 0; font-size: var(--fs-xs); font-weight: 500; color: var(--muted); }
 .flow__row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.55rem 0.75rem 0.55rem 0.4rem; }
 .flow__row--error { box-shadow: inset 3px 0 0 var(--danger-ink); }
 .flow__row.is-editing { background: var(--bg-2); }
@@ -263,6 +274,8 @@ a.builder-steps__link:hover { background: var(--bg-2); }
   .flow__actions { max-width: none; width: 100%; justify-content: flex-start; padding-left: 2.5rem; }
   .flow__form { margin-left: 0.5rem; }
   .flow__kids { margin-left: 0.8rem; padding-left: 0.5rem; }
+  .flow__path { margin-left: 0.6rem; padding-left: 0.45rem; }
+  .flow__path > .flow__item::before { left: -0.45rem; width: 0.35rem; }
   .attrs__row { flex-wrap: wrap; }
   .attrs .flow__actions { padding-left: 0; }
   .globals__fields { padding-left: 0; }
@@ -285,3 +298,33 @@ a.builder-steps__link:hover { background: var(--bg-2); }
 .pipe__more > summary { cursor: pointer; font: 600 var(--fs-md)/1.3 var(--display); color: var(--ink); }
 .pipe__more > summary:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 3px; border-radius: var(--r-xs); }
 .pipe__more[open] > summary { margin-bottom: 0.25rem; }
+
+/* ---- a draft sent to bitNtech: look only ---- */
+.builder__sent { margin-bottom: 1rem; }
+.builder__locked { min-width: 0; margin: 0; padding: 0; border: 0; }
+.builder__locked :is(input, textarea, select):disabled { cursor: default; }
+
+/* ---- what reading the calls found: one flow per group of related calls ---- */
+.fgroups { display: grid; gap: 0.6rem; }
+.fgroups__list { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); margin: 0; padding: 0; list-style: none; }
+.fgroups__card { display: grid; align-content: start; gap: 0.5rem; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
+.fgroups__card.is-using { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); }
+.fgroups__head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+.fgroups__title { font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.fgroups__intents { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.fgroups__intent { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
+.fgroups__intent-name { flex: 1 1 10rem; min-width: 0; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.fgroups__preview > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 500; color: var(--ink); }
+.fgroups__preview[open] > summary { margin-bottom: 0.5rem; }
+.fgroups__actions:empty { display: none; }
+
+@media (forced-colors: active) {
+  .fgroups__card.is-using { border-width: 3px; box-shadow: none; }
+}
+
+/* Numbers as on the diagram, and where a path joins back up. */
+.flow__num { flex: none; min-width: 1.9rem; padding: 0.1rem 0.4rem; border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--bg); font: 700 var(--fs-xs)/1.4 var(--mono); color: var(--ink); text-align: center; }
+.flow__joins { font-size: var(--fs-sm); color: var(--text); overflow-wrap: anywhere; }
+.flow__joins .btn-text { font-weight: 500; }
+.flow__joins--alt { padding: 0.15rem 0.85rem 0.35rem; }
+.flow__alt--join { border-style: dashed; }

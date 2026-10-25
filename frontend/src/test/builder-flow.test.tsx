@@ -48,7 +48,7 @@ describe('builder step 3: conversation flow', () => {
   it('reads the calls into intents with confidence and sources', async () => {
     const { user } = await toFlow()
     const book = within(tree()).getByText('Book an appointment', { selector: '.flow__label' }).closest('li')!
-    expect(within(book).getByText(/high confidence, 94%/i)).toBeInTheDocument()
+    expect(within(book.querySelector<HTMLElement>(':scope > .flow__row')!).getByText(/high confidence, 94%/i)).toBeInTheDocument()
     expect(within(book).getByText('Offer two slots')).toBeInTheDocument()
     expect(screen.getByText(/1 needs a look/i)).toBeInTheDocument()
     // Intents are headings, for jumping between them.
@@ -75,10 +75,12 @@ describe('builder step 3: conversation flow', () => {
     expect(within(tree()).getByText('Book an OPD visit', { selector: '.flow__label' })).toHaveFocus()
 
     // A new step cancelled while empty disappears again.
-    await user.click(screen.getByRole('button', { name: /add step to cancel an appointment/i }))
+    await user.click(screen.getByRole('button', { name: /add a step after cancel an appointment/i }))
     expect(screen.getByLabelText(/^name/i)).toHaveFocus()
     await user.click(screen.getByRole('button', { name: /^cancel$/i }))
     expect(within(tree()).queryByText('Unnamed')).not.toBeInTheDocument()
+    // What followed it is still there.
+    expect(within(tree()).getByText('Confirm the cancellation', { selector: '.flow__label' })).toBeInTheDocument()
 
     // Move down.
     const tops = () => [...tree().children].map((li) => li.querySelector('.flow__label')?.textContent)
@@ -91,14 +93,16 @@ describe('builder step 3: conversation flow', () => {
     await user.selectOptions(screen.getByLabelText(/merge into another intent/i), 'Reschedule an appointment')
     await user.click(screen.getByRole('button', { name: /^merge$/i }))
     await user.click(within(screen.getByRole('dialog', { name: /merge these intents/i })).getByRole('button', { name: /^merge$/i }))
-    expect(within(tree()).queryByText('Cancel an appointment', { selector: '.flow__label' })).not.toBeInTheDocument()
+    // It's no longer an intent of its own: its way becomes a branch of Reschedule.
+    expect(within(tree()).queryByRole('heading', { level: 3, name: /cancel an appointment/i })).not.toBeInTheDocument()
     const resched = within(tree()).getByText('Reschedule an appointment', { selector: '.flow__label' }).closest('li')!
+    expect(within(resched).getByText('Cancel an appointment', { selector: '.flow__label' }).closest('.flow__item')).toHaveClass('flow__item--branch')
     expect(within(resched).getByText('Confirm the cancellation', { selector: '.flow__label' })).toBeInTheDocument()
 
     // Delete an intent with steps, after confirming.
     await user.click(screen.getByRole('button', { name: /^edit ask about timings and directions$/i }))
     await user.click(screen.getByRole('button', { name: /delete intent/i }))
-    await user.click(within(screen.getByRole('dialog', { name: /delete “ask about timings/i })).getByRole('button', { name: /delete intent/i }))
+    await user.click(within(screen.getByRole('dialog', { name: /delete “ask about timings/i })).getByRole('button', { name: /delete it and what follows/i }))
     expect(within(tree()).queryByText('Ask about timings and directions', { selector: '.flow__label' })).not.toBeInTheDocument()
   })
 
@@ -291,7 +295,7 @@ describe('builder step 3: reading and focus', () => {
     const { user } = await toFlow()
     await user.click(screen.getByRole('button', { name: /^edit book an appointment$/i }))
     await user.click(screen.getByRole('button', { name: /delete intent/i }))
-    await user.click(within(screen.getByRole('dialog', { name: /delete “book an appointment/i })).getByRole('button', { name: /delete intent/i }))
+    await user.click(within(screen.getByRole('dialog', { name: /delete “book an appointment/i })).getByRole('button', { name: /delete it and what follows/i }))
     expect(within(tree()).getByText('Reschedule an appointment', { selector: '.flow__label' })).toHaveFocus()
     expect(screen.getByText(/deleted the intent\./i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^undo$/i }))

@@ -230,11 +230,13 @@ describe('detected patterns', () => {
     expect(firstCallerLine({ transcript: [turn('agent', 'Hello')] }, false)).toBeNull()
   })
 
-  it('turns the pattern into a flow to edit: the first step is the intent', () => {
+  it('turns the pattern into a flow to edit: the first step is the intent, and each step follows the one before', () => {
     const flow = patternToFlow(pattern)
     expect(flow).toHaveLength(1)
     expect(flow[0]).toMatchObject({ id: 'detected-0', kind: 'intent', label: 'Book an appointment' })
-    expect(flow[0].children.map((c) => [c.id, c.kind, c.label])).toEqual([
+    const path: [string, string, string][] = []
+    for (let n = flow[0].children[0]; n; n = n.children[0]) path.push([n.id, n.kind, n.label])
+    expect(path).toEqual([
       ['detected-1', 'step', 'Greet the caller'],
       ['detected-2', 'step', 'Ask about insurance'],
       ['detected-3', 'step', 'Hand over to a person'],
@@ -244,7 +246,8 @@ describe('detected patterns', () => {
 
   describe('what the hospital changed', () => {
     const original = patternToFlow(pattern)
-    const edit = (change: (intent: FlowNode) => FlowNode): FlowNode[] => [change({ ...original[0], children: original[0].children.map((c) => ({ ...c })) })]
+    const [greet, ask, hand] = [original[0].children[0], original[0].children[0].children[0], original[0].children[0].children[0].children[0]]
+    const leaf = (n: FlowNode, children: FlowNode[] = []): FlowNode => ({ ...n, children })
 
     it('sees no change in an untouched copy', () => {
       const c = describeChanges(original, original)
@@ -253,14 +256,8 @@ describe('detected patterns', () => {
     })
 
     it('counts added, removed, renamed and reworded items', () => {
-      const edited = edit((i) => ({
-        ...i,
-        children: [
-          { ...i.children[0], label: 'Say hello' },
-          { ...i.children[1], say: 'Do you have insurance?' },
-          { id: 'new_1', kind: 'branch', label: 'No insurance', condition: 'They say no', sourceCallIds: [], children: [] },
-        ],
-      }))
+      const noInsurance: FlowNode = { id: 'new_1', kind: 'branch', label: 'No insurance', condition: 'They say no', sourceCallIds: [], children: [] }
+      const edited = [leaf(original[0], [leaf({ ...greet, label: 'Say hello' }, [leaf({ ...ask, say: 'Do you have insurance?' }, [noInsurance])])])]
       const c = describeChanges(original, edited)
       expect(c.added).toEqual(['No insurance'])
       expect(c.removed).toEqual(['Hand over to a person'])
@@ -270,7 +267,7 @@ describe('detected patterns', () => {
     })
 
     it('counts one step moved as one move, not as its neighbours too', () => {
-      const edited = edit((i) => ({ ...i, children: [i.children[2], i.children[0], i.children[1]] }))
+      const edited = [leaf(original[0], [leaf(hand, [leaf(greet, [leaf(ask)])])])]
       const c = describeChanges(original, edited)
       expect(c.moved).toEqual(['Hand over to a person'])
       expect(c.total).toBe(1)
@@ -313,7 +310,8 @@ describe('the request for an edited pattern', () => {
     expect(text).toContain('1. Step: Greet the caller')
     expect(text).toContain('The agent says: “Namaste, how can I help?”')
     expect(text).toContain('2. Step: Check insurance')
-    expect(text).toContain('3. Branch: No slot suits (when the caller can’t make either)')
+    expect(text).toContain('- Branch: No slot suits (when the caller can’t make either)')
+    expect(text).toContain('    1. Step: Offer the next day')
     expect(text).toContain('Offer the next day')
     expect(text).toContain('Our note: Callers on insurance plans only.')
     expect(text).toContain('As detected: Book an appointment > Greet the caller > Hand over to a person')

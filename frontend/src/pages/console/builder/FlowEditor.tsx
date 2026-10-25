@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { FlowNode, FlowNodeKind } from '../../../console/types'
 import { FlowCanvas, type FlowCanvasHandle, type FlowMark } from '../../../components/console/flow/FlowCanvas'
 import { ancestorIds, flatten } from '../../../components/console/flow/layout'
@@ -7,21 +7,28 @@ import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/Dialog'
 import { SelectField, TextAreaField, TextField } from '../../../components/ui/Field'
 import { Switch } from '../../../components/ui/Switch'
+import { canJoin, indexFlow, joinTarget } from '../../../console/flowGraph'
 import {
   KIND_LABEL,
   addNode,
   allIds,
   blankNode,
   confidenceLabel,
+  canRemoveOnly,
+  countForks,
   countNodes,
+  countPaths,
   findNode,
+  joinOptions,
   lowConfidence,
   mergeIntents,
   moveNode,
   NEEDS_REVIEW,
   neighbour,
+  numberFlow,
   position,
   removeNode,
+  removeOnly,
   updateNode,
 } from './flowTree'
 import './FlowViews.css'
@@ -126,7 +133,13 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
   }
 
   const intents = flow.length
-  const total = countNodes(flow)
+  const numbers = useMemo(() => numberFlow(flow), [flow])
+  const index = useMemo(() => indexFlow(flow), [flow])
+  /** Where `n` carries on, if it joins back up. */
+  const joinOf = (n: FlowNode) => joinTarget(index, n)
+  const numbered = (n: FlowNode) => `${numbers.get(n.id) ? `${numbers.get(n.id)} · ` : ''}${n.label || 'Unnamed'}`
+  const forks = countForks(flow)
+  const paths = countPaths(flow)
   const flagged = (n: FlowNode) => lowConfidence([n]).length > 0 || !!errors[n.id] || allIds(n.children).some((c) => errors[c])
   const review = flow.filter(flagged).length
 
@@ -140,19 +153,21 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
 
   function cancelEdit(id: string) {
     if (fresh === id) {
-      change(removeNode(flow, id))
+      // A step put in between gives back what followed it.
+      change(findNode(flow, id)?.children.length ? removeOnly(flow, id) : removeNode(flow, id))
       setFocusId(neighbour(flow, id) ?? 'add')
     } else setFocusId(id)
     setEditing(null)
     setFresh(null)
   }
 
-  function remove(id: string) {
+  /** `keep`: what followed it stays, in its place. */
+  function remove(id: string, keep = false) {
     const node = findNode(flow, id)
     const kind = node ? KIND_LABEL[node.kind].toLowerCase() : 'item'
-    onChange(removeNode(flow, id))
+    onChange(keep ? removeOnly(flow, id) : removeNode(flow, id))
     setUndo({ id, label: `${kind} “${node?.label || 'unnamed'}”`, flow })
-    setNote(`Deleted the ${kind}.`)
+    setNote(keep ? `Deleted the ${kind}. What followed it moved up.` : `Deleted the ${kind}.`)
     setEditing(null)
     setFresh(null)
     setFocusId(neighbour(flow, id) ?? 'add')
@@ -166,6 +181,14 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
     setFocusId(`move:${node.id}:${dir}`)
   }
 
+  /** Moves to the step a node carries on at, unfolding what hides it. */
+  function goTo(id: string) {
+    const hidden = ancestorIds(flow, id)
+    setCollapsed((c) => new Set([...c].filter((x) => !hidden.includes(x))))
+    setSelected(id)
+    setFocusId(id)
+  }
+
   // A row being added or edited stays in view, even when filtered.
   const visible = (n: FlowNode) => !reviewOnly || flagged(n) || [n.id, ...allIds(n.children)].some((id) => id === editing || id === fresh)
 
@@ -177,30 +200,39 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
       return next
     })
 
-  // A render function, not a component: a component defined in here would
+  /** Rows that can fold what follows them: intents, branches, and any node
+   * the call can leave more than one way. */
+  const foldable = (n: FlowNode) => n.children.length > 0 && (n.kind !== 'step' || n.children.length > 1 || n.children[0].kind === 'branch')
+
+  // Render functions, not components: a component defined in here would
   // be a new type each render, remounting the tree and losing the open form.
+
+  /** One node's row (and its edit form). An intent's path is nested in it. */
   function row(node: FlowNode, depth: number) {
     const open = !collapsed.has(node.id)
-    const hasKids = node.children.length > 0
+    const canFold = foldable(node)
     const { first, last } = position(flow, node.id)
     const conf = node.confidence !== undefined ? confidenceLabel(node.confidence) : null
     const err = errors[node.id]
     const listId = `kids-${node.id}`
     const Title = node.kind === 'intent' ? 'h3' : 'p'
     const picked = showDiagram && selected === node.id
+    const name = node.label || 'unnamed'
+    const joins = joinOf(node)
+    const fork = node.children.length + (joins ? 1 : 0) > 1
     return (
       <li key={node.id} className={`flow__item flow__item--${node.kind}`}>
         <div
           className={['flow__row', err && 'flow__row--error', editing === node.id && 'is-editing', picked && 'is-selected'].filter(Boolean).join(' ')}
           onClick={showDiagram ? () => setSelected(node.id) : undefined}
         >
-          {hasKids ? (
+          {canFold ? (
             <button
               type="button"
               className="flow__toggle"
               aria-expanded={open}
-              aria-controls={listId}
-              aria-label={`Steps in ${node.label || 'unnamed'}`}
+              aria-controls={node.kind === 'intent' || fork ? listId : undefined}
+              aria-label={`What follows ${name}`}
               onClick={() => toggle(node.id)}
             >
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -213,6 +245,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
           <div className="flow__main">
             {/* Intents are headings, so screen-reader users can jump between them. */}
             <Title className="flow__title">
+              {numbers.get(node.id) && <span className="flow__num">{numbers.get(node.id)}</span>}
               <span className={`flow__kind flow__kind--${node.kind}`}>{KIND_LABEL[node.kind]}</span>
               <span className="flow__label" id={`node-${node.id}`} tabIndex={-1} data-node-focus={node.id} aria-current={picked ? 'true' : undefined}>
                 {node.label || <em className="flow__unnamed">Unnamed</em>}
@@ -220,6 +253,14 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
             </Title>
             {node.kind === 'step' && node.say && <p className="flow__say">“{node.say}”</p>}
             {node.kind === 'branch' && node.condition && <p className="flow__say">When: {node.condition}</p>}
+            {joins && !node.children.length && (
+              <p className="flow__joins">
+                Then carries on at{' '}
+                <button type="button" className="btn-text" onClick={() => goTo(joins.id)}>
+                  {numbered(joins)}
+                </button>
+              </p>
+            )}
             <p className="flow__meta">
               {conf && <span className={`conf conf--${conf.level}`}>{conf.text}</span>}
               {node.sourceCallIds.length > 0 && onShowCalls && (
@@ -233,6 +274,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
                 </button>
               )}
               {node.sourceCallIds.length === 0 && node.confidence === undefined && <span className="flow__added">Added by hand</span>}
+              {!open && canFold && <span className="flow__added">{countNodes(node.children)} hidden after it</span>}
             </p>
             {err && <p className="field__error flow__error">{err}</p>}
           </div>
@@ -241,30 +283,28 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
               <button
                 type="button"
                 className="flow__act"
-                aria-label={`Edit ${node.label || 'unnamed'}`}
+                aria-label={`Edit ${name}`}
                 aria-expanded={editing === node.id}
                 onClick={() => setEditing(editing === node.id ? null : node.id)}
               >
                 Edit
               </button>
-              {node.kind !== 'step' && (
-                <button type="button" className="flow__act" aria-label={`Add step to ${node.label || 'unnamed'}`} onClick={() => add(node.id, 'step')}>
-                  Add step
-                </button>
+              <button type="button" className="flow__act" aria-label={`Add a step after ${name}`} onClick={() => add(node.id, 'step')}>
+                Add step
+              </button>
+              <button type="button" className="flow__act" aria-label={`Add a branch after ${name}`} onClick={() => add(node.id, 'branch')}>
+                Add branch
+              </button>
+              {!(first && last) && (
+                <span className="flow__moves">
+                  <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${name} up`} title="Move up" data-node-focus={`move:${node.id}:-1`} disabled={first} onClick={() => move(node, -1)}>
+                    ↑
+                  </button>
+                  <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${name} down`} title="Move down" data-node-focus={`move:${node.id}:1`} disabled={last} onClick={() => move(node, 1)}>
+                    ↓
+                  </button>
+                </span>
               )}
-              {node.kind === 'intent' && (
-                <button type="button" className="flow__act" aria-label={`Add branch to ${node.label || 'unnamed'}`} onClick={() => add(node.id, 'branch')}>
-                  Add branch
-                </button>
-              )}
-              <span className="flow__moves">
-                <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${node.label || 'unnamed'} up`} title="Move up" data-node-focus={`move:${node.id}:-1`} disabled={first} onClick={() => move(node, -1)}>
-                  ↑
-                </button>
-                <button type="button" className="flow__act flow__act--icon" aria-label={`Move ${node.label || 'unnamed'} down`} title="Move down" data-node-focus={`move:${node.id}:1`} disabled={last} onClick={() => move(node, 1)}>
-                  ↓
-                </button>
-              </span>
             </div>
           )}
         </div>
@@ -272,7 +312,11 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
         {editing === node.id && !readOnly && (
           <NodeForm
             node={node}
+            flow={flow}
             intents={depth === 0 ? flow.filter((n) => n.id !== node.id) : []}
+            joinChoices={joinChoices(node)}
+            joinedBy={joinedBy(node)}
+            canKeepFollowers={canRemoveOnly(flow, node.id)}
             onSave={(patch) => {
               change(updateNode(flow, node.id, patch))
               setEditing(null)
@@ -285,19 +329,69 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
               setEditing(null)
               setFocusId(into)
             }}
-            onDelete={() => remove(node.id)}
+            onDelete={(keep) => remove(node.id, keep)}
             onCancel={() => cancelEdit(node.id)}
           />
         )}
 
-        {hasKids && open && (
-          <ul className="flow__kids" id={listId}>
-            {node.children.map((c) => row(c, depth + 1))}
-          </ul>
+        {node.kind === 'intent' && node.children.length > 0 && open && (
+          <ol className="flow__path" id={listId} aria-label={`What happens in ${name}`}>
+            {follow(node.children, node, depth + 1)}
+          </ol>
         )}
       </li>
     )
   }
+
+  /**
+   * What follows `from`, on its path: a single step carries straight on in
+   * the same list, so a long path reads top to bottom; a fork is a list of
+   * the ways out, each its own path, indented.
+   */
+  function follow(list: FlowNode[], from: FlowNode, depth: number): ReactNode[] {
+    if (!list.length) return []
+    if (list.length === 1 && list[0].kind !== 'branch') {
+      const next = list[0]
+      return [row(next, depth), ...(collapsed.has(next.id) ? [] : follow(next.children, next, depth))]
+    }
+    // With only branches here, a join is the way on when none applies.
+    const joins = joinOf(from)
+    const ways = list.length + (joins ? 1 : 0)
+    return [
+      <li key={`fork-${from.id}`} className="flow__fork" id={from.kind === 'intent' ? undefined : `kids-${from.id}`}>
+        <p className="flow__fork-head" aria-hidden="true">
+          {ways === 1 ? 'Only when' : `${ways} ways on`}
+        </p>
+        <ul className="flow__alts" aria-label={`${ways === 1 ? 'The way on' : `${ways} ways on`} after ${from.label || 'unnamed'}`}>
+          {list.map((alt) => (
+            <li key={`alt-${alt.id}`} className={`flow__alt flow__alt--${alt.kind}`}>
+              {alt.kind !== 'branch' && <p className="flow__otherwise">Otherwise</p>}
+              <ol className="flow__path">
+                {row(alt, depth + 1)}
+                {!collapsed.has(alt.id) && follow(alt.children, alt, depth + 1)}
+              </ol>
+            </li>
+          ))}
+          {joins && (
+            <li className="flow__alt flow__alt--join">
+              <p className="flow__otherwise">Otherwise</p>
+              <p className="flow__joins flow__joins--alt">
+                Carries on at{' '}
+                <button type="button" className="btn-text" onClick={() => goTo(joins.id)}>
+                  {numbered(joins)}
+                </button>
+              </p>
+            </li>
+          )}
+        </ul>
+      </li>,
+    ]
+  }
+
+  /** The steps a node can carry on at, named as on the diagram. */
+  const joinChoices = (n: FlowNode) => (canJoin(n) ? joinOptions(flow, n.id).map((x) => ({ value: x.id, label: numbered(x) })) : null)
+  /** How many other nodes carry on at `n`. */
+  const joinedBy = (n: FlowNode) => [...index.values()].filter((p) => p.node.joinsAt === n.id).length
 
   const shown = flow.filter(visible)
 
@@ -394,7 +488,11 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
           <NodeForm
             key={editingNode.id}
             node={editingNode}
+            flow={flow}
             intents={flow.some((n) => n.id === editingNode.id) ? flow.filter((n) => n.id !== editingNode.id) : []}
+            joinChoices={joinChoices(editingNode)}
+            joinedBy={joinedBy(editingNode)}
+            canKeepFollowers={canRemoveOnly(flow, editingNode.id)}
             onSave={(patch) => {
               change(updateNode(flow, editingNode.id, patch))
               setEditing(null)
@@ -407,7 +505,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
               setEditing(null)
               setFocusId(into)
             }}
-            onDelete={() => remove(editingNode.id)}
+            onDelete={(keep) => remove(editingNode.id, keep)}
             onCancel={() => cancelEdit(editingNode.id)}
           />
         </div>
@@ -415,6 +513,9 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
       {view === 'diagram' && !editingNode && (
         <NodeDetail
           node={picked}
+          number={picked ? (numbers.get(picked.id) ?? null) : null}
+          joins={picked ? joinOf(picked) : null}
+          joinsName={picked && joinOf(picked) ? numbered(joinOf(picked)!) : ''}
           error={picked ? errors[picked.id] : undefined}
           onShowCalls={onShowCalls}
         />
@@ -429,7 +530,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
       </p>
       <div className="flow__bar">
         <p className="flow__summary" id={summaryId} tabIndex={-1}>
-          {intents} {intents === 1 ? 'intent' : 'intents'}, {total - intents} steps and branches.{' '}
+          {intents} {intents === 1 ? 'intent' : 'intents'}, {forks} {forks === 1 ? 'point' : 'points'} where the call can go more than one way, {paths} {paths === 1 ? 'way' : 'ways'} a call can end.{' '}
           {review > 0 ? <strong>{review} {review === 1 ? 'needs' : 'need'} a look.</strong> : 'Nothing flagged.'}
         </p>
         <div className="flow__tools">
@@ -485,7 +586,7 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
       <ConfirmDialog
         open={confirmDelete !== null}
         title={`Delete “${findNode(flow, confirmDelete ?? '')?.label || 'this item'}”?`}
-        confirmLabel={`Delete ${findNode(flow, confirmDelete ?? '') ? kindWord(findNode(flow, confirmDelete ?? '')!) : 'item'}`}
+        confirmLabel={`Delete it and what follows`}
         danger
         onConfirm={() => {
           const id = confirmDelete
@@ -497,9 +598,22 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
           setConfirmDelete(null)
         }}
       >
-        <p>
-          Its {countNodes(findNode(flow, confirmDelete ?? '')?.children ?? [])} nested {countNodes(findNode(flow, confirmDelete ?? '')?.children ?? []) === 1 ? 'item goes' : 'items go'} too.
-        </p>
+        <FollowersNote node={findNode(flow, confirmDelete ?? '')} flow={flow} />
+        {confirmDelete && canRemoveOnly(flow, confirmDelete) && (
+          <p>
+            <button
+              type="button"
+              className="btn-text"
+              onClick={() => {
+                const id = confirmDelete
+                setConfirmDelete(null)
+                remove(id, true)
+              }}
+            >
+              Delete only this {kindWord(findNode(flow, confirmDelete)!)}, keep what follows
+            </button>
+          </p>
+        )}
       </ConfirmDialog>
 
       {!readOnly && (
@@ -515,18 +629,38 @@ export function FlowEditor({ flow, onChange, errors = {}, readOnly, onShowCalls,
 
 /** What a node says, how sure AICA is and where it came from: the outline
  * row's content, for the diagram view where there are no rows. */
-function NodeDetail({ node, error, onShowCalls }: { node: FlowNode | null; error?: string; onShowCalls?(node: FlowNode): void }) {
+function NodeDetail({
+  node,
+  number,
+  joins,
+  joinsName,
+  error,
+  onShowCalls,
+}: {
+  node: FlowNode | null
+  number: string | null
+  joins: FlowNode | null
+  joinsName: string
+  error?: string
+  onShowCalls?(node: FlowNode): void
+}) {
   if (!node) return <p className="flow__detail flow__detail--empty">Select a step to see what the agent says and where it came from.</p>
   const conf = node.confidence !== undefined ? confidenceLabel(node.confidence) : null
   const calls = node.sourceCallIds.length
   return (
     <section className="flow__detail" aria-label={`About ${node.label || 'unnamed'}`}>
       <p className="flow__title">
+        {number && <span className="flow__num">{number}</span>}
         <span className={`flow__kind flow__kind--${node.kind}`}>{KIND_LABEL[node.kind]}</span>
         <span className="flow__label">{node.label || <em className="flow__unnamed">Unnamed</em>}</span>
       </p>
       {node.kind === 'step' && node.say && <p className="flow__say">“{node.say}”</p>}
       {node.kind === 'branch' && node.condition && <p className="flow__say">When: {node.condition}</p>}
+      {joins && (
+        <p className="flow__joins">
+          {node.children.length ? 'If none of its branches applies, the call carries on at' : 'Then carries on at'} {joinsName}
+        </p>
+      )}
       <p className="flow__meta">
         {conf && <span className={`conf conf--${conf.level}`}>{conf.text}</span>}
         {calls > 0 && onShowCalls && (
@@ -541,26 +675,55 @@ function NodeDetail({ node, error, onShowCalls }: { node: FlowNode | null; error
   )
 }
 
+/** How much goes with a node that's deleted, and the paths that carry on
+ * at something going (they end there instead). */
+function FollowersNote({ node, flow }: { node: FlowNode | null; flow: FlowNode[] }) {
+  const n = countNodes(node?.children ?? [])
+  const going = new Set(node ? allIds([node]) : [])
+  const joining = [...indexFlow(flow).values()].filter((p) => p.node.joinsAt && going.has(p.node.joinsAt) && !going.has(p.node.id)).length
+  return (
+    <>
+      <p>{n === 1 ? '1 step or branch follows it.' : `${n} steps and branches follow it.`} They go too, unless you keep them.</p>
+      {joining > 0 && <p>{joining === 1 ? '1 other path carries on at what goes; it will end there instead.' : `${joining} other paths carry on at what goes; they will end there instead.`}</p>}
+    </>
+  )
+}
+
 function NodeForm({
   node,
+  flow,
   intents,
+  joinChoices,
+  joinedBy,
+  canKeepFollowers,
   onSave,
   onMerge,
   onDelete,
   onCancel,
 }: {
   node: FlowNode
+  /** The whole flow, to say what a delete takes with it. */
+  flow: FlowNode[]
   /** Other intents this one can merge into; empty for steps and branches. */
   intents: FlowNode[]
+  /** Steps it can carry on at; null when it can't join back up (an intent,
+   * or a node a step of its own already carries on). */
+  joinChoices: { value: string; label: string }[] | null
+  /** How many other nodes carry on at this one. */
+  joinedBy: number
+  /** It can go on its own, what follows it moving up into its place. */
+  canKeepFollowers: boolean
   onSave(patch: Partial<FlowNode>): void
   onMerge(into: string): void
-  onDelete(): void
+  /** `keep`: what follows it stays. */
+  onDelete(keep: boolean): void
   onCancel(): void
 }) {
   const id = useId()
   const [label, setLabel] = useState(node.label)
   const [say, setSay] = useState(node.say ?? '')
   const [condition, setCondition] = useState(node.condition ?? '')
+  const [joinsAt, setJoinsAt] = useState(node.joinsAt ?? '')
   const [into, setInto] = useState(intents[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'delete' | 'merge' | null>(null)
@@ -577,7 +740,12 @@ function NodeForm({
       first.current?.focus()
       return
     }
-    onSave({ label: label.trim(), say: node.kind === 'step' ? say.trim() : undefined, condition: node.kind === 'branch' ? condition.trim() : undefined })
+    onSave({
+      label: label.trim(),
+      say: node.kind === 'step' ? say.trim() : undefined,
+      condition: node.kind === 'branch' ? condition.trim() : undefined,
+      ...(joinChoices ? { joinsAt: joinsAt || undefined } : {}),
+    })
   }
 
   const kind = KIND_LABEL[node.kind].toLowerCase()
@@ -619,6 +787,24 @@ function NodeForm({
         />
       )}
       {node.kind === 'branch' && <TextField label="When this applies" value={condition} onChange={(e) => setCondition(e.target.value)} />}
+      {joinChoices && (joinChoices.length > 0 || joinsAt) && (
+        <SelectField
+          label={node.children.length ? 'If none of its branches applies, carry on at' : 'Then carry on at'}
+          hint="Join this path back up with a step further on, so the call carries on there."
+          options={[
+            { value: '', label: node.children.length ? 'Nowhere: the call ends' : 'Nowhere: the call ends here' },
+            ...joinChoices,
+            ...(joinsAt && !joinChoices.some((c) => c.value === joinsAt) ? [{ value: joinsAt, label: 'A step that can’t be used any more' }] : []),
+          ]}
+          value={joinsAt}
+          onChange={(e) => setJoinsAt(e.target.value)}
+        />
+      )}
+      {joinedBy > 0 && (
+        <p className="flow__joins">
+          {joinedBy === 1 ? '1 other path carries on here.' : `${joinedBy} other paths carry on here.`}
+        </p>
+      )}
       <div className="flow__form-actions">
         <Button type="submit" variant="plum" size="sm">
           Save
@@ -626,7 +812,7 @@ function NodeForm({
         <Button variant="line" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <button type="button" className="btn-text flow__delete" onClick={() => (node.children.length ? setConfirm('delete') : onDelete())}>
+        <button type="button" className="btn-text flow__delete" onClick={() => (node.children.length ? setConfirm('delete') : onDelete(false))}>
           Delete {kind}
         </button>
       </div>
@@ -643,15 +829,29 @@ function NodeForm({
       <ConfirmDialog
         open={confirm === 'delete'}
         title={`Delete “${node.label || 'this ' + kind}”?`}
-        confirmLabel={`Delete ${kind}`}
+        confirmLabel="Delete it and what follows"
         danger
         onConfirm={() => {
           setConfirm(null)
-          onDelete()
+          onDelete(false)
         }}
         onCancel={() => setConfirm(null)}
       >
-        <p>Its {node.children.length} nested {node.children.length === 1 ? 'item goes' : 'items go'} too.</p>
+        <FollowersNote node={node} flow={flow} />
+        {canKeepFollowers && (
+          <p>
+            <button
+              type="button"
+              className="btn-text"
+              onClick={() => {
+                setConfirm(null)
+                onDelete(true)
+              }}
+            >
+              Delete only this {kind}, keep what follows
+            </button>
+          </p>
+        )}
       </ConfirmDialog>
       <ConfirmDialog
         open={confirm === 'merge'}
@@ -664,7 +864,7 @@ function NodeForm({
         onCancel={() => setConfirm(null)}
       >
         <p>
-          The steps of “{node.label}” move to the end of “{intents.find((n) => n.id === into)?.label}”, and “{node.label}” goes.
+          The ways “{node.label}” can go become more ways out of “{intents.find((n) => n.id === into)?.label}”, and “{node.label}” goes.
         </p>
       </ConfirmDialog>
     </form>

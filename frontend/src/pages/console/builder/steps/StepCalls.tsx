@@ -53,14 +53,19 @@ export function checkCalls(draft: AgentDraft, library: SourceCall[]): StepErrors
   const chosen = library.filter((c) => draft.sourceCallIds.includes(c.id))
   const ready = chosen.filter((c) => c.status === 'ready').length
   const waiting = chosen.filter(isProcessing).length
-  if (ready < MIN_CALLS) e.calls = `Choose at least ${MIN_CALLS} ready calls. More calls give a better first draft.`
+  // Changes to an agent can come from new calls, or none: the flow is there already.
+  if (draft.baseAgentId && chosen.length === 0) return e
+  const least = draft.baseAgentId ? 1 : MIN_CALLS
+  if (ready < least) e.calls = draft.baseAgentId ? 'Wait for a chosen call to be ready, or untick the calls to change the agent by hand.' : `Choose at least ${MIN_CALLS} ready calls. More calls give a better first draft.`
   else if (waiting > 0) e.calls = `Wait for ${waiting} chosen ${waiting === 1 ? 'call' : 'calls'} to finish processing, or untick ${waiting === 1 ? 'it' : 'them'}.`
   if (!draft.consent) e.consent = 'Confirm the callers agreed to these recordings being used.'
   return e
 }
 
-/** Step 0: pick past calls to learn from, or add recordings. */
+/** Step 0: pick past calls to learn from, or upload recordings. For changes
+ * to an agent, the calls to have it handle the way they went. */
 export function StepCalls({ draft, org, update, showErrors, attempt, validator }: StepProps) {
+  const change = !!draft.baseAgentId
   const client = useConsole()
   const load = useCallback(() => client.listCalls(org.orgSlug), [client, org.orgSlug])
   const [calls, reload] = useAsync(load)
@@ -135,9 +140,18 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
     <div className="step">
       <ErrorSummary errors={errors} attempt={attempt} />
 
+      {change && (
+        <Alert tone="info" title={`Teach ${draft.name.trim()} from calls`}>
+          <p>
+            Upload recordings of calls handled the way you want {draft.name.trim()} to handle them, or choose some from your call uploads. In Conversation flow, AICA
+            shows the conversations it found in them, and you choose what to add to the agent’s flow. Nothing changes for callers until it’s published. Choosing no calls is fine: you can change the agent by hand.
+          </p>
+        </Alert>
+      )}
+
       <section className="step__section" aria-labelledby="add-h">
         <h2 id="add-h" className="step__heading">
-          Add recordings
+          Upload calls
         </h2>
         <FileDrop
           label={uploading ? 'Adding…' : 'Choose recordings'}
@@ -173,7 +187,7 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
       <section className="step__section" aria-labelledby="library-h">
         <div className="step__head-row">
           <h2 id="library-h" className="step__heading">
-            Your call library
+            From your call uploads
           </h2>
           {calls.state === 'ready' && list.length > 0 && (
             <p className="step__count" aria-live="polite">
@@ -274,7 +288,7 @@ export function StepCalls({ draft, org, update, showErrors, attempt, validator }
         <div className="step__stack">
           <Checkbox
             label="The callers agreed to these calls being recorded and used to improve our service."
-            hint="Required. Only use recordings you're allowed to use."
+            hint={change ? 'Required when you choose calls. Only use recordings you’re allowed to use.' : "Required. Only use recordings you're allowed to use."}
             checked={draft.consent}
             error={errors.consent}
             onChange={(e) => update((d) => ({ ...d, consent: e.target.checked }))}

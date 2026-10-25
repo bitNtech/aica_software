@@ -23,6 +23,11 @@ export interface StepProps {
   save(): Promise<void>
   /** The draft is gone (published): no more saves. */
   done(): void
+  /** request: the organisation's own draft, sent to bitNtech rather than
+   * published. build: bitNtech's master admin, who publishes. */
+  mode: 'build' | 'request'
+  /** Sent to bitNtech: look only, until the request is withdrawn. */
+  locked: boolean
 }
 
 /** What's missing, at the top of the step, focused on a failed Next. */

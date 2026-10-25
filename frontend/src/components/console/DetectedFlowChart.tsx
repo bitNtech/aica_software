@@ -1,12 +1,8 @@
 import { useMemo } from 'react'
 import type { DetectedFlowPattern, FlowNode } from '../../console/types'
 import { Button } from '../ui/Button'
-import { compareSteps } from './flow/compare'
+import { compareSteps, graftPattern } from './flow/compare'
 import { FlowCanvas, type FlowMark } from './flow/FlowCanvas'
-
-/** The pattern's steps as a chain of FlowNodes. Ids are positions, so they
- * are stable for a pattern and can't clash with the designed flow's. */
-const stepId = (i: number) => `detected-${i}`
 
 export interface DetectedFlowChartProps {
   pattern: DetectedFlowPattern
@@ -23,32 +19,40 @@ export interface DetectedFlowChartProps {
   exitIndex?: number
 }
 
-/** The flat step sequence behind a DetectedFlowPattern, as a diagram you
- * can pan, zoom, search and walk with the keyboard (FlowCanvas), with the
- * templated summary and a way to ask bitNtech to build it. Presentational
- * only: the page wires `onRequestFlow` to the client. */
+/** A DetectedFlowPattern drawn on the agent's designed flow, as a tree you
+ * can pan, zoom, search and walk with the keyboard (FlowCanvas): the steps
+ * the design has are followed down its intent, and where the calls went
+ * their own way a new branch holds the rest. Without a design, the pattern
+ * is drawn as a path. With the templated summary and a way to ask bitNtech
+ * to build it. Presentational only: the page wires `onRequestFlow` to the
+ * client. */
 export function DetectedFlowChart({ pattern, onRequestFlow, busy, designed, stepCounts, exitIndex }: DetectedFlowChartProps) {
-  const nodes = useMemo<FlowNode[]>(
-    () => pattern.steps.map((label, i) => ({ id: stepId(i), kind: 'step', label, sourceCallIds: [], children: [] })),
-    [pattern.steps],
+  const graft = useMemo(
+    () => graftPattern(pattern.steps, designed ?? [], `${pattern.occurrences} of the last ${pattern.windowSize} calls went this way`),
+    [pattern.steps, pattern.occurrences, pattern.windowSize, designed],
   )
+  const stepId = (i: number) => graft.stepIds[i]
 
   const marks = useMemo(() => {
     if (!designed || designed.length === 0) return undefined
     const cmp = compareSteps(pattern.steps, designed)
+    const designedIds = new Set(cmp.matches.map((m) => m.index))
     const out: Record<string, FlowMark> = {}
-    for (const m of cmp.matches) out[stepId(m.index)] = { tone: 'info', text: 'In the designed flow' }
-    for (const u of cmp.unmatched)
-      out[stepId(u.index)] = u.elsewhereId
-        ? { tone: 'warn', text: 'Under another intent', detail: 'This step is in the designed flow, but under a different intent.' }
-        : { tone: 'warn', text: 'Not in the designed flow' }
+    pattern.steps.forEach((_, i) => {
+      const id = graft.stepIds[i]
+      if (!id) return
+      if (!id.startsWith('detected-')) out[id] = { tone: 'info', text: 'In the designed flow' }
+      else if (designedIds.has(i) || cmp.unmatched.some((u) => u.index === i && u.elsewhereId))
+        out[id] = { tone: 'warn', text: 'Elsewhere in the design', detail: 'A step with this name is in the designed flow, but not at this point of the call.' }
+      else out[id] = { tone: 'warn', text: 'Not in the designed flow' }
+    })
     return out
-  }, [designed, pattern.steps])
+  }, [designed, pattern.steps, graft])
 
   const counts = useMemo(() => {
     if (!stepCounts) return undefined
-    return Object.fromEntries(stepCounts.slice(0, pattern.steps.length).map((n, i) => [stepId(i), n]))
-  }, [stepCounts, pattern.steps.length])
+    return Object.fromEntries(stepCounts.slice(0, pattern.steps.length).map((n, i) => [graft.stepIds[i], n]))
+  }, [stepCounts, pattern.steps.length, graft])
 
   return (
     <div className="detected-flow">
@@ -58,16 +62,15 @@ export function DetectedFlowChart({ pattern, onRequestFlow, busy, designed, step
       </p>
 
       <FlowCanvas
-        nodes={nodes}
+        nodes={graft.nodes}
         label="Detected flow diagram"
-        sequence
-        ordinals
+        highlightPath={graft.path}
         marks={marks}
         counts={counts}
         exitAt={exitIndex !== undefined && exitIndex >= 0 && exitIndex < pattern.steps.length ? stepId(exitIndex) : undefined}
         height="min(24rem, 55vh)"
         defaultDirection="TB"
-        description="The steps are also listed below the diagram."
+        description="The pattern’s way through the flow is highlighted and numbered. The steps are also listed below the diagram."
         emptyText="No steps were recorded for this pattern."
       />
 

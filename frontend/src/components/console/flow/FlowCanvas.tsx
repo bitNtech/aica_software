@@ -12,6 +12,7 @@ import {
   type PointerEvent,
   type Ref,
 } from 'react'
+import { normaliseFlow } from '../../../console/flowShape'
 import type { FlowNode, FlowNodeKind } from '../../../console/types'
 import { ArrowDefs, EdgeView, NodeView, type FlowMark } from './FlowSvg'
 import { FlowMinimap, type ViewRect } from './FlowMinimap'
@@ -25,11 +26,13 @@ export type { FlowDirection } from './layout'
  * FlowCanvas: a conversation flow (FlowNode[]) as a diagram that can be
  * read, searched, walked with the keyboard and, where allowed, edited.
  *
- * What it draws. A flow is an ordered script, so an intent's steps are
- * chained (each leads to the next), and a branch forks off the step before
- * it as a side path, its condition written on the arrow. Intents are rounded
- * pills, steps are rectangles, branches are notched boxes; each also says
- * what it is in words. Nothing is told apart by colour alone.
+ * What it draws. A conditional branching flowchart: each node is a card
+ * (numbered 1, 1a, 2…, with its kind in a chip and a colour down its
+ * edge), and where the call can go more than one way the alternatives sit
+ * side by side under it, each line carrying its branch's condition
+ * ("Otherwise" for the plain way on). Branches that join back up meet at
+ * the step they carry on at. A card says in words where the call ends or
+ * carries on; nothing is told apart by colour alone.
  *
  * Accessibility. The diagram is a `tree` of `treeitem`s with spoken names,
  * levels and expanded state, with one node in the tab order (roving focus).
@@ -76,15 +79,16 @@ export type { FlowDirection } from './layout'
  *                                      a selection it doesn't show into view
  *   collapsed + onCollapsedChange      controlled folding (a Set of ids);
  *                                      leave both out and it keeps its own
- *   editable + the four callbacks      shows add / edit / move / delete
- *                                      buttons on the focused node. The canvas
+ *   editable + the four callbacks      shows Edit and × on every card, and
+ *                                      add / edit / move / delete buttons on
+ *                                      the focused node. The canvas
  *                                      never changes `nodes`; the parent applies
  *                                      each callback with the flowTree.ts
  *                                      helpers (addNode, updateNode, moveNode,
  *                                      removeNode) and passes new nodes back:
- *        onAddChild(parentId | null, kind)   new node under parentId (null: a new intent)
+ *        onAddChild(parentId | null, kind)   a step or branch after parentId (null: a new intent)
  *        onRename(id)                        open the parent's editing form for id
- *        onMove(id, -1 | 1)                  one place earlier / later among its siblings
+ *        onMove(id, -1 | 1)                  one place earlier / later among the alternatives
  *        onDelete(id)                        remove id (the parent confirms if it has steps)
  *   ref → { focusNode(id), revealNode(id), fit() }  to move focus or view from outside
  *
@@ -121,8 +125,6 @@ export interface FlowCanvasProps {
   dimExcept?: string[]
   /** Number every node by its place in reading order. */
   ordinals?: boolean
-  /** Chain the top-level nodes one after another (a detected sequence). */
-  sequence?: boolean
   collapsed?: ReadonlySet<string>
   onCollapsedChange?(next: Set<string>): void
   editable?: boolean
@@ -175,7 +177,7 @@ const STEP_KEYS: Record<FlowDirection, { next: string; prev: string; before: str
 const idOf = (el: EventTarget | null): string | null => (el instanceof Element ? el.closest('[data-flow-node]')?.getAttribute('data-flow-node') ?? null : null)
 
 export function FlowCanvas({
-  nodes,
+  nodes: input,
   label = 'Conversation flow diagram',
   selectedId = null,
   onSelect,
@@ -186,7 +188,6 @@ export function FlowCanvas({
   marks,
   dimExcept,
   ordinals,
-  sequence,
   collapsed: collapsedProp,
   onCollapsedChange,
   editable,
@@ -232,7 +233,9 @@ export function FlowCanvas({
 
   const markedKey = [...new Set([...Object.keys(marks ?? {}), ...(exitAt ? [exitAt] : [])])].join('\u0000')
   const marked = useMemo(() => new Set(markedKey ? markedKey.split('\u0000') : []), [markedKey])
-  const layout: FlowLayout = useMemo(() => layoutFlow(nodes, { direction, collapsed, marked, sequence }), [nodes, direction, collapsed, marked, sequence])
+  // Older flows are drawn (and walked) in the branching shape, ids kept.
+  const nodes = useMemo(() => normaliseFlow(input), [input])
+  const layout: FlowLayout = useMemo(() => layoutFlow(nodes, { direction, collapsed, marked, editable: !!editable }), [nodes, direction, collapsed, marked, editable])
 
   const activeId = focusId && layout.byId.has(focusId) ? focusId : selectedId && layout.byId.has(selectedId) ? selectedId : (layout.nodes[0]?.id ?? null)
   const active = activeId ? layout.byId.get(activeId) : undefined
@@ -416,7 +419,17 @@ export function FlowCanvas({
     const pathAt = new Map(path.map((id, i) => [id, i]))
     const keep = dimKey === null ? null : new Set(dimKey ? dimKey.split('\u0000') : [])
     const dimmed = (id: string) => (path.length ? !pathAt.has(id) : keep ? !keep.has(id) : false)
-    const edgeOn = (from: string, to: string) => pathAt.has(from) && pathAt.has(to) && pathAt.get(to)! > pathAt.get(from)!
+    // A card can be reached more than one way (branches join up): the line
+    // the call took is the one from the latest card on its path before it.
+    const cameFrom = new Map<string, string>()
+    for (const e of layout.edges) {
+      const a = pathAt.get(e.from)
+      const b = pathAt.get(e.to)
+      if (a === undefined || b === undefined || b <= a) continue
+      const had = cameFrom.get(e.to)
+      if (had === undefined || pathAt.get(had)! < a) cameFrom.set(e.to, e.from)
+    }
+    const edgeOn = (from: string, to: string) => cameFrom.get(to) === from
     return (
       <>
         <ArrowDefs prefix={uid} />
@@ -435,6 +448,7 @@ export function FlowCanvas({
             const name = [
               `${ln.caption}: ${n.label.trim() || 'Unnamed'}`,
               n.kind === 'branch' && n.condition?.trim() ? `when ${n.condition.trim()}` : '',
+              ln.number ? `numbered ${ln.number}` : '',
               count !== null ? `${count} ${count === 1 ? countNoun[0] : countNoun[1]}` : '',
               at !== undefined ? `number ${at + 1} on the call’s path` : '',
               exit ? 'the call left here' : '',
@@ -446,6 +460,8 @@ export function FlowCanvas({
             const desc = [
               n.kind === 'step' && n.say?.trim() ? `The agent says: ${n.say.trim()}` : '',
               n.kind === 'branch' && n.condition?.trim() ? `Applies when: ${n.condition.trim()}` : '',
+              ln.joins ? `${n.children.length ? 'If none of its branches applies, the call carries' : 'Then the call carries'} on at ${ln.joins.number ? `${ln.joins.number}, ` : ''}${ln.joins.label}.` : '',
+              ln.foot === 'Ends the call' ? 'The call ends here.' : '',
               n.confidence !== undefined ? `Confidence ${Math.round(n.confidence * 100)}%.` : '',
               mark?.detail ?? '',
             ]
@@ -468,6 +484,7 @@ export function FlowCanvas({
                 count={count}
                 mark={mark}
                 exit={exit}
+                editable={!!editable}
               />
             )
           })}
@@ -475,7 +492,7 @@ export function FlowCanvas({
       </>
     )
     // `counts` and `marks` are tracked by their serialised keys.
-  }, [layout, uid, activeId, selectedId, current, matchSet, pathKey, dimKey, countsKey, marksKey, exitAt, ordinals, countNoun[0], countNoun[1]])
+  }, [layout, uid, activeId, selectedId, current, matchSet, pathKey, dimKey, countsKey, marksKey, exitAt, ordinals, countNoun[0], countNoun[1], editable])
 
   /* ---- keyboard ---- */
 
@@ -721,7 +738,10 @@ export function FlowCanvas({
       style: { top: above ? active.y * scale - 38 : (active.y + active.h) * scale + 14, ...(flip ? { right: Math.max(0, (layout.width - active.x - active.w) * scale) } : { left }) } as CSSProperties,
     }
   })()
-  const pos = active ? { first: active.posInSet === 1, last: active.posInSet === active.setSize } : null
+  // Intents and branches move among the alternatives at their fork; the
+  // plain step that carries the call on stays last, so it doesn't move.
+  const movable = active && active.parentId ? (layout.byId.get(active.parentId)?.node.children.filter((c) => c.kind !== 'step').length ?? 0) : (active?.setSize ?? 0)
+  const pos = active ? (active.kind === 'step' && active.parentId ? { first: true, last: true } : { first: active.posInSet === 1, last: active.posInSet >= movable }) : null
   const name = active?.node.label.trim() || 'unnamed'
   const along = direction === 'TB' ? ['↑', '↓'] : ['←', '→']
   const full = mode !== 'off'
@@ -873,6 +893,15 @@ export function FlowCanvas({
                     toggle(tog.getAttribute('data-toggle')!)
                     return
                   }
+                  // The card's own Edit and ×.
+                  const act = editable ? e.target.closest('[data-act]')?.getAttribute('data-act') : null
+                  const on = idOf(e.target)
+                  if (act && on) {
+                    setFocusId(on)
+                    if (act === 'edit') onRename?.(on)
+                    else onDelete?.(on)
+                    return
+                  }
                   const id = idOf(e.target)
                   if (id) {
                     setFocusId(id)
@@ -885,25 +914,25 @@ export function FlowCanvas({
             )}
             {toolbarAt && active && pos && (
               <div className="flowc__edit" role="group" aria-label={`Edit ${name}`} style={toolbarAt.style}>
-                {active.kind !== 'step' && (
-                  <button type="button" className="flowc__btn" aria-label={`Add a step under ${name}`} onClick={() => onAddChild?.(active.id, 'step')}>
-                    + Step
-                  </button>
-                )}
-                {active.kind === 'intent' && (
-                  <button type="button" className="flowc__btn" aria-label={`Add a branch under ${name}`} onClick={() => onAddChild?.(active.id, 'branch')}>
-                    + Branch
-                  </button>
-                )}
+                <button type="button" className="flowc__btn" aria-label={`Add a step after ${name}`} onClick={() => onAddChild?.(active.id, 'step')}>
+                  + Step
+                </button>
+                <button type="button" className="flowc__btn" aria-label={`Add a branch after ${name}`} onClick={() => onAddChild?.(active.id, 'branch')}>
+                  + Branch
+                </button>
                 <button type="button" className="flowc__btn" aria-label={`Edit details of ${name}`} onClick={() => onRename?.(active.id)}>
                   Edit
                 </button>
-                <button type="button" className="flowc__btn flowc__btn--icon" aria-label={`Move ${name} earlier`} disabled={pos.first} onClick={() => onMove?.(active.id, -1)}>
-                  {along[0]}
-                </button>
-                <button type="button" className="flowc__btn flowc__btn--icon" aria-label={`Move ${name} later`} disabled={pos.last} onClick={() => onMove?.(active.id, 1)}>
-                  {along[1]}
-                </button>
+                {!(pos.first && pos.last) && (
+                  <>
+                    <button type="button" className="flowc__btn flowc__btn--icon" aria-label={`Move ${name} earlier`} disabled={pos.first} onClick={() => onMove?.(active.id, -1)}>
+                      {along[0]}
+                    </button>
+                    <button type="button" className="flowc__btn flowc__btn--icon" aria-label={`Move ${name} later`} disabled={pos.last} onClick={() => onMove?.(active.id, 1)}>
+                      {along[1]}
+                    </button>
+                  </>
+                )}
                 <button type="button" className="flowc__btn flowc__btn--danger" aria-label={`Delete ${name}`} onClick={() => onDelete?.(active.id)}>
                   Delete
                 </button>
@@ -933,11 +962,11 @@ export function FlowCanvas({
         <summary>Keyboard and mouse</summary>
         <dl>
           <dt>Arrow keys</dt>
-          <dd>Move along the arrows. {direction === 'TB' ? 'Down: next step. Up: the step before. Left and right: the alternatives beside it.' : 'Right: next step. Left: the step before. Up and down: the alternatives beside it.'}</dd>
+          <dd>Move along the arrows. {direction === 'TB' ? 'Down: what follows. Up: the step before. Left and right: the other ways out of the same fork.' : 'Right: what follows. Left: the step before. Up and down: the other ways out of the same fork.'}</dd>
           <dt>Enter</dt>
           <dd>Select the node.</dd>
           <dt>Space, − and +</dt>
-          <dd>Fold or unfold what is inside an intent or branch.</dd>
+          <dd>Fold or unfold everything that follows a node.</dd>
           <dt>/ , 0 , z and Shift+z</dt>
           <dd>Find, fit to the window, zoom in and zoom out.</dd>
           <dt>Mouse</dt>

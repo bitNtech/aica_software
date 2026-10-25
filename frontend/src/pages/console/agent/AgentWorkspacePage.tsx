@@ -58,6 +58,8 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
   /** The outcome of the last action, shown and announced. */
   const [notice, setNotice] = useState<string | null>(null)
   const problemsRef = useRef<HTMLDivElement>(null)
+  const [opening, setOpening] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   const loadLib = useCallback(async (): Promise<Library> => {
     const [voices, tools, knowledge, numbers, models] = await Promise.all([
@@ -255,6 +257,23 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
       )
   }
 
+  /** The agent builder, on a draft of changes to this agent (an open one if there is). */
+  async function openBuilder() {
+    setOpenError(null)
+    const c = detail?.agent.change
+    if (c) return navigate(`${orgBase}/agents/drafts/${c.draftId}/${c.state === 'sent' ? 'review' : 'flow'}`)
+    if (!client.startAgentChange) return setOpenError('Changing an agent in the builder needs the AICA server to be updated first. Describe the change in a request instead.')
+    setOpening(true)
+    try {
+      await autosave.flush().catch(() => {})
+      const d = await client.startAgentChange(org.orgSlug, agentId)
+      navigate(`${orgBase}/agents/drafts/${d.id}/flow`)
+    } catch (err) {
+      setOpenError(asAuthError(err).message)
+      setOpening(false)
+    }
+  }
+
   async function deleteAgent() {
     // Saves stop only once it's gone: if the delete fails, editing carries on.
     await autosave.flush().catch(() => {})
@@ -367,12 +386,21 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
           {tab !== 'flow' && tab !== 'versions' && <h2 className="sr-only">{TAB_LABEL[tab]}</h2>}
           {STRUCTURE_TABS.has(tab) && !isMaster(access) ? (
             <div className="ws__ask">
-              <p>bitNtech sets up the {tab === 'flow' ? 'conversation flow' : tab === 'tools' ? 'tools' : 'voice pipeline'}, so every change is built and tested before it goes live.</p>
+              <p>
+                bitNtech sets up the {tab === 'flow' ? 'conversation flow' : tab === 'tools' ? 'tools' : 'voice pipeline'}, so every change is built and tested before it goes live.
+                {canRequest && ' Make the change yourself in the agent builder, from calls or by hand, and send it to them.'}
+              </p>
               {canRequest && (
-                <Link className="btn btn--line btn--sm" to={`${orgBase}/requests?new=${tab === 'tools' ? 'integration' : 'flow_change'}&agent=${agentId}`}>
-                  <span>Ask for a change</span>
-                </Link>
+                <div className="ws__ask-actions">
+                  <Button variant="line" size="sm" busy={opening} busyLabel="Opening…" onClick={() => void openBuilder()}>
+                    {a.change ? 'Continue in the agent builder' : 'Change it in the agent builder'}
+                  </Button>
+                  <Link className="link" to={`${orgBase}/requests?new=${tab === 'tools' ? 'integration' : 'flow_change'}&agent=${agentId}`}>
+                    Or describe it in a request
+                  </Link>
+                </div>
               )}
+              {openError && <p className="field__error">{openError}</p>}
             </div>
           ) : (
             <p className="ws__ro-note">You can view this agent. Owners and admins can change it.</p>

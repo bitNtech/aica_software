@@ -14,10 +14,8 @@ const RATE_LABEL = { slower: 'Slower', normal: 'Normal', faster: 'Faster' } as c
 
 /** Builder step 2, plus how it pronounces and listens. */
 export function BehaviourTab({ spec, update, readOnly, errors, lib }: TabProps) {
-  const id = useId()
   const b = spec.behaviour
   const sp = spec.speech
-  const setSpeech = (patch: Partial<SpeechSettings>) => update((s) => ({ ...s, speech: { ...s.speech, ...patch } }))
 
   if (readOnly) {
     const voice = lib.voices.find((v) => v.id === b.voiceId)
@@ -57,6 +55,17 @@ export function BehaviourTab({ spec, update, readOnly, errors, lib }: TabProps) 
         onReloadVoices={() => {}}
       />
 
+      <SpeechEditor speech={sp} onChange={(speech) => update((s) => ({ ...s, speech }))} />
+    </div>
+  )
+}
+
+/** How it pronounces and listens: shared by this tab and the builder. */
+export function SpeechEditor({ speech: sp, onChange }: { speech: SpeechSettings; onChange(next: SpeechSettings): void }) {
+  const id = useId()
+  const setSpeech = (patch: Partial<SpeechSettings>) => onChange({ ...sp, ...patch })
+  return (
+    <>
       <section className="step__section" aria-labelledby={`${id}-say`}>
         <h2 id={`${id}-say`} className="step__heading">
           Pronunciations
@@ -103,7 +112,7 @@ export function BehaviourTab({ spec, update, readOnly, errors, lib }: TabProps) 
           />
         </div>
       </section>
-    </div>
+    </>
   )
 }
 

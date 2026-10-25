@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { LANGUAGE_LABEL } from '../../auth/roles'
 import { asAuthError } from '../../auth/types'
 import { can } from '../../console/access'
@@ -7,6 +7,8 @@ import { useConsole } from '../../console/ConsoleProvider'
 import { canSeeFlowPatterns, FLOW_PATTERN_WINDOW } from '../../console/flowPatternConfig'
 import { BUILDER_STEPS, type AgentStatus, type AgentSummary } from '../../console/types'
 import { STEP_META, stepIndex } from './builder/steps'
+import { AGENT_STATUS_WORD, AgentAvatar, AgentProfile } from './AgentProfile'
+import './Agents.css'
 import { useOrg } from '../../console/useOrg'
 import { ConsolePage } from '../../components/console/ConsolePage'
 import { Alert } from '../../components/ui/Alert'
@@ -16,7 +18,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { shortDate } from '../../lib/time'
 import { useAsync } from '../../lib/useAsync'
 
-export const AGENT_STATUS_LABEL: Record<AgentStatus, string> = { live: 'Live', draft: 'Draft', paused: 'Paused' }
+export const AGENT_STATUS_LABEL: Record<AgentStatus, string> = AGENT_STATUS_WORD
 
 /** Live first: what's answering calls now; then work in progress. */
 const ORDER: Record<AgentStatus, number> = { live: 0, draft: 1, paused: 2 }
@@ -38,6 +40,19 @@ export default function AgentsPage() {
   const search = useRef<HTMLInputElement>(null)
   const canCreate = can(access, 'agent.create')
   const canRequest = can(access, 'request.create')
+  // The builder: bitNtech's master admin builds; the organisation drafts requests.
+  const canBuild = canCreate || canRequest
+  const [params, setParams] = useSearchParams()
+  /** Chosen in the list (not just shown first): focus follows it. */
+  const [picked, setPicked] = useState(false)
+  const pick = (agentId: string) => {
+    setPicked(true)
+    setParams((p) => {
+      const next = new URLSearchParams(p)
+      next.set('agent', agentId)
+      return next
+    }, { replace: true, preventScrollReset: true })
+  }
   const [patternAgentIds, setPatternAgentIds] = useState<Set<string>>(new Set())
   useEffect(() => {
     if (!canSeeFlowPatterns(access)) return
@@ -80,6 +95,7 @@ export default function AgentsPage() {
         (qDigits.length >= 3 && (a.phoneNumber ?? '').replace(/\D/g, '').includes(qDigits))),
   )
   const count = (f: Filter) => (f === 'all' ? all.length : all.filter((a) => a.status === f).length)
+  const selected = shown.find((a) => a.id === params.get('agent')) ?? shown[0] ?? null
 
   // Announce the result count once typing pauses, not on every keystroke.
   const summary = shown.length === all.length ? `${all.length} agents` : `${shown.length} of ${all.length} agents shown`
@@ -99,7 +115,10 @@ export default function AgentsPage() {
         canCreate ? (
           <p>Each agent answers one phone line. Build it from recordings of {org.orgName}’s past calls, test it, then publish it for them.</p>
         ) : (
-          <p>Each agent answers one phone line. bitNtech builds it from recordings of your past calls; you keep its greeting, knowledge and hours up to date.</p>
+          <p>
+            Each agent answers one phone line. Build one in the agent builder from recordings of your past calls, or open an agent there to change it, then send it to bitNtech: they
+            finish it, test it and publish it. You keep its greeting, knowledge and hours up to date.
+          </p>
         )
       }
       actions={
@@ -109,7 +128,7 @@ export default function AgentsPage() {
           </Link>
         ) : (
           canRequest && (
-            <Link className="btn btn--line" to={`${base}/requests?new=new_agent`}>
+            <Link className="btn btn--orange" to={`${base}/agents/new`}>
               <span>Ask for a new agent</span>
             </Link>
           )
@@ -153,7 +172,7 @@ export default function AgentsPage() {
               </Link>
             ) : (
               canRequest && (
-                <Link className="btn btn--plum btn--sm" to={`${base}/requests?new=new_agent`}>
+                <Link className="btn btn--plum btn--sm" to={`${base}/agents/new`}>
                   <span>Ask bitNtech for your first agent</span>
                 </Link>
               )
@@ -164,7 +183,7 @@ export default function AgentsPage() {
             {canCreate
               ? 'An agent answers one of their phone lines. Build it from recordings of their past calls.'
               : canRequest
-                ? 'An agent answers one of your phone lines. bitNtech builds it from recordings of your past calls: upload some, then ask for it.'
+                ? 'An agent answers one of your phone lines. Set it up in the agent builder from recordings of your past calls, then send it to bitNtech to build.'
                 : 'When bitNtech sets up an agent for you, it appears here.'}
           </p>
         </EmptyState>
@@ -220,11 +239,23 @@ export default function AgentsPage() {
               </button>
             </p>
           ) : (
-            <ul className="rows" aria-label="Agents">
-              {shown.map((a) => (
-                <AgentRow key={a.id} agent={a} base={`${base}/agents`} canBuild={canCreate} newPattern={patternAgentIds.has(a.id)} callsHref={`${base}/calls?agent=${a.id}`} />
-              ))}
-            </ul>
+            <div className="agents-split">
+              <ul className="rows agent-cards" aria-label="Agents">
+                {shown.map((a) => (
+                  <AgentCard
+                    key={a.id}
+                    agent={a}
+                    base={`${base}/agents`}
+                    master={canCreate}
+                    selected={a.id === selected?.id}
+                    onSelect={() => pick(a.id)}
+                    newPattern={patternAgentIds.has(a.id)}
+                    callsHref={`${base}/calls?agent=${a.id}`}
+                  />
+                ))}
+              </ul>
+              {selected && <AgentProfile key={selected.id} agent={selected} base={base} canBuild={canBuild} master={canCreate} newPattern={patternAgentIds.has(selected.id)} focusOnShow={picked} />}
+            </div>
           )}
         </>
       )}
@@ -232,9 +263,36 @@ export default function AgentsPage() {
   )
 }
 
-function AgentRow({ agent: a, base, canBuild, newPattern, callsHref }: { agent: AgentSummary; base: string; canBuild: boolean; newPattern: boolean; callsHref: string }) {
+/** One agent in the list: who it is, how it's doing, and what needs doing. */
+function AgentCard({
+  agent: a,
+  base,
+  master,
+  selected,
+  onSelect,
+  newPattern,
+  callsHref,
+}: {
+  agent: AgentSummary
+  base: string
+  master: boolean
+  selected: boolean
+  onSelect(): void
+  newPattern: boolean
+  callsHref: string
+}) {
+  const mine = a.request?.state === 'drafting'
   return (
-    <li className="agent-row">
+    <li
+      className={['agent-row', 'agent-card', selected && 'is-selected'].filter(Boolean).join(' ')}
+      // The whole card picks it, for the mouse; the avatar button does for the keyboard.
+      onClick={(e) => {
+        if (!(e.target as Element).closest('a, button')) onSelect()
+      }}
+    >
+      <button type="button" className="agent-card__pick" aria-pressed={selected} aria-controls="agent-profile" aria-label={`Show ${a.name}`} onClick={onSelect}>
+        <AgentAvatar agent={a} />
+      </button>
       <div className="agent-row__main">
         <h2 className="agent-row__name">
           {a.setupStep ? (
@@ -246,6 +304,7 @@ function AgentRow({ agent: a, base, canBuild, newPattern, callsHref }: { agent: 
           )}
         </h2>
         <span className="row__meta">
+          {a.persona ? `${a.persona} · ` : ''}
           {a.useCase} <i aria-hidden="true">·</i> {a.languages.map((l) => LANGUAGE_LABEL[l]).join(', ')}
         </span>
         {newPattern && (
@@ -255,10 +314,17 @@ function AgentRow({ agent: a, base, canBuild, newPattern, callsHref }: { agent: 
           </Link>
         )}
         {a.hasChanges && <span className="agent-row__setup">Unpublished changes</span>}
+        {a.change && <span className="agent-row__setup">{a.change.state === 'sent' ? 'Changes sent to bitNtech' : 'Changes being made in the builder'}</span>}
         {a.setupStep && (
           <span className="agent-row__setup">
-            {canBuild ? `Setup: step ${stepIndex(a.setupStep) + 1} of ${BUILDER_STEPS.length}, ${STEP_META[a.setupStep].label.toLowerCase()}` : 'Being set up by bitNtech'}
-            {canBuild && (
+            {a.request
+              ? a.request.state === 'sent'
+                ? `Asked for by ${a.request.by}: bitNtech is building it`
+                : `Your request, not sent yet: step ${stepIndex(a.setupStep) + 1} of ${BUILDER_STEPS.length}`
+              : master
+                ? `Setup: step ${stepIndex(a.setupStep) + 1} of ${BUILDER_STEPS.length}, ${STEP_META[a.setupStep].label.toLowerCase()}`
+                : 'Being set up by bitNtech'}
+            {(master || mine) && (
               <>
                 {' '}
                 <Link className="link" to={`${base}/drafts/${a.id}/${a.setupStep}`} aria-label={`Continue setup of ${a.name}`}>

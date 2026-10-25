@@ -1,3 +1,4 @@
+import { normaliseFlow } from './flowShape'
 import { request } from '../auth/httpClient'
 import { AuthError, type AuthErrorCode } from '../auth/types'
 import { apiBase, apiCredentials, apiUrl } from '../lib/api'
@@ -8,6 +9,7 @@ import type {
   ActivityQuery,
   AgentDetail,
   AgentDraft,
+  AgentSpec,
   AgentSummary,
   AgentTool,
   AgentType,
@@ -101,13 +103,15 @@ export function createHttpConsoleClient(
    * overwrite another's newer save (the server answers "conflict"). */
   const agentRev = new Map<string, number>()
   const draftRev = new Map<string, number>()
+  // Flows saved before they could branch come back in the branching shape.
   const seen = (d: AgentDetail & { revision?: number }) => {
     if (typeof d.revision === 'number') agentRev.set(d.agent.id, d.revision)
-    return d
+    const shaped = <T extends { flow?: AgentSpec['flow'] }>(s: T): T => (Array.isArray(s?.flow) ? { ...s, flow: normaliseFlow(s.flow) } : s)
+    return { ...d, working: shaped(d.working), versions: Array.isArray(d.versions) ? d.versions.map((v) => ({ ...v, spec: shaped(v.spec) })) : d.versions }
   }
   const seenDraft = (d: AgentDraft & { revision?: number }) => {
     if (typeof d.revision === 'number') draftRev.set(d.id, d.revision)
-    return d
+    return Array.isArray(d.flow) ? { ...d, flow: normaliseFlow(d.flow) } : d
   }
   const NEEDS_PIPELINE = (what: string) => Promise.reject(new AuthError('unknown', `${what} needs the AI pipeline, which isn’t connected yet.`))
   const qs = (params: Record<string, string | number | undefined>) => {

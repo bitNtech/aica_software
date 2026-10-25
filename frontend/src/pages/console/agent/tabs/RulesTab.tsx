@@ -1,9 +1,10 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { Guardrails } from '../../../../console/types'
 import { SelectField, TextAreaField, TextField } from '../../../../components/ui/Field'
 import { Switch } from '../../../../components/ui/Switch'
 import { ListEditor } from '../../builder/ListEditor'
+import type { StepErrors } from '../../builder/StepShared'
 import type { TabProps } from '../shared'
 
 const FAILURES = [1, 2, 3].map((n) => ({ value: String(n), label: n === 1 ? 'The first time it can’t help' : `After ${n} tries` }))
@@ -11,9 +12,7 @@ const MINUTES = [5, 10, 15, 20, 30].map((n) => ({ value: String(n), label: `${n}
 
 /** When and where it hands over, what it won't discuss, and call limits. */
 export function RulesTab({ base, detail, spec, update, readOnly, errors }: TabProps) {
-  const id = useId()
   const g = spec.guardrails
-  const set = (patch: Partial<Guardrails>) => update((s) => ({ ...s, guardrails: { ...s.guardrails, ...patch } }))
   const flowLink = (
     <Link className="link" to={`${base}/agents/${detail.agent.id}/flow`}>
       Flow
@@ -46,11 +45,44 @@ export function RulesTab({ base, detail, spec, update, readOnly, errors }: TabPr
 
   return (
     <div className="step ws__sections">
+      <GuardrailsEditor
+        guardrails={g}
+        onChange={(guardrails) => update((s) => ({ ...s, guardrails }))}
+        errors={errors}
+        redact={spec.redact}
+        onRedact={(redact) => update((s) => ({ ...s, redact }))}
+        handoffNote={<>What it says when handing over is set under “Anywhere in a call” on the {flowLink} tab.</>}
+      />
+    </div>
+  )
+}
+
+/** When and where it hands over, what it won't discuss, and call limits:
+ * shared by this tab and the builder. */
+export function GuardrailsEditor({
+  guardrails: g,
+  onChange,
+  errors,
+  redact,
+  onRedact,
+  handoffNote,
+}: {
+  guardrails: Guardrails
+  onChange(next: Guardrails): void
+  errors: StepErrors
+  redact: boolean
+  onRedact(redact: boolean): void
+  handoffNote: ReactNode
+}) {
+  const id = useId()
+  const set = (patch: Partial<Guardrails>) => onChange({ ...g, ...patch })
+  return (
+    <>
       <section className="step__section" aria-labelledby={`${id}-hand`}>
         <h2 id={`${id}-hand`} className="step__heading">
           Handing over to a person
         </h2>
-        <p className="step__sub">What it says when handing over is set under “Anywhere in a call” on the {flowLink} tab.</p>
+        <p className="step__sub">{handoffNote}</p>
         <div className="step__grid">
           <SelectField
             label="Hand over when it can’t help"
@@ -109,8 +141,8 @@ export function RulesTab({ base, detail, spec, update, readOnly, errors }: TabPr
           <Switch
             label="Hide personal details in transcripts"
             hint="Names, numbers and patient IDs show as [name], [phone] and so on."
-            checked={spec.redact}
-            onChange={(redact) => update((s) => ({ ...s, redact }))}
+            checked={redact}
+            onChange={onRedact}
           />
         </div>
         {g.recordingNotice && (
@@ -132,6 +164,6 @@ export function RulesTab({ base, detail, spec, update, readOnly, errors }: TabPr
           />
         </div>
       </section>
-    </div>
+    </>
   )
 }

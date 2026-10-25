@@ -1,10 +1,14 @@
+import { indexFlow, joinTarget, type Placed } from '../../../console/flowGraph'
 import type { AgentDraft, AgentTool, FlowNode, GlobalFlowKind, KnowledgeSource } from '../../../console/types'
 
 /**
  * A text stand-in for testing an agent in the browser: it picks the intent
- * whose words best match what the tester typed, then walks that intent's
- * steps one reply at a time. It shows the path, tools and knowledge the real
- * agent would use; the real agent (speech, the LLM) runs on AICA's servers.
+ * whose words best match what the tester typed, then walks down its tree
+ * one step a reply. At a fork it takes the branch whose condition shares
+ * the most words with the reply, else the plain step ("otherwise"), else
+ * the step the fork joins back at, else the first branch. A branch with no
+ * steps of its own carries on where it joins. It shows the path, tools and knowledge the real agent
+ * would use; the real agent (speech, the LLM) runs on AICA's servers.
  */
 
 export interface SimReply {
@@ -19,11 +23,11 @@ export interface SimReply {
 
 export interface SimState {
   intentId: string | null
-  /** Index of the next step to say within the intent. */
-  next: number
+  /** The step said last, or null before the intent's first. */
+  at: string | null
 }
 
-export const SIM_START: SimState = { intentId: null, next: 0 }
+export const SIM_START: SimState = { intentId: null, at: null }
 
 /** What the simulator needs: a builder draft or a published agent's setup. */
 export type SimAgent = Pick<AgentDraft, 'behaviour' | 'flow' | 'globalFlows' | 'context'>
@@ -48,10 +52,25 @@ const SYNONYMS: [RegExp, string][] = [
 
 const words = (s: string) => s.toLowerCase().match(/[a-z]{3,}/g) ?? []
 
-function steps(intent: FlowNode): FlowNode[] {
-  // The simulator can't tell which branch applies: it follows the first.
-  const first = intent.children.find((c) => c.kind === 'branch')
-  return intent.children.flatMap((c) => (c.kind !== 'branch' ? [c] : c === first ? c.children : []))
+/** The way on from `from` for what the caller said, and the branches
+ * passed on the way to the step it reaches. */
+function nextStep(index: Map<string, Placed>, from: FlowNode, message: string): { step: FlowNode | null; via: FlowNode[] } {
+  const said = new Set(words(message))
+  const via: FlowNode[] = []
+  let at = from
+  for (;;) {
+    const list = at.children
+    const joins = joinTarget(index, at)
+    if (!list.length) return { step: joins, via }
+    const score = (n: FlowNode) => words(`${n.condition ?? ''} ${n.label}`).filter((w) => said.has(w)).length
+    const branches = list.filter((n) => n.kind === 'branch')
+    const best = branches.reduce<FlowNode | null>((b, n) => (score(n) > (b ? score(b) : 0) ? n : b), null)
+    const plain = list.find((n) => n.kind !== 'branch')
+    if (!best && (plain || joins)) return { step: plain ?? joins, via }
+    const pick = best ?? branches[0]
+    via.push(pick)
+    at = pick
+  }
 }
 
 function bestIntent(flow: FlowNode[], message: string): FlowNode | null {
@@ -95,9 +114,12 @@ export function simulate(draft: SimAgent, tools: AgentTool[], knowledge: Knowled
   }
 
   const fresh = intent.id !== state.intentId
-  const list = steps(intent)
-  const i = fresh ? 0 : Math.min(state.next, list.length - 1)
-  const step = list[i]
+  const index = indexFlow(draft.flow)
+  const placed = !fresh && state.at ? index.get(state.at) : undefined
+  const last = placed && placed.intentId === intent.id ? placed.node : null
+  const found = nextStep(index, last ?? intent, message)
+  // At the end of a path it says the last step again.
+  const step = found.step ?? last
   const text = step?.say?.trim() || 'Sure.'
 
   const usesKnowledge = /knowledge|\{answer\}|\{hours\}|\{parking\}/i.test(`${step?.label} ${step?.say}`)
@@ -109,10 +131,10 @@ export function simulate(draft: SimAgent, tools: AgentTool[], knowledge: Knowled
   return {
     reply: {
       text,
-      path: [intent.label, ...(step ? [step.label] : [])],
+      path: [intent.label, ...found.via.map((b) => b.label), ...(step ? [step.label] : [])],
       knowledge: usesKnowledge && chosen.length ? chosen.map((k) => k.name) : undefined,
       tool: tool ? { name: tool.name, asksFirst: tool.acts && draft.context.confirmBeforeActions } : undefined,
     },
-    state: { intentId: intent.id, next: i + 1 },
+    state: { intentId: intent.id, at: step?.id ?? null },
   }
 }
