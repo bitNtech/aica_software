@@ -18,6 +18,7 @@ import { useAsync } from '../../../../lib/useAsync'
 import { countForks, countPaths, lowConfidence } from '../flowTree'
 import { STEP_META } from '../steps'
 import type { StepErrors, StepProps } from '../StepShared'
+import { VoiceCallPanel } from '../../../../components/voice/VoiceCallPanel'
 import { TestChat } from '../TestChat'
 import { checkAttributes } from './StepAttributes'
 import { checkBehaviour } from './StepBehaviour'
@@ -358,6 +359,17 @@ export function StepReview({ draft, org, base: orgBase, update, validator, save,
           Try it
         </h2>
         <TestChat draft={draft} tools={data.tools} knowledge={data.knowledge} />
+        {mode === 'build' && client.startDraftTestCall && (
+          <>
+            <h3 className="step__heading">Call it in your browser</h3>
+            <p className="step__sub">The real agent on the voice server, built from this draft as it’s saved now. Nobody else can call it.</p>
+            <VoiceCallPanel<'draft'>
+              getTicket={() => client.startDraftTestCall!(org.orgSlug, draft.id)}
+              getTranscript={client.getTestCallTranscript ? (callId) => client.getTestCallTranscript!(org.orgSlug, callId) : undefined}
+              onBeforeStart={save}
+            />
+          </>
+        )}
       </section>
 
       {mode === 'build' ? (

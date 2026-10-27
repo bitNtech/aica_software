@@ -10,6 +10,7 @@ import { createDemoConsoleClient } from '../console/demoClient'
 import type { ConsoleClient } from '../console/types'
 import { createDemoOpsClient } from '../ops/demoOpsClient'
 import { OpsDataProvider } from '../ops/OpsDataProvider'
+import type { OpsDataClient } from '../ops/types'
 
 export function renderApp(
   path = '/login',
@@ -17,7 +18,8 @@ export function renderApp(
     idleMs,
     consoleClient = createDemoConsoleClient({ latency: 0 }),
     probe,
-  }: { idleMs?: number; consoleClient?: ConsoleClient; /** Rendered beside the app, inside the router: e.g. something that shows the address. */ probe?: ReactNode } = {},
+    opsClient = createDemoOpsClient({ latency: 0 }),
+  }: { idleMs?: number; consoleClient?: ConsoleClient; opsClient?: OpsDataClient; /** Rendered beside the app, inside the router: e.g. something that shows the address. */ probe?: ReactNode } = {},
 ) {
   const client = createMockAuthClient({ latency: 0 })
   const user = userEvent.setup()
@@ -25,7 +27,7 @@ export function renderApp(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider client={client} idleMs={idleMs}>
         <ConsoleProvider client={consoleClient}>
-          <OpsDataProvider client={createDemoOpsClient({ latency: 0 })}>
+          <OpsDataProvider client={opsClient}>
             <App />
             {probe}
           </OpsDataProvider>

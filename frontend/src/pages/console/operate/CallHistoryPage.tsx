@@ -142,6 +142,21 @@ export default function CallHistoryPage() {
   }, [client, org.orgSlug, filters.days, filters.agentId, filters.outcome, filters.q, limit, tick])
   const retry = useCallback(() => setTick((t) => t + 1), [])
 
+  // Calls the voice server finished that haven't arrived as events yet
+  // (always the case in local development): bring them in once per visit,
+  // and reload if any did. Only for people who see every call.
+  useEffect(() => {
+    if (!client.syncCalls || own) return
+    let live = true
+    client.syncCalls(org.orgSlug).then(
+      (r) => live && r.added > 0 && setTick((t) => t + 1),
+      () => undefined,
+    )
+    return () => {
+      live = false
+    }
+  }, [client, org.orgSlug, own])
+
   // ---- what the list can't say: sentiment and success, once a call has been opened
   const [analysed, setAnalysed] = useState<ReadonlyMap<string, Analysed>>(new Map())
   const learn = useCallback((r: CallRecord) => {

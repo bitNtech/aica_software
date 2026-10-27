@@ -97,6 +97,23 @@ ROUTES = [
     ("POST", "/drafts/draft_1", {"draft": {}}, NOBODY),
     ("POST", "/drafts/draft_1/discard", None, NOBODY),
     ("POST", "/drafts/draft_1/publish", {"numberId": None}, NOBODY),
+    # The voice stack (routes/org/voice.py)
+    ("POST", "/voice/preview", {"text": "Vanakkam", "voiceId": "kavya"}, perm("agents.configure", "agents.test")),
+    ("GET", "/agents/agt_1/voice", None, perm("agents.view", "agents.test", "agents.configure")),
+    ("POST", "/agents/agt_1/voice/sync", None, perm("agents.publish")),
+    ("POST", "/agents/agt_1/voice-token", {"target": "test"}, perm("agents.test")),
+    ("POST", "/drafts/draft_1/voice-token", None, NOBODY),
+    ("GET", "/voice/calls/call_live1/transcript", None, perm("agents.test")),
+    ("POST", "/agents/agt_1/scenarios/run", None, perm("agents.test")),
+    ("GET", "/live-calls", None, perm("calls.viewAll", "calls.take")),
+    ("GET", "/live-calls/call_live1", None, perm("calls.viewAll", "calls.take")),
+    ("POST", "/live-calls/call_live1/end", {"reason": ""}, perm("calls.take")),
+    ("POST", "/live-calls/call_live1/interrupt", None, perm("calls.take")),
+    ("POST", "/live-calls/call_live1/say", {"text": "One moment please."}, perm("calls.take")),
+    ("POST", "/live-calls/call_live1/handoff", {"reason": ""}, perm("calls.take")),
+    ("POST", "/live-calls/call_live1/release", {"resumeAi": True}, perm("calls.take")),
+    ("POST", "/live-calls/call_live1/operator-token", {"mode": "listen"}, perm("calls.take")),
+    ("POST", "/calls/sync", None, perm("calls.viewAll")),
 ]
 
 
@@ -106,7 +123,9 @@ def test_route_follows_the_permission_table(env, role, method, path, body, may):
     client, fb, store, _ = env
     people = seed(fb, store)
     seed_ops(store, people)
-    seed_library(client.app.state.services, store)
+    svc = client.app.state.services
+    seed_library(svc, store)
+    svc.fake_orch.add_session("ten_test123456", "call_live1", voice_agent_id=None, live=True, metadata={"aica_org": "arogya"})
     if role == "viewer" and "{viewer}" in path:
         pytest.skip("nobody changes themselves; covered in test_org_team")
     login(client, people[role][1])
@@ -125,7 +144,7 @@ def test_every_org_route_is_in_the_matrix(env):
         p = p.split("?")[0].replace("{viewer}", "{member_id}")
         if p.startswith("/uploads/"):
             p = p.replace("up_1", "{call_id}").replace("up_2", "{call_id}")
-        for concrete, name in (("cr_1", "{request_id}"), ("call_1", "{call_id}"), ("cb_1", "{callback_id}"), ("apt_1", "{appointment_id}"), ("ho_1", "{handoff_id}"),
+        for concrete, name in (("call_live1", "{call_id}"), ("cr_1", "{request_id}"), ("call_1", "{call_id}"), ("cb_1", "{callback_id}"), ("apt_1", "{appointment_id}"), ("ho_1", "{handoff_id}"),
                                ("num_2", "{number_id}"), ("tool_1", "{tool_id}"), ("OTHER_KEY", "{name}"), ("kn_1", "{source_id}"), ("kn_2", "{source_id}"), ("kn_3", "{source_id}"),
                                ("scn_1", "{scenario_id}"), ("agt_1", "{agent_id}"), ("draft_1", "{draft_id}")):
             p = p.replace(concrete, name)

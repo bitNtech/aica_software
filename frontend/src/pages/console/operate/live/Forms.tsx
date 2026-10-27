@@ -8,7 +8,7 @@ import { ChoiceGroup } from '../../../../components/ui/Choice'
 import { SelectField, TextField } from '../../../../components/ui/Field'
 
 /** A note only the agent hears, mid-call, e.g. "Offer Saturday with Dr. Arvind". */
-export function GuideForm({ callId, inputRef, onSent }: { callId: string; inputRef: Ref<HTMLInputElement>; onSent(call: LiveCall): void }) {
+export function GuideForm({ callId, inputRef, onSent, aloud = false }: { callId: string; inputRef: Ref<HTMLInputElement>; onSent(call: LiveCall): void; aloud?: boolean }) {
   const client = useConsole()
   const { org } = useOrg()
   const [text, setText] = useState('')
@@ -25,7 +25,7 @@ export function GuideForm({ callId, inputRef, onSent }: { callId: string; inputR
   async function send(e: FormEvent) {
     e.preventDefault()
     if (!text.trim()) {
-      setError('Write what the agent should know.')
+      setError(aloud ? 'Write what the agent should say.' : 'Write what the agent should know.')
       own.current?.focus()
       return
     }
@@ -47,16 +47,16 @@ export function GuideForm({ callId, inputRef, onSent }: { callId: string; inputR
     <form className="op-form live-guide" onSubmit={send} noValidate>
       <TextField
         ref={field}
-        label="Note to the agent"
-        hint="A note only the agent hears, e.g. “Offer Saturday 10 AM with Dr. Arvind”."
-        maxLength={200}
+        label={aloud ? 'The agent says' : 'Note to the agent'}
+        hint={aloud ? 'The caller hears this in the agent’s voice, e.g. “Dr. Arvind can see you on Saturday at 10 AM.”' : 'A note only the agent hears, e.g. “Offer Saturday 10 AM with Dr. Arvind”.'}
+        maxLength={aloud ? 500 : 200}
         value={text}
         error={error}
         onChange={(e) => setText(e.target.value)}
       />
       <div className="op-card__actions">
         <Button type="submit" variant="line" size="sm" busy={busy} busyLabel="Sending…">
-          Send to the agent
+          {aloud ? 'Say it to the caller' : 'Send to the agent'}
         </Button>
       </div>
     </form>

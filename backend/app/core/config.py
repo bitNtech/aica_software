@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     # "text" for a terminal, "json" for log search (the default on Vercel).
     log_format: Literal["text", "json"] = "text"
 
+    # The voice orchestrator (docs/orchestrator-contract.md). Empty base URL
+    # or key: voice features say they aren't set up. The key is a platform
+    # admin key; every tenant call names the organisation's own tenant.
+    orch_base_url: str = ""
+    orch_api_key: str = ""
+    # ORCH_WEBHOOKS__SECRET on the orchestrator: signs call and handoff events.
+    orch_webhook_secret: str = ""
+    orch_timeout_s: float = Field(15.0, ge=1, le=120)
+
     # Vercel system variables (hostnames, no scheme), set only on Vercel.
     # Only production deployments exist (see docs/cicd.md).
     vercel_url: str = ""
@@ -126,6 +135,17 @@ class Settings(BaseSettings):
         # Back to this API, so the session cookie lands on the API's host. In
         # dev that is the Vite proxy, i.e. the frontend's origin.
         return f"{self.public_api_url}/api/auth/google/callback"
+
+    @property
+    def orchestrator_enabled(self) -> bool:
+        return bool(self.orch_base_url.strip() and self.orch_api_key.strip())
+
+    @property
+    def orchestrator_webhook_url(self) -> str | None:
+        """Where the orchestrator sends our voice agents' events. Only a
+        public https API can receive them (the orchestrator refuses others)."""
+        url = self.public_api_url
+        return f"{url}/api/hooks/orchestrator" if url.startswith("https://") and self.orch_webhook_secret else None
 
     @property
     def google_enabled(self) -> bool:

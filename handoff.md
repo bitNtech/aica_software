@@ -1,6 +1,10 @@
 # Project Handoff
 
 ## Status
+- Latest (2026-10-27, `feat/branching-flowchart-and-builder-requests`, **uncommitted**): the console is connected to the AICA voice orchestrator: agents are built and published to it, tested by browser calls, and live calls are run and joined from the console. bitNtech has an Ops page for the orchestrator. See "Voice orchestrator" below and `docs/orchestrator-contract.md`. Approved "proceed" on the Phases A–E plan. Verified: backend pytest 701 passed / 3 skipped; frontend `tsc -b` clean, vitest 898/898 (one run under load had one flaky failure; two reruns clean), `npm run build` ok; live checks against the test tenant `ten_7e28…` (below).
+- Dev scripts (2026-10-27): `npm run dev` now sets `VITE_CONSOLE_MODE=live` and every live section in `VITE_CONSOLE_LIVE` (real sign-in, every page from the local API on :8000); `npm run dev:demo` sets `VITE_AUTH_MODE=demo` and `VITE_CONSOLE_MODE=demo`. Builds and Vercel are unchanged. Script values win over `.env.local`.
+- Fix (2026-10-27): the Ops organisation page no longer fails for a real organisation. Its usage, team, jobs and history still come from sample data that only knows the demo organisations; when that's missing the page shows the rest (Manage links, Agents, Voice server link) with a note. `OpsOrgDetailPage.tsx`, plus an `opsClient` option on the test `renderApp`.
+- Next recommended action: put `ORCH_API_KEY` and `ORCH_WEBHOOK_SECRET` in `backend/.env` and the backend's Vercel env, add `agents,live,calls,handoffs` to `VITE_CONSOLE_LIVE`, link a test organisation to `ten_7e28f7eeaaf97338038c4bb3` in Ops, publish an agent, and place a microphone test call in a real browser. Then rotate the two secrets shared in chat.
 - Latest (2026-10-25, `main`, **uncommitted**): the conversation flow is drawn as a conditional branching flowchart, and branches can join back up (see "Flowchart and joins" below). Approved "proceed". Verified: `tsc -b` clean, vitest 881/881 (65 files), `npm run build` ok, headless screenshots reviewed (Flow tab diagram light and dark at 1440, outline, 390).
 - Next recommended action: look at the diagram in a real browser (edit a branch, pick "Then carry on at"), then add `joinsAt` to the backend's flow schema when the builder contract is agreed.
 - Latest (2026-10-25, `main`, **uncommitted**): branching conversation trees everywhere, agent requests built in the agent builder, agents shown as agents, and call uploads inside each agent's builder (see "Branching flows and builder requests" below). Approved "proceed" with these answers: frontend and demo first; as many settings as possible; related calls grouped, unrelated kept apart; the master admin keeps building and publishing to the organisation; existing flows converted. Verified: `tsc -b` clean, vitest 863/863 (64 files), `npm run build` ok, headless screenshots reviewed (Agents at 1440 and 390, Flow tab outline and diagram, builder flow step with groups, a change draft's calls and flow steps).
@@ -48,6 +52,86 @@
 
 
 
+
+
+## Voice orchestrator (2026-10-27, approved "proceed"; backend and frontend)
+
+**What it does**
+- **Agents on the voice server.** Publishing (agent publish, rollback, draft publish) saves the version, then writes it as an LLM agent (through `/v1/llm/agents`) and a voice agent (`/v1/voice-agents`) for the organisation's tenant.
+  - Each agent also has a test pair, built from its saved working setup, so testing never changes what callers hear. Drafts get a test pair too.
+  - Renaming resyncs. Pausing disables the voice agent. Deleting removes the copies.
+  - A failed sync shows on the agent (a banner, and the Settings → Voice server card, with Retry) and never undoes the publish.
+- **The mapping** is in `docs/orchestrator-contract.md`. In short:
+  - instructions are written from persona, rules, flow (branches and joins), details, global flows, guardrails, FAQ knowledge and pronunciations;
+  - the voice is the agent's `voiceId` when the TTS server has it, else its active voice, with a warning;
+  - the VAD, barge-in, fillers, idle, call length, handoff and prompts overrides follow the pipeline settings;
+  - HTTP tools become LLM tools, with the secret header decrypted at sync;
+  - settings it has nothing for are listed on the agent's Settings tab.
+- **Using agents.**
+  - The Test tab's "Test call in your browser" talks to the saved changes or the live version. It has mute, stop the agent, typed turns, latency figures, close-code messages, and "what the agent heard" afterwards.
+  - Scenarios now run for real, as text through throwaway LLM sessions, checking "must say", handover and intent.
+  - The builder's review step has a draft test call (master admin).
+  - The behaviour editor plays a voice sample.
+- **Live calls.**
+  - The live calls page reads the voice server, polled every 4 s, and shows only this organisation's calls.
+  - Staff listen in or take over in the browser (operator socket), say things the caller hears, stop the agent, give the call back, or end it.
+  - "Guide the agent" becomes "Say something", because the voice server has no whisper.
+  - "Take the call" asks for a person, then joins in takeover.
+  - The handoff queue pulls from `/v1/handoffs`.
+- **Call history.** Finished calls come in by signed webhook (`/api/hooks/orchestrator`), or by `POST /calls/sync`, which Call history runs on open.
+  - Each call is written once, through `record_call`, so reports count it.
+  - Test calls stay out.
+  - Caller words (and agent words when `redact`) are marked personal.
+- **Ops → Voice server (`/ops/voice`).**
+  - Status (polled every 5 s), with reloads and maintenance mode.
+  - A settings editor generated from the JSON Schema, with search, locked and secret fields, per-field and per-section reset, a dry run before every save, and version conflicts handled.
+  - Model and voice switches showing `in_use`, and ASR load and unload.
+  - Testing another LLM or TTS server, then switching to it.
+  - Presets, checked first.
+  - All live calls, with End, and the change history.
+  - Ops → organisation → Voice server links the tenant.
+- **Security.**
+  - The platform key is in backend env only, and the tenant comes from the organisation record.
+  - The browser gets 10-minute call tokens in the `bearer.` subprotocol.
+  - Webhooks are HMAC-checked with 5 minutes of clock difference and read back before writing.
+  - Ops writes are audited without values.
+  - Staff can't start calls or change anything.
+
+**Files**
+- Backend, new: `integrations/orchestrator.py` (client, error mapping), `integrations/voicesync.py`, `domain/agentcompile.py`, `domain/voicecalls.py`, `routes/org/voice.py`, `routes/hooks.py`, `routes/ops_voice.py`, `tests/fakeorch.py` (an in-memory orchestrator), `tests/test_voice.py`.
+- Backend, changed: `core/config.py` (`ORCH_*`), `core/services.py`, `data/store.py` (`OrgDoc.orchTenantId`, `AgentDoc.voice` / `voiceAgentId`, `DraftDoc.voice`, `ToolDoc.llm`), `main.py` (hooks are exempt from the Origin check), `routes/org/agents.py`, `routes/org/handoffs.py`, `.env.example`, `README.md`, and the permission matrix (new routes).
+- Frontend, new: `console/voice/` (pcm, audio, sockets, callState, closeCodes, useVoiceCall), `components/voice/` (VoiceCallPanel, OperatorPanel, CallTranscript, VoicePreview, Voice.css), `ops/voiceAdmin.ts`, `pages/ops/OpsVoicePage.tsx`, `pages/ops/voice/` (SettingsEditor, panels, OrgVoiceLink, VoiceOps.css), `pages/console/agent/VoiceServerCard.tsx`, and tests `voice-call.test.ts` and `voice-settings.test.tsx`.
+- Frontend, changed: `types.ts` (optional voice methods, the `live` section), `httpConsoleClient.ts`, the agent workspace (Test and Settings tabs, failed-sync banner), the builder (behaviour preview, review call), Live calls (detail, forms), Call history (sync on open), Ops (nav, route, org page), and two tests updated for live models and scenarios.
+
+**Checked live** (test tenant, everything created was deleted)
+- Creating a voice agent with our id; 409 on a repeat; 412 on a stale ETag.
+- PATCH replaces whole sections (so `prompts: {}` is always sent); `null` is refused.
+- The profile endpoint.
+- Voice and operator tokens; `aica.voice.v1` and `aica.operator.v1` with `bearer.<token>`.
+- `session.start` with our metadata, typed turns, barge-in events, REST `say` and `end`, and a 1000 close.
+- Our live-call and call mappings on real sessions and events.
+- Agent audio arriving at 48 kHz, about 1.3 s to first sound.
+- LLM sessions with the client handover tool: it must carry the orchestrator's description, or the model never calls it.
+- WAV preview; `/v1/models` and `/v1/tts/voices` without a tenant.
+
+**Not run**
+- README §8's model switch and server-wide setting change. The sandbox refused them, because they change the shared orchestrator for every tenant. The Ops page does both (unit-tested against the fake). Try them once yourself, or allow them.
+- A microphone call in a real browser. The audio worklet and playback are unit-tested with stand-ins only.
+- Webhook delivery from the real orchestrator: it needs a public https `API_URL`, `ORCH_WEBHOOK_SECRET`, and a republish so our voice agents carry `webhook_url`.
+- The real backend with Firebase; the frontend `.env.example` (unreadable here). Add `agents,live,calls,handoffs` to `VITE_CONSOLE_LIVE` yourself.
+
+**Limits and follow-ups**
+- The TTS server has no named voices, so every agent speaks with its active voice until voices named after the catalogue (`kavya`…) are added there.
+- Not on the voice server:
+  - document and web knowledge (only FAQ reaches the agent);
+  - SMS and WhatsApp tools;
+  - keypad, ambience, per-agent noise removal, speaking rate;
+  - a whisper only the agent hears;
+  - reading a flow from uploaded recordings.
+- Call outcomes are provisional (handed over, dropped, resolved) and intent is "Not analysed yet" until post-call analysis exists.
+- Callers' phone numbers come from session metadata (`caller_phone` etc.), which SIP calls will need to set.
+- Live calls are polled, not pushed: 4 s per organisation page, with one events read per call (at most 20).
+- The two secrets were shared in this chat: rotate them.
 
 ## Flowchart and joins (2026-10-25, approved "proceed"; frontend and demo only)
 

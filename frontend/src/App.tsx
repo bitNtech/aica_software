@@ -47,6 +47,7 @@ import OpsOrgDetailPage from './pages/ops/OpsOrgDetailPage'
 import OpsTemplatesPage from './pages/ops/OpsTemplatesPage'
 import OpsPlatformPage from './pages/ops/OpsPlatformPage'
 import OpsStatusPage from './pages/ops/OpsStatusPage'
+import OpsVoicePage from './pages/ops/OpsVoicePage'
 import OpsOrgsPage from './pages/ops/OpsOrgsPage'
 import OpsCallsPage, { OpsCallRedirect } from './pages/ops/OpsCallsPage'
 import OpsLiveCallsPage from './pages/ops/OpsLiveCallsPage'
@@ -211,6 +212,7 @@ export default function App() {
       <Route path="/ops/templates" element={staff(<OpsTemplatesPage />)} />
       <Route path="/ops/platform" element={staff(<OpsPlatformPage />)} />
       <Route path="/ops/status" element={staff(<OpsStatusPage />)} />
+      <Route path="/ops/voice" element={staff(<OpsVoicePage />)} />
 
       <Route path="/403" element={<ForbiddenPage />} />
       <Route path="*" element={<NotFoundPage />} />

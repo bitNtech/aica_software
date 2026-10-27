@@ -9,14 +9,16 @@ import { SelectField, TextAreaField, TextField } from '../../../../components/ui
 import { Spinner } from '../../../../components/ui/Spinner'
 import { useAsync } from '../../../../lib/useAsync'
 import { timeAgo } from '../../../../lib/time'
+import { VoiceCallPanel } from '../../../../components/voice/VoiceCallPanel'
 import { TestChat } from '../../builder/TestChat'
 import { useAnnouncer } from '../../operate/LiveBits'
 import type { TabProps } from '../shared'
 
-/** Try the agent: scripted test scenarios, a text simulation now, and a
- * test call once the voice servers are connected. */
+/** Try the agent: scripted test scenarios, a text simulation in the
+ * browser, and a real test call through the voice server. */
 export function TestTab(props: TabProps & { hasChanges: boolean; onBeforeRun(): Promise<void> }) {
-  const { detail, spec, lib, hasChanges } = props
+  const { org, detail, spec, lib, hasChanges, onBeforeRun } = props
+  const client = useConsole()
   const id = useId()
   return (
     <div className="ws__sections">
@@ -28,7 +30,8 @@ export function TestTab(props: TabProps & { hasChanges: boolean; onBeforeRun(): 
         <p className="step__sub">
           {hasChanges
             ? `This tries your draft changes, not version ${detail.agent.version} that callers get.`
-            : `This tries version ${detail.agent.version}, the one callers get.`}
+            : `This tries version ${detail.agent.version}, the one callers get.`}{' '}
+          {client.startTestCall && 'It’s a quick simulation in your browser that follows the flow; the test call below uses the real agent.'}
         </p>
         <TestChat draft={spec} tools={lib.tools} knowledge={lib.knowledge} />
       </section>
@@ -36,15 +39,33 @@ export function TestTab(props: TabProps & { hasChanges: boolean; onBeforeRun(): 
         <h2 id={`${id}-call`} className="step__heading">
           Test call in your browser
         </h2>
-        <div className="ws__unavailable">
-          <p>Talk to the agent through your microphone, as a caller would. This needs AICA’s voice servers, which aren’t connected yet.</p>
-          <Button variant="line" size="sm" className="btn--inactive" aria-disabled aria-describedby={`${id}-why`}>
-            Start a test call
-          </Button>
-          <p className="field__hint" id={`${id}-why`}>
-            Not available yet.
-          </p>
-        </div>
+        {client.startTestCall ? (
+          <>
+            <p className="step__sub">Talk to the agent through your microphone, as a caller would. Use headphones if you can. Test calls never reach Call history or reports.</p>
+            <VoiceCallPanel<'test' | 'live'>
+              targets={[
+                { value: 'test', label: hasChanges ? 'Your saved changes' : 'The saved setup', hint: hasChanges ? `What you're editing, not version ${detail.agent.version}.` : `The same as version ${detail.agent.version}.` },
+                { value: 'live', label: `Version ${detail.agent.version}`, hint: detail.agent.status === 'live' ? 'Exactly what callers get now.' : 'The agent is paused, so this is refused.' },
+              ]}
+              getTicket={(target) => client.startTestCall!(org.orgSlug, detail.agent.id, target)}
+              getTranscript={client.getTestCallTranscript ? (callId) => client.getTestCallTranscript!(org.orgSlug, callId) : undefined}
+              onBeforeStart={async (target) => {
+                // The test copy is the saved setup: save what's on screen first.
+                if (target === 'test') await onBeforeRun()
+              }}
+            />
+          </>
+        ) : (
+          <div className="ws__unavailable">
+            <p>Talk to the agent through your microphone, as a caller would. This needs AICA’s voice servers, which aren’t connected in the demo.</p>
+            <Button variant="line" size="sm" className="btn--inactive" aria-disabled aria-describedby={`${id}-why`}>
+              Start a test call
+            </Button>
+            <p className="field__hint" id={`${id}-why`}>
+              Not available in the demo.
+            </p>
+          </div>
+        )}
       </section>
     </div>
   )

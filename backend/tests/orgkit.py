@@ -33,8 +33,8 @@ def login(client, email, password=PW):
     return r
 
 
-def make_org(store, slug=SLUG, status="active", owner_uid="nobody"):
-    store.save_org(OrgDoc(slug=slug, name=slug.title(), city="Coimbatore", type="hospital", languages=["tamil"], status=status, ownerUid=owner_uid))
+def make_org(store, slug=SLUG, status="active", owner_uid="nobody", tenant="ten_test123456"):
+    store.save_org(OrgDoc(slug=slug, name=slug.title(), city="Coimbatore", type="hospital", languages=["tamil"], status=status, ownerUid=owner_uid, orchTenantId=tenant))
 
 
 def add_member(fb, store, role, *, slug=SLUG, email=None, name=None, permissions=None, disabled=False) -> str:

@@ -92,9 +92,13 @@ describe('createHttpConsoleClient', () => {
     const c = client()
     expect(c.isDemo).toBe(true)
     expect(ALL_LIVE_SECTIONS.every((s) => c.isLive?.(s))).toBe(true)
-    // The model catalogue is the pipeline's: no request, sample data.
-    expect(await c.listModels()).toBeTruthy()
-    expect(f).not.toHaveBeenCalled()
+    // The model catalogue is the voice server's, through the API; when that
+    // isn't set up here, the console falls back to the sample catalogue.
+    f.mockImplementation(async () => new Response(JSON.stringify({ error: { code: 'unknown', message: 'not set up' } }), { status: 503, headers: { 'Content-Type': 'application/json' } }))
+    const models = await c.listModels()
+    expect(models.live).toBeUndefined()
+    expect(models.speech.length).toBeGreaterThan(0)
+    expect(f.mock.calls.map(([u]) => u)).toEqual(['/api/catalogue/models'])
   })
 
   it('calls the Phase 2 and 3 paths', async () => {

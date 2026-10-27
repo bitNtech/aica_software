@@ -89,6 +89,8 @@ class OrgDoc:
     closed: list[dict] = field(default_factory=list)
     settingsUpdatedAt: datetime | None = None
     settingsUpdatedBy: str | None = None
+    # The voice orchestrator / LLM server tenant (ten_…) its agents and calls live in.
+    orchTenantId: str | None = None
 
 
 @dataclass
@@ -283,6 +285,9 @@ class ToolDoc:
     retries: int | None = None
     lastTestedAt: datetime | None = None
     updatedAt: datetime = field(default_factory=now)
+    # Its copy on the LLM server (http tools): {id, version, hash}. Set by
+    # app/integrations/voicesync.py when an agent using it is synced.
+    llm: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -356,6 +361,13 @@ class AgentDoc:
     changed: bool = False  # saved edits not published yet
     revision: int = 0  # bumped on every change to `working` (optimistic concurrency)
     createdAt: datetime = field(default_factory=now)
+    # The voice stack's copies (app/integrations/voicesync.py): "live" (the
+    # published version callers get) and "test" (the working setup, for test
+    # calls). Each {llmAgentId, llmVersion, voiceAgentId, voiceVersion,
+    # status, error, warnings, syncedAt, syncedVersion | hash}.
+    voice: dict = field(default_factory=dict)
+    # voice["live"]["voiceAgentId"], kept top-level so calls can be matched to the agent.
+    voiceAgentId: str | None = None
 
 
 @dataclass
@@ -370,6 +382,8 @@ class DraftDoc:
     revision: int = 0
     # Set once published: publishing again returns this agent (safe retries).
     publishedAgentId: str | None = None
+    # Its test copy on the voice stack, as AgentDoc.voice["test"].
+    voice: dict = field(default_factory=dict)
 
 
 @dataclass

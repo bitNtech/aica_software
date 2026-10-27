@@ -8,6 +8,13 @@ import type {
   ActivityPage,
   ActivityQuery,
   AgentDetail,
+  AgentVoice,
+  AgentVoiceDetail,
+  LiveCall,
+  ModelCatalogue,
+  OperatorTicket,
+  TestCallTranscript,
+  VoiceTicket,
   AgentDraft,
   AgentSpec,
   AgentSummary,
@@ -40,7 +47,7 @@ import type {
 } from './types'
 
 /** Every section the API serves (docs/backend-workflow.md, Phases 1–3). */
-export const ALL_LIVE_SECTIONS: readonly ConsoleSection[] = ['team', 'settings', 'activity', 'requests', 'calls', 'callbacks', 'appointments', 'handoffs', 'reports', 'numbers', 'tools', 'knowledge', 'uploads', 'agents']
+export const ALL_LIVE_SECTIONS: readonly ConsoleSection[] = ['team', 'settings', 'activity', 'requests', 'calls', 'callbacks', 'appointments', 'handoffs', 'reports', 'numbers', 'tools', 'knowledge', 'uploads', 'agents', 'live']
 
 /** What's live unless an environment says otherwise. The operations
  * sections (calls, callbacks, appointments, handoffs) only fill up once the
@@ -80,6 +87,23 @@ export function createHttpConsoleClient(
     let res: Response
     try {
       res = await fetch(apiUrl(`/api${path}`, base), { credentials: apiCredentials(base) })
+    } catch {
+      throw new AuthError('network', "We couldn't reach AICA. Check your connection and try again.")
+    }
+    if (res.ok) return res.blob()
+    const err = ((await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null)?.error
+    throw new AuthError((err?.code as AuthErrorCode) ?? 'unknown', err?.message ?? 'Something went wrong on our side. Try again in a moment.')
+  }
+  /** A POST whose answer is a file (a voice sample). */
+  const postFile = async (path: string, body: unknown): Promise<Blob> => {
+    let res: Response
+    try {
+      res = await fetch(apiUrl(`/api${path}`, base), {
+        method: 'POST',
+        credentials: apiCredentials(base),
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/wav, application/json' },
+        body: JSON.stringify(body),
+      })
     } catch {
       throw new AuthError('network', "We couldn't reach AICA. Check your connection and try again.")
     }
@@ -155,6 +179,7 @@ export function createHttpConsoleClient(
       listCallLog: (o, q) => get<CallLogPage>(org(o, `/calls${qs({ days: q.days, agentId: q.agentId, outcome: q.outcome, q: q.q, limit: q.limit })}`)),
       getCallRecord: (o, id) => get<CallRecord>(org(o, `/calls/${enc(id)}`)),
       addCallNote: (o, id, text) => post<CallNote>(org(o, `/calls/${enc(id)}/notes`), { text }),
+      syncCalls: (o) => post<{ added: number }>(org(o, '/calls/sync')),
     },
     callbacks: {
       listCallbacks: (o) => get<Callback[]>(org(o, '/callbacks')),
@@ -254,9 +279,35 @@ export function createHttpConsoleClient(
       deleteScenario: (o, id, sid) => post<void>(org(o, `/agents/${enc(id)}/scenarios/${enc(sid)}/delete`)),
       listAgentTypes: () => get<AgentType[]>('/catalogue/agent-types'),
       listVoices: () => get<Voice[]>('/catalogue/voices'),
-      // AI work (docs/backend-workflow.md, out of scope): say so instead of pretending.
-      runScenarios: () => NEEDS_PIPELINE('Running test scenarios'),
+      // Scenarios run as text against the agent's test copy on the voice server.
+      runScenarios: (o, id) => post<Scenario[]>(org(o, `/agents/${enc(id)}/scenarios/run`)),
+      // Reading a flow from recordings needs transcription, which isn't connected.
       extractFlow: () => NEEDS_PIPELINE('Reading a flow from calls'),
+      // The voice server's catalogue; the demo's when it isn't set up here.
+      listModels: () => get<ModelCatalogue>('/catalogue/models').catch(() => fallback.listModels()),
+      getAgentVoice: (o, id) => get<AgentVoiceDetail>(org(o, `/agents/${enc(id)}/voice`)),
+      resyncAgentVoice: (o, id) => post<AgentVoice>(org(o, `/agents/${enc(id)}/voice/sync`)),
+      startTestCall: (o, id, target) => post<VoiceTicket>(org(o, `/agents/${enc(id)}/voice-token`), { target }),
+      startDraftTestCall: (o, id) => post<VoiceTicket>(org(o, `/drafts/${enc(id)}/voice-token`)),
+      getTestCallTranscript: (o, callId) => get<TestCallTranscript>(org(o, `/voice/calls/${enc(callId)}/transcript`)),
+      previewVoice: (o, voiceId, text) => postFile(org(o, '/voice/preview'), { voiceId, text }),
+    },
+    live: {
+      listLiveCalls: (o) => get<LiveCall[]>(org(o, '/live-calls')),
+      // "Take the call": ask for a person on the voice server; the page then joins in the browser.
+      takeOverCall: (o, id) => post<LiveCall>(org(o, `/live-calls/${enc(id)}/handoff`), { reason: '' }),
+      // There's no whisper on the voice server: the page words this as "Say to the caller".
+      whisperToAgent: (o, id, text) => post<LiveCall>(org(o, `/live-calls/${enc(id)}/say`), { text }),
+      transferCall: async (o, id, to, warm) => {
+        const name = (await get<Member[]>(org(o, '/members')).catch(() => [] as Member[])).find((m) => m.id === to)?.name ?? 'a colleague'
+        const call = await post<LiveCall>(org(o, `/live-calls/${enc(id)}/handoff`), { reason: `${name} will take the call${warm ? '; tell the caller who is joining' : ''}` })
+        return { ...call, transferredTo: { name, warm } }
+      },
+      endLiveCall: (o, id) => post<unknown>(org(o, `/live-calls/${enc(id)}/end`), { reason: '' }).then(() => undefined),
+      interruptLiveCall: (o, id) => post<LiveCall>(org(o, `/live-calls/${enc(id)}/interrupt`)),
+      sayToCaller: (o, id, text) => post<LiveCall>(org(o, `/live-calls/${enc(id)}/say`), { text }),
+      releaseLiveCall: (o, id, resumeAi) => post<LiveCall>(org(o, `/live-calls/${enc(id)}/release`), { resumeAi }),
+      joinLiveCall: (o, id, mode) => post<OperatorTicket>(org(o, `/live-calls/${enc(id)}/operator-token`), { mode }),
     },
     handoffs: {
       listHandoffs: (o) => get<Handoff[]>(org(o, '/handoffs')),

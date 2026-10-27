@@ -55,6 +55,9 @@ def _get(tx: Tx, slug: str, handoff_id: str) -> HandoffDoc:
 
 @router.get("", response_model=list[HandoffOut], response_model_by_alias=True)
 def list_handoffs(ctx: OrgContext = Depends(org_permission("calls.viewAll", "calls.take", what="see who is waiting for a person"))):
+    from .voice import pull_handoffs
+
+    pull_handoffs(ctx)
     personal = ctx.access.has("calls.personal")
     rows = sorted(ctx.svc.store.list_handoffs(ctx.slug, now() - RECENT), key=lambda h: h.waitingSince)
     return [handoff_out(h, personal) for h in rows]

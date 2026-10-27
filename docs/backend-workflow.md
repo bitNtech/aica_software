@@ -287,12 +287,14 @@ This phase is CRUD over records. **Creating** call records needs the voice pipel
 
 The pipeline itself is out of scope, but the backend has to **receive** data from it. Agree on these contracts before Phase 3 can carry real data:
 
-- [ ] **Call-ended event:** how a finished call reaches the backend (webhook or queue), with its auth (an HMAC signature or mTLS), payload (the `CallSummary` and `CallRecord` fields) and retry/idempotency key.
-- [ ] **Live call state** for `listLiveCalls`, take-over and transfer: polling, WebSocket or SSE, and who owns the state.
-- [ ] **Handoff created:** an event when the agent passes a call to a person.
+> **2026-10-27: the voice orchestrator is connected** ([`orchestrator-contract.md`](orchestrator-contract.md)). Call-ended, handoff events, live call state, desk-to-call controls and published-spec-to-agent are now built against its documented, live-checked API. Recordings, notices and line mode to the running agent, and appointment requests are still open.
+
+- [x] **Call-ended event:** *(orchestrator `call.ended` webhook, HMAC-signed, plus a pull from `GET /v1/voice/sessions?status=ended`; see orchestrator-contract.md)* how a finished call reaches the backend (webhook or queue), with its auth (an HMAC signature or mTLS), payload (the `CallSummary` and `CallRecord` fields) and retry/idempotency key.
+- [x] **Live call state** *(polled from the orchestrator; listening in and taking over through its operator socket)* for `listLiveCalls`, take-over and transfer: polling, WebSocket or SSE, and who owns the state.
+- [x] **Handoff created:** *(`handoff.*` webhooks and `GET /v1/handoffs`)* an event when the agent passes a call to a person.
 - [ ] **Recordings:** where audio is stored, its retention, and how the backend signs URLs for it.
 - [ ] **Desk to agent:** how notices, doctor changes and line mode reach the running agent.
-- [ ] **Published spec to agent:** how the agent runtime fetches the published `AgentSpec` (pull by version, or push on publish).
+- [x] **Published spec to agent:** *(pushed on publish: each version becomes an LLM agent and a voice agent; `app/integrations/voicesync.py`)* how the agent runtime fetches the published `AgentSpec` (pull by version, or push on publish).
 - [ ] **Appointment requests (frontend built in demo, 2026-10-24):** the flow the Appointments page shows. This is a description only: nothing is built on the server or pipeline yet.
   1. *Request in:* when the agent books on a call, the pipeline sends a request event: patient, phone, doctor, department, date and time, type, the reason for the visit in the patient's words, the call id, and an optional `checkReason`. The backend stores it as an `Appointment` with `status: "pending"` and `source: "ai_call"`. Several requests may share one doctor and time.
   2. *Ranking:* when a time has more than one pending request, an LLM ranks them from what the agent gathered. It writes `rank: {position, of, level: urgent|high|normal|routine, reasons, rankedAt}` on each, and ranks again whenever the set changes. We need to agree which model, the prompt and inputs, a timeout, and what happens if ranking fails (suggested: order by when they asked, with `level: "normal"`).

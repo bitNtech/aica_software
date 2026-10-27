@@ -4,7 +4,9 @@ import type { AgentPatch } from '../../../../console/types'
 import { Button } from '../../../../components/ui/Button'
 import { ConfirmDialog } from '../../../../components/ui/Dialog'
 import { SelectField, TextField } from '../../../../components/ui/Field'
+import { useConsole } from '../../../../console/ConsoleProvider'
 import type { TabProps } from '../shared'
+import { VoiceServerCard } from '../VoiceServerCard'
 
 interface Props extends TabProps {
   canDelete: boolean
@@ -19,8 +21,9 @@ interface Props extends TabProps {
 }
 
 /** Name, number, on or off, and deleting: outside versions, applied at once. */
-export function SettingsTab({ detail, spec, lib, canDelete, canRename, canNumber, canPause, onUpdate, onDelete }: Props) {
+export function SettingsTab({ org, detail, spec, lib, canDelete, canRename, canNumber, canPause, onUpdate, onDelete }: Props) {
   const id = useId()
+  const client = useConsole()
   const a = detail.agent
   const current = lib.numbers.find((n) => n.agentId === a.id)
 
@@ -135,6 +138,7 @@ export function SettingsTab({ detail, spec, lib, canDelete, canRename, canNumber
   return (
     <div className="ws__sections">
       <p className="step__sub ws__apply-note">Changes here apply straight away. They aren’t saved as a version.</p>
+      {client.getAgentVoice && <VoiceServerCard orgSlug={org.orgSlug} agentId={a.id} version={a.version} canSync={canPause} />}
       <section className="step__section" aria-labelledby={`${id}-name`}>
         <h2 id={`${id}-name`} className="step__heading">
           Name

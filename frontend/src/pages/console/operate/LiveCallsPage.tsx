@@ -171,6 +171,7 @@ export default function LiveCallsPage() {
     <ConsolePage
       kicker="Operate"
       title="Live calls"
+      section="live"
       docTitle="Live calls"
       status={<UpdatedAgo at={feed.checkedAt} />}
       actions={canAct ? <AlertsMenu alerts={alerts} /> : null}

@@ -188,3 +188,4 @@
 @media (max-width: 600px) {
   .live-alerts__panel { position: fixed; left: 1rem; right: 1rem; top: auto; bottom: 1rem; width: auto; }
 }
+.live-actions--quiet { background: transparent; padding-inline: 0; }
