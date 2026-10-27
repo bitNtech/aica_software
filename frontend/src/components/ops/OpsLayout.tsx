@@ -121,6 +121,9 @@ export function OpsBar({ pendingCount }: { pendingCount?: number }) {
         <NavLink to="/ops/status" className="ops__link">
           Service status
         </NavLink>
+        <NavLink to="/ops/voice" className="ops__link">
+          Voice server
+        </NavLink>
 
         {user.platformRole === 'master_admin' && (
           <>

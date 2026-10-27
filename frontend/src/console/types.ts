@@ -47,7 +47,7 @@ export interface AgentSummary {
 
 /** The parts of the console that move from demo data to the API one at a
  * time (docs/backend-workflow.md). */
-export type ConsoleSection = 'team' | 'settings' | 'activity' | 'requests' | 'calls' | 'callbacks' | 'appointments' | 'handoffs' | 'reports' | 'numbers' | 'tools' | 'knowledge' | 'uploads' | 'agents'
+export type ConsoleSection = 'team' | 'settings' | 'activity' | 'requests' | 'calls' | 'callbacks' | 'appointments' | 'handoffs' | 'reports' | 'numbers' | 'tools' | 'knowledge' | 'uploads' | 'agents' | 'live'
 
 /** Methods reject with an `AuthError` (auth/types.ts), whose message is
  * written for the person using the console. Pages show it as-is, so a real
@@ -188,8 +188,32 @@ export interface ConsoleClient {
   /** Runs every scenario against the saved setup (draft changes included). */
   runScenarios(orgSlug: string, agentId: string): Promise<Scenario[]>
 
+  // ---- the voice stack (absent in the demo: the pages say what it needs)
+  /** The agent's copies on the voice server, and the settings a call uses. */
+  getAgentVoice?(orgSlug: string, agentId: string): Promise<AgentVoiceDetail>
+  /** Sends the published version to the voice server again (after a failed sync). */
+  resyncAgentVoice?(orgSlug: string, agentId: string): Promise<AgentVoice>
+  /** A browser call with the agent: `test` is the saved setup, `live` what callers get. */
+  startTestCall?(orgSlug: string, agentId: string, target: 'test' | 'live'): Promise<VoiceTicket>
+  /** bitNtech: a browser call with an agent still being built. */
+  startDraftTestCall?(orgSlug: string, draftId: string): Promise<VoiceTicket>
+  /** What was said on a test call, once it has ended. */
+  getTestCallTranscript?(orgSlug: string, callId: string): Promise<TestCallTranscript>
+  /** A short sample in the agent's voice, as audio. */
+  previewVoice?(orgSlug: string, voiceId: string, text: string): Promise<Blob>
+
   // ---- operate: calls as they happen, and after
   listLiveCalls(orgSlug: string): Promise<LiveCall[]>
+  /** Live calls on the voice server: hang up, stop the agent, say something
+   * the caller hears, give a call back to the agent, or listen in / take
+   * over in the browser. Absent: the demo's desk-phone flow. */
+  endLiveCall?(orgSlug: string, callId: string): Promise<void>
+  interruptLiveCall?(orgSlug: string, callId: string): Promise<LiveCall>
+  sayToCaller?(orgSlug: string, callId: string, text: string): Promise<LiveCall>
+  releaseLiveCall?(orgSlug: string, callId: string, resumeAi: boolean): Promise<LiveCall>
+  joinLiveCall?(orgSlug: string, callId: string, mode: 'listen' | 'takeover'): Promise<OperatorTicket>
+  /** Brings finished calls from the voice server into Call history. */
+  syncCalls?(orgSlug: string): Promise<{ added: number }>
   /** Puts the caller through to the person asking (their desk phone). */
   takeOverCall(orgSlug: string, callId: string): Promise<LiveCall>
   /** A note only the agent hears, e.g. "Offer Saturday with Dr. Arvind". */
@@ -353,6 +377,8 @@ export interface ModelCatalogue {
   voice: { id: string; label: string; note: string }[]
   /** What "default" means today, by id. */
   defaults: { speech: string; language: string; voice: string }
+  /** From the voice server, not the demo catalogue. */
+  live?: boolean
 }
 
 export type Tone = 'warm' | 'formal' | 'brisk'
@@ -797,6 +823,61 @@ export interface AgentDetail {
   working: AgentSpec
   /** Newest first. The first is the one callers get. */
   versions: AgentVersion[]
+  /** Its copies on the voice server; absent in the demo. */
+  voice?: AgentVoice
+}
+
+/** An agent's copies on the voice server (backend app/integrations/voicesync.py). */
+export interface AgentVoice {
+  /** out_of_date: synced, but an older version than the published one. */
+  status: 'synced' | 'failed' | 'out_of_date' | 'not_synced'
+  error: string | null
+  /** Settings the voice server doesn't use, or choices it replaced, in words. */
+  warnings: string[]
+  syncedAt: string | null
+  syncedVersion: number | null
+  voiceAgentId: string | null
+  llmAgentId: string | null
+  testVoiceAgentId: string | null
+  testSyncedAt: string | null
+}
+
+export interface AgentVoiceDetail extends AgentVoice {
+  /** The organisation is linked to the voice server. */
+  connected: boolean
+  /** The merged settings a call uses (the voice server's profile). */
+  profile: { profile?: Record<string, Record<string, unknown>> } | null
+  profileError?: string
+}
+
+/** What the browser needs to open a voice call: a short-lived token, never a key. */
+export interface VoiceTicket {
+  token: string
+  expiresAt: string | null
+  /** wss://… of the voice server. */
+  wsBase: string
+  voiceAgentId: string
+  warnings: string[]
+  /** Sent with session.start, stored on the call record. */
+  metadata: Record<string, string>
+}
+
+export interface OperatorTicket {
+  token: string
+  expiresAt: string | null
+  wsBase: string
+  /** /v1/voice/sessions/{id}/operator */
+  path: string
+  mode: 'listen' | 'takeover'
+  /** Shown to the caller's side as who joined. */
+  name: string
+}
+
+export interface TestCallTranscript {
+  callId: string
+  turns: TranscriptTurn[]
+  stats: Record<string, unknown>
+  endReason: string | null
 }
 
 export interface AgentPatch {
@@ -851,6 +932,11 @@ export interface LiveCall {
   whispers: { by: string; at: string; text: string }[]
   /** Handed to a colleague: who, and whether the agent briefed them first. */
   transferredTo?: { name: string; warm: boolean } | null
+  /** A test call from the console, not a customer. */
+  test?: boolean
+  /** On the voice server: ai, handoff_pending (waiting for a person) or human. */
+  mode?: string
+  handoffId?: string | null
 }
 
 export interface CollectedDetail {

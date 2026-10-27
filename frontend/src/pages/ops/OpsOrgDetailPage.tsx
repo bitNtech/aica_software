@@ -15,6 +15,8 @@ import type { OrgDetail, OrgJob } from '../../ops/types'
 import { useAsync } from '../../lib/useAsync'
 import { shortDate, timeAgo } from '../../lib/time'
 import { useAnnouncer } from '../console/operate/LiveBits'
+import { OrgVoiceLink } from './voice/OrgVoiceLink'
+import '../../components/voice/Voice.css'
 import '../console/library/Library.css'
 import '../console/operate/Operate.css'
 import './Ops.css'
@@ -38,7 +40,9 @@ export default function OpsOrgDetailPage() {
   const ops = useOpsData()
   const isMaster = user?.platformRole === 'master_admin'
   const load = useCallback(async () => {
-    const [orgs, detail] = await Promise.all([client.listOrgs(), ops.getOrgDetail(slug)])
+    // Usage, team, jobs and history still come from sample data, which only
+    // knows the demo organisations: a real one shows everything else.
+    const [orgs, detail] = await Promise.all([client.listOrgs(), ops.getOrgDetail(slug).catch(() => null)])
     const org = orgs.find((o) => o.slug === slug)
     if (!org) throw new Error('missing')
     return { org, detail }
@@ -78,7 +82,7 @@ export default function OpsOrgDetailPage() {
   )
 }
 
-function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; detail: OrgDetail; isMaster: boolean; onChanged(): void }) {
+function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; detail: OrgDetail | null; isMaster: boolean; onChanged(): void }) {
   const { client, actAs } = useAuth()
   const ops = useOpsData()
   const navigate = useNavigate()
@@ -86,7 +90,7 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
   const [open, setOpen] = useState<'suspend' | 'act' | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [jobs, setJobs] = useState(d.jobs)
+  const [jobs, setJobs] = useState(d?.jobs ?? [])
   const [jobError, setJobError] = useState<{ id: string; text: string } | null>(null)
   /** Failed jobs, then the newest few, until "Show all". */
   const [allJobs, setAllJobs] = useState(false)
@@ -165,10 +169,12 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
             <dt>Owner</dt>
             <dd>{org.ownerEmail}</dd>
           </div>
-          <div>
-            <dt>Plan</dt>
-            <dd>{d.plan}</dd>
-          </div>
+          {d && (
+            <div>
+              <dt>Plan</dt>
+              <dd>{d.plan}</dd>
+            </div>
+          )}
           <div>
             <dt>Since</dt>
             <dd>{shortDate(org.createdAt)}</dd>
@@ -235,141 +241,153 @@ function Detail({ org, detail: d, isMaster, onChanged }: { org: OrgSummary; deta
         )}
       </section>
 
-      <section className="ops-section" aria-labelledby={`${id}-use`}>
-        <div className="ops-section__head">
-          <h2 id={`${id}-use`} className="ops-section__title">
-            Last 30 days
-          </h2>
-          <Link className="link" to="/ops/analytics">
-            All usage
-          </Link>
-        </div>
-        <dl className="stats ops-stats">
-          <div className="stat">
-            <dt className="stat__label">Calls</dt>
-            <dd className="stat__value">{num(d.usage.calls)}</dd>
-          </div>
-          <div className="stat">
-            <dt className="stat__label">Call minutes</dt>
-            <dd className="stat__value">{num(d.usage.minutes)}</dd>
-          </div>
-          <div className="stat">
-            <dt className="stat__label">Recordings processed</dt>
-            <dd className="stat__value">{d.usage.uploadHours} h</dd>
-          </div>
-        </dl>
-      </section>
+      {d ? (
+        <>
+          <section className="ops-section" aria-labelledby={`${id}-use`}>
+            <div className="ops-section__head">
+              <h2 id={`${id}-use`} className="ops-section__title">
+                Last 30 days
+              </h2>
+              <Link className="link" to="/ops/analytics">
+                All usage
+              </Link>
+            </div>
+            <dl className="stats ops-stats">
+              <div className="stat">
+                <dt className="stat__label">Calls</dt>
+                <dd className="stat__value">{num(d.usage.calls)}</dd>
+              </div>
+              <div className="stat">
+                <dt className="stat__label">Call minutes</dt>
+                <dd className="stat__value">{num(d.usage.minutes)}</dd>
+              </div>
+              <div className="stat">
+                <dt className="stat__label">Recordings processed</dt>
+                <dd className="stat__value">{d.usage.uploadHours} h</dd>
+              </div>
+            </dl>
+          </section>
 
-      <section className="ops-section" aria-labelledby={`${id}-team`}>
-        <div className="ops-section__head">
-          <h2 id={`${id}-team`} className="ops-section__title">
-            Team <span className="op-count">{d.members.length}</span>
-          </h2>
-        </div>
-        <div className="ops-table" role="region" aria-labelledby={`${id}-team`} tabIndex={0}>
-          <table className="op-table ops-left">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Email</th>
-                <th scope="col">Role</th>
-                <th scope="col">Last active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.members.map((m) => (
-                <tr key={m.id}>
-                  <th scope="row">{m.status === 'invited' ? 'Invited' : m.name}</th>
-                  <td>{m.email}</td>
-                  <td>{ROLE_LABEL[m.role]}</td>
-                  <td>{m.lastActiveAt ? timeAgo(m.lastActiveAt) : 'Never'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+          <section className="ops-section" aria-labelledby={`${id}-team`}>
+            <div className="ops-section__head">
+              <h2 id={`${id}-team`} className="ops-section__title">
+                Team <span className="op-count">{d.members.length}</span>
+              </h2>
+            </div>
+            <div className="ops-table" role="region" aria-labelledby={`${id}-team`} tabIndex={0}>
+              <table className="op-table ops-left">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Last active</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.members.map((m) => (
+                    <tr key={m.id}>
+                      <th scope="row">{m.status === 'invited' ? 'Invited' : m.name}</th>
+                      <td>{m.email}</td>
+                      <td>{ROLE_LABEL[m.role]}</td>
+                      <td>{m.lastActiveAt ? timeAgo(m.lastActiveAt) : 'Never'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
+        <p className="empty-note">Usage figures, the team, processing jobs and status history aren’t available for this organisation yet.</p>
+      )}
 
       <OrgAgents slug={org.slug} active={org.status === 'active'} isMaster={isMaster} />
 
-      <section className="ops-section" aria-labelledby={`${id}-jobs`}>
-        <div className="ops-section__head">
-          <h2 id={`${id}-jobs`} className="ops-section__title">
-            Processing jobs
-          </h2>
-          <p className="ops-section__note">{failed ? `${failed} failed` : 'None failed'}</p>
-        </div>
-        {jobs.length === 0 ? (
-          <p className="empty-note">No uploads or knowledge yet.</p>
-        ) : (
-          <ul className="lib-rows" aria-labelledby={`${id}-jobs`}>
-            {shownJobs.map((j) => (
-              <li key={j.id} className="lib-row">
-                <div className="lib-row__main">
-                  <h3 className="lib-row__name" id={`${id}-job-${j.id}`} tabIndex={-1}>
-                    <span className="lib-row__origin">{j.name}</span>
-                    <span className={`status-chip status-chip--call-${j.status === 'indexing' ? 'queued' : j.status}`}>{JOB_STATUS[j.status]}</span>
-                  </h3>
-                  <p className="row__meta">
-                    {j.kind === 'recording' ? 'Call recording' : 'Knowledge'} <i aria-hidden="true">·</i> added {timeAgo(j.addedAt)}
-                  </p>
-                  {j.error && <p className="lib-row__warn">{j.error}</p>}
-                  {jobError?.id === j.id && (
-                    <p className="field__error" role="alert">
-                      {jobError.text}
-                    </p>
-                  )}
-                </div>
-                {isMaster && j.status === 'failed' && (
-                  <div className="lib-row__actions">
-                    <Button variant="line" size="sm" busy={busy === j.id} busyLabel="Queuing…" onClick={() => void retry(j)}>
-                      Try again<span className="sr-only">: {j.name}</span>
-                    </Button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-        {jobs.length > shownJobs.length && (
-          <p className="op-log__more">
-            Showing {shownJobs.length} of {jobs.length}: failed ones first, then the newest.{' '}
-            <button
-              type="button"
-              className="btn-text"
-              onClick={() => {
-                const next = shownJobs.length
-                setAllJobs(true)
-                // The first job it adds takes focus.
-                window.setTimeout(() => document.querySelectorAll<HTMLElement>(`[id^="${id}-job-"]`)[next]?.focus(), 0)
-              }}
-            >
-              Show all {jobs.length}
-            </button>
-          </p>
-        )}
-      </section>
+      <OrgVoiceLink slug={org.slug} isMaster={isMaster} />
 
-      <section className="ops-section" aria-labelledby={`${id}-hist`}>
-        <div className="ops-section__head">
-          <h2 id={`${id}-hist`} className="ops-section__title">
-            Status history
-          </h2>
-          {isMaster && (
-            <Link className="link" to="/ops/audit">
-              Audit log
-            </Link>
-          )}
-        </div>
-        <ol className="ops-history">
-          {d.history.map((h) => (
-            <li key={h.at + h.status}>
-              <span className="ops-history__what">{STATUS_WORD[h.status]}</span> <span className="row__meta">{shortDate(h.at)}, by {h.by}</span>
-              {h.reason && <p className="row__reason">“{h.reason}”</p>}
-            </li>
-          ))}
-        </ol>
-      </section>
+      {d && (
+        <>
+          <section className="ops-section" aria-labelledby={`${id}-jobs`}>
+            <div className="ops-section__head">
+              <h2 id={`${id}-jobs`} className="ops-section__title">
+                Processing jobs
+              </h2>
+              <p className="ops-section__note">{failed ? `${failed} failed` : 'None failed'}</p>
+            </div>
+            {jobs.length === 0 ? (
+              <p className="empty-note">No uploads or knowledge yet.</p>
+            ) : (
+              <ul className="lib-rows" aria-labelledby={`${id}-jobs`}>
+                {shownJobs.map((j) => (
+                  <li key={j.id} className="lib-row">
+                    <div className="lib-row__main">
+                      <h3 className="lib-row__name" id={`${id}-job-${j.id}`} tabIndex={-1}>
+                        <span className="lib-row__origin">{j.name}</span>
+                        <span className={`status-chip status-chip--call-${j.status === 'indexing' ? 'queued' : j.status}`}>{JOB_STATUS[j.status]}</span>
+                      </h3>
+                      <p className="row__meta">
+                        {j.kind === 'recording' ? 'Call recording' : 'Knowledge'} <i aria-hidden="true">·</i> added {timeAgo(j.addedAt)}
+                      </p>
+                      {j.error && <p className="lib-row__warn">{j.error}</p>}
+                      {jobError?.id === j.id && (
+                        <p className="field__error" role="alert">
+                          {jobError.text}
+                        </p>
+                      )}
+                    </div>
+                    {isMaster && j.status === 'failed' && (
+                      <div className="lib-row__actions">
+                        <Button variant="line" size="sm" busy={busy === j.id} busyLabel="Queuing…" onClick={() => void retry(j)}>
+                          Try again<span className="sr-only">: {j.name}</span>
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {jobs.length > shownJobs.length && (
+              <p className="op-log__more">
+                Showing {shownJobs.length} of {jobs.length}: failed ones first, then the newest.{' '}
+                <button
+                  type="button"
+                  className="btn-text"
+                  onClick={() => {
+                    const next = shownJobs.length
+                    setAllJobs(true)
+                    // The first job it adds takes focus.
+                    window.setTimeout(() => document.querySelectorAll<HTMLElement>(`[id^="${id}-job-"]`)[next]?.focus(), 0)
+                  }}
+                >
+                  Show all {jobs.length}
+                </button>
+              </p>
+            )}
+          </section>
+
+          <section className="ops-section" aria-labelledby={`${id}-hist`}>
+            <div className="ops-section__head">
+              <h2 id={`${id}-hist`} className="ops-section__title">
+                Status history
+              </h2>
+              {isMaster && (
+                <Link className="link" to="/ops/audit">
+                  Audit log
+                </Link>
+              )}
+            </div>
+            <ol className="ops-history">
+              {d.history.map((h) => (
+                <li key={h.at + h.status}>
+                  <span className="ops-history__what">{STATUS_WORD[h.status]}</span> <span className="row__meta">{shortDate(h.at)}, by {h.by}</span>
+                  {h.reason && <p className="row__reason">“{h.reason}”</p>}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </>
+      )}
     </>
   )
 }

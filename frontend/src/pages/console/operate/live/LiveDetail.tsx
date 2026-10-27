@@ -10,7 +10,8 @@ import { ToneIcon } from '../../../../components/console/StatusPill'
 import { useToast } from '../../../../components/console/Toast'
 import { WaitTimer } from '../../../../components/console/WaitTimer'
 import { Button } from '../../../../components/ui/Button'
-import { Modal } from '../../../../components/ui/Dialog'
+import { ConfirmDialog, Modal } from '../../../../components/ui/Dialog'
+import { OperatorPanel } from '../../../../components/voice/OperatorPanel'
 import { languageName, timeOfDay } from '../shared'
 import { GuideForm, TransferForm } from './Forms'
 import { CallClock, RowPills } from './parts'
@@ -69,6 +70,11 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
   const [busy, setBusy] = useState<'take' | 'callback' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [handing, setHanding] = useState(false)
+  // The voice server: staff join calls in the browser, and the agent can be stopped or the call ended.
+  const voice = !!client.joinLiveCall
+  const [joinAs, setJoinAs] = useState<'listen' | 'takeover' | null>(null)
+  const [ending, setEnding] = useState<'confirm' | 'busy' | null>(null)
+  const [endError, setEndError] = useState<string | null>(null)
 
   const f = factsOf(item)
   const call = item.call
@@ -99,7 +105,11 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
         by = c.takenBy
       }
       if (by && by !== user.name) toast.show({ message: `${by} has this call.`, tone: 'warn' })
-      else toast.show({ message: `You took the call${name ? ` from ${name}` : ''}. Your desk phone rings.${client.isDemo ? ' (In the demo nothing rings.)' : ''}`, tone: 'ok' })
+      else if (voice && call) {
+        // The agent puts the caller on hold; this browser joins and takes over.
+        setJoinAs('takeover')
+        toast.show({ message: `Joining the call${name ? ` with ${name}` : ''} in your browser.`, tone: 'ok' })
+      } else toast.show({ message: `You took the call${name ? ` from ${name}` : ''}. Your desk phone rings.${client.isDemo ? ' (In the demo nothing rings.)' : ''}`, tone: 'ok' })
       // The button goes: keep focus in this call.
       requestAnimationFrame(() => heading.current?.focus())
     } catch (err) {
@@ -133,9 +143,33 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
     }
   }
 
+  async function endCall() {
+    if (!call) return
+    setEnding('busy')
+    setEndError(null)
+    try {
+      await client.endLiveCall!(org.orgSlug, call.id)
+      setEnding(null)
+      toast.show({ message: 'The call has ended.', tone: 'ok' })
+      onRefresh()
+    } catch (err) {
+      setEnding('confirm')
+      setEndError(asAuthError(err).message)
+    }
+  }
+
+  async function stopAgent() {
+    if (!call) return
+    try {
+      onCall(await client.interruptLiveCall!(org.orgSlug, call.id))
+    } catch (err) {
+      setError(asAuthError(err).message)
+    }
+  }
+
   useShortcuts({
     ...(canTake ? { t: { description: 'Take the call', run: () => void take() } } : {}),
-    ...(canGuide ? { g: { description: 'Guide the agent: go to the note box', run: () => guideField.current?.focus() } } : {}),
+    ...(canGuide ? { g: { description: client.sayToCaller ? 'Say something to the caller: go to the box' : 'Guide the agent: go to the note box', run: () => guideField.current?.focus() } } : {}),
     ...(canHand ? { h: { description: 'Hand the call to a colleague', run: () => setHanding(true) } } : {}),
   })
 
@@ -252,7 +286,7 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
           )}
           {canGuide && (
             <Button variant="line" size="sm" disabled={!!busy} aria-keyshortcuts="g" onClick={() => guideField.current?.focus()}>
-              Guide the agent <kbd className="kbd" aria-hidden="true">G</kbd>
+              {client.sayToCaller ? 'Say something' : 'Guide the agent'} <kbd className="kbd" aria-hidden="true">G</kbd>
             </Button>
           )}
           {canHand && (
@@ -267,13 +301,38 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
           )}
         </div>
       )}
-      {canAct && live && !f.takenBy && (
+      {canAct && live && voice && call &&
+        section(
+          'Join the call',
+          <>
+            <OperatorPanel key={`${call.id}-${joinAs ?? 'idle'}`} autoJoin={joinAs ?? undefined} getTicket={(mode) => client.joinLiveCall!(org.orgSlug, call.id, mode)} onLeft={() => setJoinAs(null)} />
+            {client.endLiveCall && (
+              <div className="live-actions live-actions--quiet" role="group" aria-label="Without joining">
+                <Button variant="line" size="sm" onClick={() => void stopAgent()}>
+                  Stop the agent talking
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setEndError(null)
+                    setEnding('confirm')
+                  }}
+                >
+                  End the call
+                </Button>
+              </div>
+            )}
+          </>,
+          'join',
+        )}
+      {canAct && live && !voice && !f.takenBy && (
         <p className="live-listen">
           <Button variant="line" size="sm" className="btn--inactive" aria-disabled aria-describedby={`${uid}-listen`}>
             Listen in
           </Button>{' '}
           <span className="field__hint" id={`${uid}-listen`}>
-            Listening needs AICA’s voice servers: not available yet.
+            Listening needs AICA’s voice servers: not available in the demo.
           </span>
         </p>
       )}
@@ -318,7 +377,7 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
       )}
 
       {section(
-        'Notes to the agent',
+        client.sayToCaller ? 'Say something to the caller' : 'Notes to the agent',
         <>
           {call && call.whispers.length > 0 ? (
             <ul className="op-whispers" aria-label="Notes to the agent, oldest first">
@@ -335,9 +394,10 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
             <GuideForm
               callId={call.id}
               inputRef={guideField}
+              aloud={!!client.sayToCaller}
               onSent={(c) => {
                 onCall(c)
-                toast.show({ message: 'Sent to the agent. The caller doesn’t hear it.', tone: 'ok' })
+                toast.show({ message: client.sayToCaller ? 'The agent is saying it to the caller.' : 'Sent to the agent. The caller doesn’t hear it.', tone: 'ok' })
                 onRefresh()
               }}
             />
@@ -346,6 +406,20 @@ export function LiveDetail({ item, canAct, mayShowPersonal, team, onHandoff, onC
         </>,
         'notes',
       )}
+
+      <ConfirmDialog
+        open={!!ending}
+        title="End this call?"
+        confirmLabel="End the call"
+        busyLabel="Ending…"
+        busy={ending === 'busy'}
+        danger
+        error={endError}
+        onConfirm={() => void endCall()}
+        onCancel={() => setEnding(null)}
+      >
+        <p>The caller is disconnected at once. To speak to them first, join the call instead.</p>
+      </ConfirmDialog>
 
       {call && (
         <Modal open={handing} title="Hand the call to a colleague" onClose={() => setHanding(false)}>

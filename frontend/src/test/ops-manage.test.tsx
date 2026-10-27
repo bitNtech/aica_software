@@ -26,6 +26,19 @@ describe('Ops pages for every organisation', () => {
     for (const l of ['Agents', 'Calls', 'Team', 'Settings', 'Billing']) expect(within(manage).getByRole('link', { name: l })).toBeInTheDocument()
   })
 
+  it('still opens an organisation the sample usage data doesn’t know', async () => {
+    const ops = createDemoOpsClient({ latency: 0 })
+    ops.getOrgDetail = () => Promise.reject(new Error('That organisation doesn’t exist any more.'))
+    const view = renderApp('/ops/orgs/arogya-demo', { opsClient: ops })
+    await signIn(view.user, 'master@example.com')
+    const manage = await screen.findByRole('navigation', { name: /manage arogya/i })
+    expect(within(manage).getByRole('link', { name: 'Agents' })).toBeInTheDocument()
+    expect(screen.getByText(/usage figures, the team, processing jobs and status history aren’t available/i)).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'New agent' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Voice server' })).toBeInTheDocument()
+    expect(screen.queryByText(/couldn't load this organisation/i)).not.toBeInTheDocument()
+  })
+
   it('shows callers to the master admin, and hides them from staff', async () => {
     await open('master@example.com', '/ops/calls')
     const table = await screen.findByRole('table', undefined, { timeout: 4000 })

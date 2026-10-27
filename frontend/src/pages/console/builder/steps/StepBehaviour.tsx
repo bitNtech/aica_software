@@ -8,6 +8,7 @@ import { Alert } from '../../../../components/ui/Alert'
 import { ChoiceGroup } from '../../../../components/ui/Choice'
 import { SelectField, TextAreaField, TextField } from '../../../../components/ui/Field'
 import { Switch } from '../../../../components/ui/Switch'
+import { VoicePreview } from '../../../../components/voice/VoicePreview'
 import { useAsync, type Async } from '../../../../lib/useAsync'
 import { ListEditor } from '../ListEditor'
 import { ErrorSummary, type StepErrors, type StepProps } from '../StepShared'
@@ -100,6 +101,7 @@ export function BehaviourEditor({
 }) {
   const set = (patch: Partial<BotBehaviour>) => onChange({ ...b, ...patch })
   const id = useId()
+  const client = useConsole()
   return (
     <>
       <section className="step__section step__narrow">
@@ -174,7 +176,7 @@ export function BehaviourEditor({
         ) : (
           <ChoiceGroup
             legend="Voice"
-            hint="Voice previews arrive once AICA is connected to its voice servers."
+            hint={client.previewVoice ? 'Hear the chosen voice with the button below the list.' : 'Voice previews arrive once AICA is connected to its voice servers.'}
             type="radio"
             columns={2}
             error={errors.voice}
@@ -186,6 +188,9 @@ export function BehaviourEditor({
             value={[b.voiceId]}
             onChange={([v]) => set({ voiceId: v })}
           />
+        )}
+        {voices.state === 'ready' && voices.data.some((v) => v.id === b.voiceId) && (
+          <VoicePreview voiceId={b.voiceId} voiceName={voices.data.find((v) => v.id === b.voiceId)!.name} text={b.greeting} />
         )}
         <div className="step__narrow step__after">
           <SelectField label="Speaking speed" value={b.rate} options={RATES} onChange={(e) => set({ rate: e.target.value as SpeakingRate })} />

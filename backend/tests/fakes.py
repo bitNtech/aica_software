@@ -517,11 +517,17 @@ def make_services(**overrides) -> tuple[Services, FakeFirebase, MemoryStore, Fak
     from app.data.vault import SecretBox
 
     fb, store, mailer = FakeFirebase(), MemoryStore(), FakeMailer()
+    from .fakeorch import BASE, KEY, FakeOrch
+
+    overrides = {"orch_base_url": BASE, "orch_api_key": KEY, "orch_webhook_secret": "whsec_test", **overrides}
     settings = Settings(_env_file=None, app_url="http://localhost:5173", allowed_origins="http://localhost:5173", firebase_web_api_key="x", **overrides)
+    fake_orch = FakeOrch()
     svc = Services(
         settings=settings, admin=fb, identity=fb, store=store, mailer=mailer, google=FakeGoogle(fb.google_users),
         secrets=SecretBox(TEST_SECRETS_KEY), blobs=FakeBlobs(),
         # No real network in tests: every name is a public address, and requests are refused unless a test sets a transport.
         resolve=lambda host, port: ["93.184.216.34"],
+        orch=fake_orch.orchestrator() if settings.orchestrator_enabled else None,
     )
+    svc.fake_orch = fake_orch  # tests reach the orchestrator's state through it
     return svc, fb, store, mailer

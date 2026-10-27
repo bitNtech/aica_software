@@ -48,9 +48,11 @@ backend/
     auth/            sessions (cookie + route guards), identity (Firebase Auth, Google), accounts, passwords
     access/          permissions.py + permissions.json (role table, shared with the frontend), orgs (the /api/orgs/{slug} guard)
     data/            store (Firestore), blobs (Cloud Storage), vault (encrypted system secrets)
-    domain/          rules that aren't storage or HTTP: agentspec, catalogue(.json), rollups (report counters), usage, redact
-    integrations/    outgoing calls to other services: mailer (Resend), toolhttp (SSRF-guarded tool tests)
-    routes/          HTTP endpoints; routes/org/ is everything under /api/orgs/{slug}
+    domain/          rules that aren't storage or HTTP: agentspec, catalogue(.json), rollups (report counters), usage, redact,
+                     agentcompile (an agent setup as LLM and voice agents), voicecalls (the voice server's calls in our shapes)
+    integrations/    outgoing calls to other services: mailer (Resend), toolhttp (SSRF-guarded tool tests),
+                     orchestrator (the voice server's client), voicesync (agents' copies on the voice server)
+    routes/          HTTP endpoints; routes/org/ is everything under /api/orgs/{slug}; hooks (signed events), ops_voice
     scripts/         one-off commands: python -m app.scripts.<name>
   firestore/         indexes.json and firestore.rules
   tests/             pytest; fakes.py and orgkit.py are the shared helpers
@@ -80,6 +82,9 @@ backend/
 | `ALLOWED_ORIGINS` | Frontend origins allowed to call the API with cookies (CORS) and to make writes, comma-separated. Defaults to `APP_URL`'s origin |
 | `COOKIE_SECURE` | `true` behind HTTPS (required in production). Defaults to `true` on Vercel |
 | `LOG_FORMAT` | `text` (default locally) or `json` (default on Vercel): one JSON object per line, with a request id, route template, status, duration, caller uid and organisation slug. Logs never hold emails, names, phone numbers, tokens or request bodies |
+| `ORCH_BASE_URL`, `ORCH_API_KEY` | The voice orchestrator and a platform admin key for it ([`docs/orchestrator-contract.md`](../docs/orchestrator-contract.md)). Server-side only; the browser gets short-lived call tokens. Empty: publishing to the voice server, test calls and live calls are off |
+| `ORCH_WEBHOOK_SECRET` | The orchestrator's `ORCH_WEBHOOKS__SECRET`, to verify call and handoff events at `/api/hooks/orchestrator`. Events also need a public https `API_URL`; without them, Call history pulls finished calls when it's opened |
+| `ORCH_TIMEOUT_S` | Seconds per orchestrator request, default 15 |
 | `COOKIE_SAMESITE` | `lax` (default). Works when the frontend and API share a site, e.g. `aica.bitntech.in` and `api.aica.bitntech.in`. `none` needs `COOKIE_SECURE=true` and breaks in browsers that block third-party cookies |
 
 The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/cicd.md) for hosts and per-environment values. Explicit values always win.
@@ -127,6 +132,17 @@ The frontend and this API are deployed separately. See [`docs/cicd.md`](../docs/
 | GET/POST | `/api/orgs/{slug}/agents`, `/agents/{id}`, `/publish`, `/discard`, `/rollback`, `/settings`, `/delete`, `/scenarios…` | see `routes/org/agents.py`: list for members; open with `agents.view`/`test`/`configure`; edit `agents.configure` (structure: master admin); publish `agents.publish`; delete master admin |
 | GET/POST | `/api/orgs/{slug}/drafts`, `/drafts/{id}`, `/discard`, `/publish` | master admin only. Publishing is safe to retry |
 | GET | `/api/catalogue/agent-types`, `/api/catalogue/voices` | anyone signed in |
+| GET | `/api/catalogue/models`, `/api/catalogue/voices/live` | anyone signed in. The voice server's enabled models and its TTS voices |
+| GET/POST | `/api/orgs/{slug}/agents/{id}/voice`, `/voice/sync` | see `routes/org/voice.py`: the agent's copies on the voice server (`agents.view`/`test`/`configure`); send the published version again (`agents.publish`) |
+| POST | `/api/orgs/{slug}/agents/{id}/voice-token` (`{"target": "test" \| "live"}`), `/drafts/{id}/voice-token`, `/voice/calls/{id}/transcript` (GET) | `agents.test` (drafts: master admin). A ten-minute browser token for a test call; staff can't start one |
+| POST | `/api/orgs/{slug}/agents/{id}/scenarios/run` | `agents.test`. Runs every scenario as text against the saved setup |
+| POST | `/api/orgs/{slug}/voice/preview` | `agents.configure` or `agents.test`. A WAV sample in the agent's voice, 10 a minute |
+| GET | `/api/orgs/{slug}/live-calls`, `/live-calls/{id}` | `calls.viewAll` or `calls.take`. Calls on the voice server now, with the transcript so far |
+| POST | `/api/orgs/{slug}/live-calls/{id}/end`, `/interrupt`, `/say`, `/handoff`, `/release`, `/operator-token` | `calls.take`, not bitNtech staff |
+| POST | `/api/orgs/{slug}/calls/sync` | `calls.viewAll`. Brings finished calls into Call history (once each) |
+| POST | `/api/hooks/orchestrator` | the orchestrator, signed (HMAC). Call ended, handoff requested/accepted/released/timeout |
+| GET | `/api/ops/voice/status`, `/voice/models`, `/voice/sessions`, `/api/ops/orgs/{slug}/voice` | bitNtech staff and master admin |
+| GET/POST | `/api/ops/voice/config`, `/config/schema`, `/config/history`, `/config/replace`, `/config/reset`, `/presets`, `/presets/{name}/apply`, `/models`, `/models/{kind}/{id}/switch`, `/asr/{name}/load\|unload`, `/upstreams/{llm\|tts}/test`, `/reload/{component}`, `/admission`, `/sessions/{id}/end`, `/api/ops/orgs/{slug}/voice` (POST) | master admin only. Writes carry the version loaded (`conflict` when stale), support `dryRun`, and go to the audit log |
 | POST | `/api/leads/demo` | anyone, from an allowed origin. The landing page's demo form: validated, emailed to `DEMO_REQUEST_TO` through Resend, not stored. 204 when sent, 503 when Resend fails, 5 per minute per IP. A filled-in `website` honeypot gets 204 and is dropped |
 | GET | `/api/ops/orgs`, `/api/ops/signup-requests` | bitNtech staff and master admin |
 | POST | `/api/ops/signup-requests/{slug}/approve`, `/decline` | bitNtech staff and master admin |

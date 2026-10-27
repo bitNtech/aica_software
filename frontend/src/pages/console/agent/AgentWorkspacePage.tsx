@@ -325,6 +325,19 @@ function AgentWorkspace({ agentId }: { agentId: string }) {
         {notice ?? ''}
       </p>
 
+      {detail.voice?.status === 'failed' && (
+        <Alert tone="warn" title="The voice server didn’t get the last version">
+          <p>
+            {detail.voice.error} Callers still get what was there before.{' '}
+            {tab !== 'settings' && (
+              <Link className="link" to={`${base}/settings`}>
+                Check it in Settings
+              </Link>
+            )}
+          </p>
+        </Alert>
+      )}
+
       {hasChanges && (
         <div className="ws__changes" role="region" aria-labelledby={`${id}-changes`}>
           <p id={`${id}-changes`}>

@@ -13,6 +13,7 @@ from ..data.blobs import Blobs
 from ..data.store import FirestoreStore, Store
 from ..data.vault import SecretBox, SecretsUnavailable
 from ..integrations.mailer import Mailer
+from ..integrations.orchestrator import Orchestrator
 from .config import Settings
 
 log = logging.getLogger("aica")
@@ -33,6 +34,8 @@ class Services:
     # Tests replace both (app/integrations/toolhttp.py).
     resolve: object = None
     tool_transport: object = None
+    # The voice orchestrator; None when ORCH_BASE_URL / ORCH_API_KEY aren't set.
+    orch: Orchestrator | None = None
 
 
 def build_services(settings: Settings) -> Services:
@@ -67,6 +70,13 @@ def build_services(settings: Settings) -> Services:
         blobs = Blobs(storage.bucket(settings.storage_bucket, app=app))
     else:
         log.warning("STORAGE_BUCKET not set: recordings and knowledge files can't be uploaded")
+    orch = None
+    if settings.orchestrator_enabled:
+        orch = Orchestrator(settings.orch_base_url, settings.orch_api_key, timeout=settings.orch_timeout_s)
+    else:
+        log.warning("ORCH_BASE_URL / ORCH_API_KEY not set: voice agents, test calls and live calls are off")
+    if orch and not settings.orch_webhook_secret:
+        log.warning("ORCH_WEBHOOK_SECRET not set: call and handoff events can't be received (call sync still works)")
     return Services(
         settings=settings,
         admin=FirebaseAdmin(app),
@@ -76,6 +86,7 @@ def build_services(settings: Settings) -> Services:
         google=google,
         secrets=box,
         blobs=blobs,
+        orch=orch,
     )
 
 

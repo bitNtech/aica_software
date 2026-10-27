@@ -1,0 +1,51 @@
+/* /ops/voice: the voice server's control plane. */
+.vops { display: grid; gap: 1rem; }
+.vops__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.6rem; }
+.vops__kpi { display: grid; gap: 0.2rem; padding: 0.75rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface-1); }
+.vops__kpi-label { font-size: var(--fs-xs); color: var(--muted); }
+.vops__kpi strong { font: 600 var(--fs-lg)/1.2 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.vops__table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.vops__table th, .vops__table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.vops__table thead th { font-weight: 500; color: var(--muted); }
+.vops__table tbody th { font-weight: 500; color: var(--ink); }
+.vops__detail { color: var(--text); }
+.vops__actions { display: grid; justify-items: start; gap: 0.35rem; }
+.vops__presets { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.vops__presets li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: var(--r-md); }
+.vops__presets strong { text-transform: capitalize; color: var(--ink); }
+.vops__presets .row__meta { flex: 1 1 12rem; }
+.vops__history { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.vops__history li { display: grid; gap: 0.2rem; padding: 0.55rem 0.75rem; border-left: 3px solid var(--line-strong); }
+.vops__json { white-space: pre-wrap; word-break: break-all; color: var(--text); }
+
+/* The settings editor. */
+.vset { display: grid; gap: 0.75rem; }
+.vset__tools { display: grid; gap: 0.3rem; max-width: 36rem; }
+.vset__section { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--surface-1); }
+.vset__section > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.7rem; padding: 0.75rem 0.9rem; cursor: pointer; }
+.vset__section > summary:focus-visible { outline: 2px solid var(--orange-text); outline-offset: 2px; border-radius: var(--r-card); }
+.vset__section[open] > summary { border-bottom: 1px solid var(--line); }
+.vset__section > .field__hint, .vset__section > .btn-text { margin: 0.6rem 0.9rem; }
+.vset__title { font-weight: 600; color: var(--ink); text-transform: capitalize; }
+.vset__apply { font-size: var(--fs-xs); color: var(--muted); }
+.vset__fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.9rem 1.2rem; padding: 0.9rem; }
+.vset__group { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.9rem 1.2rem; margin: 0; padding: 0.7rem 0.8rem; border: 1px dashed var(--line); border-radius: var(--r-md); }
+.vset__group > legend { padding: 0 0.3rem; font-weight: 500; color: var(--ink); text-transform: capitalize; }
+.vset__group > .field__hint { grid-column: 1 / -1; margin: 0; }
+.vset__field { display: grid; align-content: start; gap: 0.3rem; min-width: 0; }
+.vset__field .field__label { text-transform: capitalize; }
+.vset__field.is-changed .field__input { border-color: var(--orange); }
+.vset__marks { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
+.vset__num { max-width: 12rem; }
+.vset__check { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--ink); }
+.vset__secret { margin: 0; color: var(--text); }
+.vset__save {
+  position: sticky; bottom: 0; z-index: 1; display: grid; gap: 0.5rem;
+  padding: 0.8rem 0.9rem; border: 1px solid var(--line-strong); border-radius: var(--r-card); background: var(--surface-2); box-shadow: var(--elev, none);
+}
+@media (max-width: 40rem) {
+  .vops__table thead { display: none; }
+  .vops__table tr { display: grid; gap: 0.2rem; padding: 0.5rem 0; border-bottom: 1px solid var(--line); }
+  .vops__table th, .vops__table td { border: 0; padding: 0.1rem 0; }
+  .vset__fields, .vset__group { grid-template-columns: 1fr; }
+}

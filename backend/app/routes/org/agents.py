@@ -16,7 +16,11 @@ demo client (frontend/src/console/demoClient.ts).
   "conflict") instead of overwriting someone else's work.
 - Publishing a draft is safe to retry: the draft remembers the agent it
   became.
-- Running scenarios and reading a flow from calls are AI work, not here.
+- Publishing, rolling back and renaming also bring the agent's copies on
+  the voice stack up to date (app/integrations/voicesync.py); a failed sync
+  is shown on the agent and doesn't undo the publish. Pausing disables its
+  voice agent; deleting removes its copies.
+- Running scenarios and test calls are in routes/org/voice.py.
 """
 from __future__ import annotations
 
@@ -33,6 +37,7 @@ from ...data.store import AgentDoc, DraftDoc, ScenarioDoc, Tx, VersionDoc, new_i
 from ...domain.agentspec import SpecField, locked
 from ...domain.catalogue import AGENT_TYPES, VOICES, default_analysis, default_behaviour, default_context, default_guardrails, default_pipeline, default_speech, sub_type
 from ...domain.rollups import calls_this_week, window
+from ...integrations import voicesync
 from ...models import Camel
 
 router = APIRouter(prefix="/api/orgs/{slug}", tags=["org"])
@@ -166,6 +171,7 @@ def detail_out(ctx: OrgContext, a: AgentDoc) -> dict:
         "working": a.working,
         "versions": [{"version": v.version, "publishedAt": iso(v.publishedAt), "publishedBy": v.publishedBy, "note": v.note, "spec": v.spec} for v in versions],
         "revision": a.revision,
+        "voice": voicesync.voice_out(a),
     }
 
 
@@ -261,7 +267,8 @@ def publish(agent_id: str, body: NoteIn, ctx: OrgContext = Depends(org_member)):
         ctx.log(tx, "agents", f"Published {a.name}, version {a.version}", note[:500])
         return a
 
-    return detail_out(ctx, ctx.svc.store.transact(run))
+    a = ctx.svc.store.transact(run)
+    return detail_out(ctx, voicesync.sync_live(ctx.svc, ctx.org, a))
 
 
 @router.post("/agents/{agent_id}/discard", dependencies=[WRITE_LIMIT])
@@ -304,7 +311,8 @@ def rollback(agent_id: str, body: RollbackIn, ctx: OrgContext = Depends(org_memb
         ctx.log(tx, "agents", f"Rolled {a.name} back to version {body.version}", f"Published as version {a.version}.")
         return a
 
-    return detail_out(ctx, ctx.svc.store.transact(run))
+    a = ctx.svc.store.transact(run)
+    return detail_out(ctx, voicesync.sync_live(ctx.svc, ctx.org, a))
 
 
 @router.post("/agents/{agent_id}/settings", dependencies=[WRITE_LIMIT])
@@ -361,9 +369,17 @@ def update_agent(agent_id: str, body: AgentPatchIn, ctx: OrgContext = Depends(or
             ctx.log(tx, "agents", f"Renamed {was_name} to {a.name}")
         if a.status != was_status:
             ctx.log(tx, "agents", f"{'Paused' if a.status == 'paused' else 'Turned on'} {a.name}")
-        return a
+        return a, was_name, was_status
 
-    return detail_out(ctx, ctx.svc.store.transact(run))
+    a, was_name, was_status = ctx.svc.store.transact(run)
+    live = (a.voice or {}).get("live") or {}
+    if live.get("voiceAgentId"):
+        if a.name != was_name:
+            # The copies carry the name: write them again.
+            a = voicesync.sync_live(ctx.svc, ctx.org, a, force=True)
+        elif a.status != was_status:
+            a = voicesync._save_state(ctx.svc, ctx.slug, a.id, "live", voicesync.set_status(ctx.svc, ctx.org, live, a.status == "live")) or a
+    return detail_out(ctx, a)
 
 
 @router.post("/agents/{agent_id}/delete", status_code=204, dependencies=[WRITE_LIMIT])
@@ -381,7 +397,10 @@ def delete_agent(agent_id: str, ctx: OrgContext = Depends(org_member)):
         tx.delete_record(ctx.slug, "agent", a.id)
         ctx.log(tx, "agents", f"Deleted the agent {a.name}")
 
+    gone = ctx.svc.store.get_record(ctx.slug, "agent", agent_id)
     ctx.svc.store.transact(run)
+    for state in ((gone.voice or {}).values() if gone else ()):
+        voicesync.remove(ctx.svc, ctx.org, state)
     # Its versions and scenarios go after: there can be more than one
     # transaction may write (500), and left over they'd only be unused.
     for kind in ("version", "scenario"):
@@ -440,8 +459,9 @@ def save_draft(draft_id: str, body: SaveDraftIn, ctx: OrgContext = Depends(org_m
 @router.post("/drafts/{draft_id}/discard", status_code=204, dependencies=[WRITE_LIMIT])
 def discard_draft(draft_id: str, ctx: OrgContext = Depends(org_member)):
     _allow_master(ctx, "discard drafts")
-    _draft(ctx.svc.store, ctx.slug, draft_id)
+    d = _draft(ctx.svc.store, ctx.slug, draft_id)
     ctx.svc.store.delete_record(ctx.slug, "draft", draft_id)
+    voicesync.remove(ctx.svc, ctx.org, d.voice or {})
 
 
 @router.post("/drafts/{draft_id}/publish", dependencies=[WRITE_LIMIT])
@@ -489,6 +509,14 @@ def publish_draft(draft_id: str, body: PublishDraftIn, ctx: OrgContext = Depends
         return a
 
     a = ctx.svc.store.transact(run)
+    if not (a.voice or {}).get("live"):
+        a = voicesync.sync_live(ctx.svc, ctx.org, a)
+        d = ctx.svc.store.get_record(ctx.slug, "draft", draft_id)
+        if d and d.voice:
+            # Its test copy was for building; the agent gets its own.
+            voicesync.remove(ctx.svc, ctx.org, d.voice)
+            d.voice = {}
+            ctx.svc.store.save_record(ctx.slug, "draft", d)
     numbers = {n.id: n for n in ctx.svc.store.list_records(ctx.slug, "number")}
     return summary_out(a, numbers, {})
 

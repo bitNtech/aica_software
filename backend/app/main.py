@@ -13,7 +13,7 @@ from .core import logs
 from .core.config import Settings, get_settings
 from .core.errors import ApiError, api_error_handler, validation_handler
 from .core.services import Services, build_services
-from .routes import auth, google, invites, leads, ops, org
+from .routes import auth, google, hooks, invites, leads, ops, ops_voice, org
 
 log = logging.getLogger("aica")
 
@@ -36,7 +36,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         """Cookie sessions + state-changing requests: refuse any write whose
         Origin isn't the console's (CSRF). SameSite=Lax already blocks most
         of this; the check covers older browsers and subdomain tricks."""
-        if request.method in UNSAFE and request.url.path.startswith("/api/"):
+        # Server-to-server events carry their own signature, not a browser's Origin.
+        if request.method in UNSAFE and request.url.path.startswith("/api/") and not request.url.path.startswith("/api/hooks/"):
             origin = (request.headers.get("origin") or "").rstrip("/")
             if origin not in settings.origins:
                 return JSONResponse({"error": {"code": "forbidden", "message": "Request blocked: unexpected origin."}}, status_code=403)
@@ -80,6 +81,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     app.include_router(invites.router)
     app.include_router(leads.router)
     app.include_router(ops.router)
+    app.include_router(ops_voice.router)
+    app.include_router(hooks.router)
     for r in org.routers:
         app.include_router(r)
     return app

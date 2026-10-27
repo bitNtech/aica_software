@@ -81,8 +81,55 @@ describe('the library and agents over HTTP', () => {
 
   it('says plainly what needs the AI pipeline', async () => {
     const c = client()
-    await expect(c.runScenarios('o', 'agt_1')).rejects.toThrow(/needs the AI pipeline/)
     await expect(c.extractFlow('o', 'draft_1')).rejects.toThrow(/needs the AI pipeline/)
+  })
+
+  it('reaches the voice server through the API, never with a key', async () => {
+    const f = vi.fn().mockImplementation(async () => json({}))
+    vi.stubGlobal('fetch', f)
+    const c = createHttpConsoleClient('', createDemoConsoleClient({ latency: 0 }), ['agents', 'live', 'calls'])
+    await c.runScenarios('o', 'agt_1')
+    await c.getAgentVoice!('o', 'agt_1')
+    await c.resyncAgentVoice!('o', 'agt_1')
+    await c.startTestCall!('o', 'agt_1', 'test')
+    await c.startDraftTestCall!('o', 'draft_1')
+    await c.getTestCallTranscript!('o', 'call_1')
+    await c.listLiveCalls('o')
+    await c.sayToCaller!('o', 'call_1', 'One moment')
+    await c.interruptLiveCall!('o', 'call_1')
+    await c.endLiveCall!('o', 'call_1')
+    await c.releaseLiveCall!('o', 'call_1', true)
+    await c.joinLiveCall!('o', 'call_1', 'takeover')
+    await c.takeOverCall('o', 'call_1')
+    await c.syncCalls!('o')
+    expect(calls(f).map(([u, m]) => `${m} ${u}`)).toEqual([
+      'POST /api/orgs/o/agents/agt_1/scenarios/run',
+      'GET /api/orgs/o/agents/agt_1/voice',
+      'POST /api/orgs/o/agents/agt_1/voice/sync',
+      'POST /api/orgs/o/agents/agt_1/voice-token',
+      'POST /api/orgs/o/drafts/draft_1/voice-token',
+      'GET /api/orgs/o/voice/calls/call_1/transcript',
+      'GET /api/orgs/o/live-calls',
+      'POST /api/orgs/o/live-calls/call_1/say',
+      'POST /api/orgs/o/live-calls/call_1/interrupt',
+      'POST /api/orgs/o/live-calls/call_1/end',
+      'POST /api/orgs/o/live-calls/call_1/release',
+      'POST /api/orgs/o/live-calls/call_1/operator-token',
+      'POST /api/orgs/o/live-calls/call_1/handoff',
+      'POST /api/orgs/o/calls/sync',
+    ])
+    const bodies = calls(f).map(([, , b]) => (b ? JSON.parse(b as string) : undefined))
+    expect(bodies[3]).toEqual({ target: 'test' })
+    expect(bodies[11]).toEqual({ mode: 'takeover' })
+    expect(bodies[10]).toEqual({ resumeAi: true })
+  })
+
+  it('gets a voice sample as a file', async () => {
+    const f = vi.fn().mockImplementation(async () => new Response('RIFF', { status: 200, headers: { 'Content-Type': 'audio/wav' } }))
+    vi.stubGlobal('fetch', f)
+    const blob = await client().previewVoice!('o', 'kavya', 'Vanakkam')
+    expect(blob.size).toBe(4)
+    expect(calls(f)[0]).toEqual(['/api/orgs/o/voice/preview', 'POST', JSON.stringify({ voiceId: 'kavya', text: 'Vanakkam' })])
   })
 })
 
